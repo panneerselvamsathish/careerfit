@@ -60,8 +60,7 @@ class LearningStep(BaseModel):
     estimated_weeks: int | None
 
 class GapAnalysisFacts(BaseModel):
-
-    resume_source: str
+    model_config = ConfigDict(frozen=True)
     jd_source: str
     analyzed_at: datetime
     llm_used: bool
