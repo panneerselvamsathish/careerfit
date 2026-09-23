@@ -31,7 +31,7 @@ def test_skill_observation_not_assessed_rejects_confidence():
         SkillObservation(skill="test", status=SkillStatus.NOT_ASSESSED,confidence=0.5) # type: ignore[call-arg]
 
 def test_skill_observation_valid_matched():
-    SkillObservation(skill="test", status=SkillStatus.MATCHED, jd_evidence=Provenance(source="jd", locator="test", retrieved_at=datetime.now()))
+    SkillObservation(skill="test", status=SkillStatus.MATCHED, resume_evidence=Provenance(source="resume", locator="experience[0]", retrieved_at=datetime.now()))
 
 def test_skill_observation_matched_requires_evidence():
     with pytest.raises(ValidationError):
