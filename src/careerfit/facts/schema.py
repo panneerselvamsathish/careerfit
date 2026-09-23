@@ -30,9 +30,10 @@ class SkillObservation(BaseModel):
 
     @model_validator(mode="after")
     def check_evidence(self) -> "SkillObservation":
-        if self.status in (SkillStatus.MATCHED, SkillStatus.GAP):
-            if self.jd_evidence is None and self.resume_evidence is None:
-                raise ValueError("at least one evidence (jd_evidence or resume_evidence) must be provided")
+        if self.status == SkillStatus.MATCHED and self.resume_evidence is None:
+            raise ValueError("matched status requires resume_evidence")
+        if self.status == SkillStatus.GAP and self.jd_evidence is None:
+            raise ValueError("gap status requires jd_evidence")
         return self
 
     @model_validator(mode="after")
