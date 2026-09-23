@@ -33,7 +33,7 @@ not conventions, not comments. A build constraint.
 ## Milestones
 
 - [x] Milestone 1: Scaffold — uv, src layout, AST boundary enforcement
-- [ ] Milestone 2: Facts schema — Pydantic v2 models, five-status enum, model validators
+- [x] Milestone 2: Facts schema — Pydantic v2 models, five-status enum, model validators
 - [ ] Milestone 3: Ingest — PDF + plain text parsing, Coverage builder
 - [ ] Milestone 4: Analyze — pure skill extraction, keyword gap computation
 - [ ] Milestone 5: Evals — honesty invariants + golden expectations (two-layer eval design)
