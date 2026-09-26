@@ -13,14 +13,15 @@ class SkillStatus(str, Enum):
 class Provenance(BaseModel):
     """Audit trail for a single claim. Immutable once created."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
 
     source: Literal["resume", "jd", "derived", "llm_judge"]
     locator: str
     retrieved_at: datetime
 
 class SkillObservation(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     skill: str
     status: SkillStatus
@@ -44,7 +45,7 @@ class SkillObservation(BaseModel):
         return self
 
 class FitScore(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     overall: float = Field(..., ge=0.0, le=1.0)
     must_have_coverage: float = Field(..., ge=0.0, le=1.0)
@@ -52,22 +53,40 @@ class FitScore(BaseModel):
     explanation: str
 
 class LearningStep(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     skill: str
     priority: int
     why_it_matters: str
-    resources: list[str]
+    resources: tuple[str, ...]
     estimated_weeks: int | None
 
+class Coverage(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    source_format: Literal["pdf", "txt"]
+    pages_total: int | None = Field(..., ge=0)
+    pages_with_text: int | None = Field(..., ge=0)
+    chars_extracted: int=Field(..., ge=0)
+    known_blind_spots: tuple[Literal["scanned_pages", "encrypted", "layout_order", "graphics", "tables"], ...]
+
+    @model_validator(mode="after")
+    def check_pages_with_text(self) -> "Coverage":
+        if self.pages_with_text is not None and self.pages_total is not None:
+            if self.pages_with_text > self.pages_total:
+                raise ValueError("pages_with_text cannot be greater than pages_total")
+        return self
 class GapAnalysisFacts(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    resume_source: str
     jd_source: str
     analyzed_at: datetime
     llm_used: bool
     schema_version: str = "0.1.0"
     fit_score: FitScore | None = None
-    skill_observations: list[SkillObservation]
-    learning_steps: list[LearningStep] = []
+    skill_observations: tuple[SkillObservation, ...]
+    learning_steps: tuple[LearningStep, ...] = ()
     perspective: Literal["candidate", "hiring_manager"]
 
     @model_validator(mode="after")
