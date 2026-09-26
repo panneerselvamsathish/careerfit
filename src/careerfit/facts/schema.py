@@ -53,12 +53,12 @@ class FitScore(BaseModel):
     explanation: str
 
 class LearningStep(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     skill: str
     priority: int
     why_it_matters: str
-    resources: list[str]
+    resources: tuple[str, ...]
     estimated_weeks: int | None
 
 class Coverage(BaseModel):
@@ -68,7 +68,7 @@ class Coverage(BaseModel):
     pages_total: int | None = Field(..., ge=0)
     pages_with_text: int | None = Field(..., ge=0)
     chars_extracted: int=Field(..., ge=0)
-    known_blind_spots: list[Literal["scanned_pages", "encrypted", "layout_order", "graphics", "tables"]]
+    known_blind_spots: tuple[Literal["scanned_pages", "encrypted", "layout_order", "graphics", "tables"], ...]
 
     @model_validator(mode="after")
     def check_pages_with_text(self) -> "Coverage":
@@ -76,7 +76,6 @@ class Coverage(BaseModel):
             if self.pages_with_text > self.pages_total:
                 raise ValueError("pages_with_text cannot be greater than pages_total")
         return self
-
 class GapAnalysisFacts(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -86,8 +85,8 @@ class GapAnalysisFacts(BaseModel):
     llm_used: bool
     schema_version: str = "0.1.0"
     fit_score: FitScore | None = None
-    skill_observations: list[SkillObservation]
-    learning_steps: list[LearningStep] = []
+    skill_observations: tuple[SkillObservation, ...]
+    learning_steps: tuple[LearningStep, ...] = ()
     perspective: Literal["candidate", "hiring_manager"]
 
     @model_validator(mode="after")
