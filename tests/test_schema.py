@@ -1,4 +1,6 @@
-import pytest,inspect
+import inspect
+import pytest
+
 from pydantic import BaseModel, ValidationError
 from careerfit.facts import schema 
 from datetime import datetime
