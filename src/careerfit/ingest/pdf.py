@@ -7,12 +7,12 @@ from careerfit.facts.schema import Coverage
 
 
 def read_pdf(path: Path) -> tuple[str, Coverage]:
-    reader = PdfReader(path)
-
+    
     pages_with_text = 0
     pages_without_text = 0
     consolidated_text = ""
     try:
+        reader = PdfReader(path)
         total_pages = len(reader.pages)
     except FileNotDecryptedError as e:
         raise ValueError(f"{path.name} is password-protected. Remove the password and upload it again.") from e
