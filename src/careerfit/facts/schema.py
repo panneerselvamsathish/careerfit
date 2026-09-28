@@ -68,7 +68,7 @@ class Coverage(BaseModel):
     pages_total: int | None = Field(..., ge=0)
     pages_with_text: int | None = Field(..., ge=0)
     chars_extracted: int=Field(..., ge=0)
-    known_blind_spots: tuple[Literal["scanned_pages", "encrypted", "layout_order", "graphics", "tables"], ...]
+    known_blind_spots: tuple[Literal["scanned_pages", "layout_order", "graphics", "tables"], ...]
 
     @model_validator(mode="after")
     def check_pages_with_text(self) -> "Coverage":

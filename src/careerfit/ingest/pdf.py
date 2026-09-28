@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from pypdf import PdfReader
-
+from pypdf.errors import FileNotDecryptedError
 from careerfit.facts.schema import Coverage 
 
 
@@ -12,7 +12,10 @@ def read_pdf(path: Path) -> tuple[str, Coverage]:
     pages_with_text = 0
     pages_without_text = 0
     consolidated_text = ""
-    total_pages = len(reader.pages)
+    try:
+        total_pages = len(reader.pages)
+    except FileNotDecryptedError as e:
+        raise ValueError(f"{path.name} is password-protected. Remove the password and upload it again.") from e
     known_blind_spots=("layout_order","graphics","tables")
 
     for page in reader.pages:
