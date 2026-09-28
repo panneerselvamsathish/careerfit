@@ -143,6 +143,5 @@ def test_read_document_rejects_unsupported_type(tmp_path):
     unsupported_path = tmp_path / "test.docx"
     unsupported_path.write_text("Python and AWS")
 
-    # Ensure that attempting to read an unsupported file type raises a ValueError
     with pytest.raises(ValueError, match="test.docx"):
         text, coverage = read_document(unsupported_path)

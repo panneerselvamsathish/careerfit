@@ -84,13 +84,3 @@ def test_coverage_rejects_unknown_blind_spot():
 def test_coverage_requires_blind_spots():
     with pytest.raises(ValidationError):
         schema.Coverage(source_format="pdf", pages_total=3, pages_with_text=2, chars_extracted=100) # type: ignore[call-arg]
-
-
-'''@pytest.mark.parametrize("model,kwargs", [
-    (FitScore, {"overall": 0.5, "must_have_coverage": 0.5, "nice_to_have_coverage": 0.5, "explanation": "test"}),
-    (Coverage, {"source_format": "pdf", "pages_total": 3, "pages_with_text": 2, "chars_extracted": 100, "known_blind_spots": ['scanned_pages']}),
-    (SkillObservation, {"skill": "test", "status": SkillStatus.MATCHED, "resume_evidence": Provenance(source="resume", locator="experience[0]", retrieved_at=datetime.now())}),
-    (LearningStep, {"skill": "test", "priority": 1, "why_it_matters": "needed", "resources": (), "estimated_weeks": 4}),
-    (GapAnalysisFacts, {"llm_used": True, "fit_score": None, "resume_source": "test", "jd_source": "jd test", "analyzed_at": datetime.now(), "skill_observations": [], "perspective": "candidate"}),
-])'''
-
