@@ -1,4 +1,5 @@
 import pytest
+from careerfit.ingest.document import read_document
 from careerfit.ingest.text import read_text
 from careerfit.facts.schema import Coverage
 from careerfit.ingest.pdf import read_pdf
@@ -93,4 +94,55 @@ def test_read_pdf_password_protected_raises_clear_error(tmp_path):
 
     with pytest.raises(ValueError, match="password-protected"):
         text, coverage = read_pdf(pdf_path)
-        
+
+def test_read_document_routes_txt(tmp_path):
+    txt_path = tmp_path / "test.txt"
+    txt_path.write_text("Python and AWS", encoding="utf-8")
+
+    text, coverage = read_document(txt_path)
+    assert "Python and AWS" in text
+    assert coverage.source_format == "txt"
+    assert coverage.pages_total is None
+    assert coverage.pages_with_text is None
+    assert coverage.chars_extracted == len(text)
+    assert coverage.known_blind_spots == ()
+
+def test_read_document_routes_pdf(tmp_path):
+    pdf_path = tmp_path / "test.pdf"
+    pdf = FPDF()
+    pdf.set_font("Helvetica", size=12)
+    pdf.add_page()
+    pdf.cell(text="Python and AWS")
+    pdf.output(pdf_path)
+
+    text, coverage = read_document(pdf_path)
+    assert "Python and AWS" in text
+    assert coverage.source_format == "pdf"
+    assert coverage.pages_total == 1
+    assert coverage.pages_with_text == 1
+    assert coverage.chars_extracted == len(text)
+    assert coverage.known_blind_spots == ("layout_order", "graphics", "tables")
+
+def test_read_document_routes_uppercase_pdf(tmp_path):
+    pdf_path = tmp_path / "test.PDF"
+    pdf = FPDF()
+    pdf.set_font("Helvetica", size=12)
+    pdf.add_page()
+    pdf.cell(text="Python and AWS")
+    pdf.output(pdf_path)
+
+    text, coverage = read_document(pdf_path)
+    assert "Python and AWS" in text
+    assert coverage.source_format == "pdf"
+    assert coverage.pages_total == 1
+    assert coverage.pages_with_text == 1
+    assert coverage.chars_extracted == len(text)
+    assert coverage.known_blind_spots == ("layout_order", "graphics", "tables")
+
+def test_read_document_rejects_unsupported_type(tmp_path):
+    unsupported_path = tmp_path / "test.docx"
+    unsupported_path.write_text("Python and AWS")
+
+    # Ensure that attempting to read an unsupported file type raises a ValueError
+    with pytest.raises(ValueError, match="test.docx"):
+        text, coverage = read_document(unsupported_path)
