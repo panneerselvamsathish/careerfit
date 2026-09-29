@@ -1,0 +1,37 @@
+
+# ambiguous: true when the word's non-skill meaning is common in resumes/JDs
+# (e.g. "go live", "a swift turnaround"), so a keyword match alone can't be trusted.
+# aliases must never be ambiguous; an ambiguous spelling doesn't belong in aliases.
+
+python:
+  aliases: ["python3"]
+  ambiguous: false
+
+kubernetes:
+  aliases: ["k8s", "kube"]
+  ambiguous: false
+
+aws:
+  aliases: ["amazon web services"]
+  ambiguous: false
+
+java:
+  aliases: []
+  ambiguous: false
+
+javascript:
+  aliases: ["js"]
+  ambiguous: false
+
+
+go:
+  aliases: ["golang"]
+  ambiguous: true
+
+swift:
+  aliases: []
+  ambiguous: true
+
+r:
+  aliases: []
+  ambiguous: true
