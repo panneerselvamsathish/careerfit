@@ -22,7 +22,8 @@ build-backend = "uv_build"
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
-    "httpx>=0.26"
+    "httpx>=0.26",
+    "fpdf2>=2.8.8",
 ]
 
 [project.scripts]
