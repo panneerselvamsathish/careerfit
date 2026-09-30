@@ -1,5 +1,5 @@
 import pytest
-from careerfit.analyze.matcher import detect
+from careerfit.analyze.matcher import detect, scan
 from careerfit.analyze.ontology import SkillEntry
 
 @pytest.mark.parametrize("name, entry, text, expected", [
@@ -9,6 +9,18 @@ from careerfit.analyze.ontology import SkillEntry
     ("python", SkillEntry(aliases=("py",), ambiguous=True), "Python is a versatile language", "unclear"),
     ("c++", SkillEntry(aliases=("cpp",), ambiguous=False), "C++ developer needed", "found"),
     ("c++", SkillEntry(aliases=("cpp",), ambiguous=True), "C++ can be tricky", "unclear"),
+    ("kubernetes", SkillEntry(aliases=("k8s", "kube"), ambiguous=False), "We deploy on kube", "found"),
+    ("go", SkillEntry(aliases=("golang",), ambiguous=True), "Go and Golang", "found"),
+    ("go", SkillEntry(aliases=("golang",), ambiguous=True), "We go live weekly", "unclear"),
 ])
 def test_detect(name, entry, text, expected):
     assert detect(name, entry, text) == expected
+
+def test_scan_reports_every_skill():
+    ontology = {
+        "python": SkillEntry(aliases=(), ambiguous=False),
+        "go": SkillEntry(aliases=("golang",), ambiguous=True),
+        "java": SkillEntry(aliases=(), ambiguous=False),
+    }
+    result = scan("Python services, we go live weekly", ontology)
+    assert result == {"python": "found", "go": "unclear", "java": "absent"}

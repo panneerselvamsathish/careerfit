@@ -15,3 +15,11 @@ def detect(name: str, entry: SkillEntry, text: str) -> Literal["found", "unclear
     if mentions(name, text):
         return "unclear" if entry.ambiguous else "found"
     return "absent"
+
+def scan(text: str, ontology: dict[str, SkillEntry]) -> dict[str, Literal["found", "unclear", "absent"]]:
+
+    results = {}
+    
+    for name, entry in ontology.items():
+        results[name] = detect(name, entry, text)
+    return results
