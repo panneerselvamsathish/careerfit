@@ -2,6 +2,7 @@ import re
 from typing import Literal
 
 from careerfit.analyze.ontology import SkillEntry
+from careerfit.facts.schema import SkillStatus
 
 def mentions(term: str, text: str) -> bool:
     return re.search(rf'(?<!\w)(?<!\w\.){re.escape(term)}(?!\w)(?!\.\w)', text, re.IGNORECASE) is not None
@@ -48,3 +49,19 @@ def requirement_levels(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[st
                     continue
                 levels[name] = level
     return levels
+
+def decide_status(jd_result: str, resume_result: str, scanned: bool) -> SkillStatus:
+    """Map (jd, resume, scanned) evidence into a SkillStatus.
+
+    Pure function: no clock, no network, no LLM. Any ambiguity on the JD
+    side collapses to UNRESOLVABLE — the judge/ package resolves those.
+    """
+    if jd_result == "unclear":
+        return SkillStatus.UNRESOLVABLE
+    # jd_result == "found" below
+    if resume_result == "unclear":
+        return SkillStatus.UNRESOLVABLE
+    if resume_result == "found":
+        return SkillStatus.MATCHED
+    # resume_result == "absent"
+    return SkillStatus.NOT_ASSESSED if scanned else SkillStatus.GAP

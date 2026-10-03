@@ -1,5 +1,6 @@
 import pytest
-from careerfit.analyze.matcher import detect, requirement_levels, scan
+from careerfit.analyze.matcher import detect, requirement_levels, scan, decide_status
+from careerfit.facts.schema import SkillStatus
 from careerfit.analyze.ontology import SkillEntry
 
 ONTOLOGY = {
@@ -44,3 +45,22 @@ def test_scan_reports_every_skill():
 def test_requirement_levels(jd_text, expected):
    
     assert requirement_levels(jd_text, ONTOLOGY) == expected
+
+@pytest.mark.parametrize("jd_result, resume_result, scanned, expected", [
+    ("found", "found", False, SkillStatus.MATCHED),
+    # ...one line per row of the table
+    ("found", "absent", False, SkillStatus.GAP),
+    ("found", "unclear", False, SkillStatus.UNRESOLVABLE),
+    ("found", "found", True, SkillStatus.MATCHED),
+    ("found", "absent", True, SkillStatus.NOT_ASSESSED),
+    ("found", "unclear", True, SkillStatus.UNRESOLVABLE),
+    ("unclear", "found", False, SkillStatus.UNRESOLVABLE),
+    ("unclear", "absent", False, SkillStatus.UNRESOLVABLE),
+    ("unclear", "unclear", False, SkillStatus.UNRESOLVABLE),
+    ("unclear", "found", True, SkillStatus.UNRESOLVABLE),
+    ("unclear", "absent", True, SkillStatus.UNRESOLVABLE),
+    ("unclear", "unclear", True, SkillStatus.UNRESOLVABLE),
+])
+def test_decide_status(jd_result, resume_result, scanned, expected):
+    assert decide_status(jd_result, resume_result, scanned) == expected
+
