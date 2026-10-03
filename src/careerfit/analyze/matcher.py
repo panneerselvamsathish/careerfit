@@ -4,7 +4,7 @@ from typing import Literal
 from careerfit.analyze.ontology import SkillEntry
 
 def mentions(term: str, text: str) -> bool:
-    return re.search(rf'(?<!\w){re.escape(term)}(?!\w)', text, re.IGNORECASE) is not None
+    return re.search(rf'(?<!\w)(?<!\w\.){re.escape(term)}(?!\w)(?!\.\w)', text, re.IGNORECASE) is not None
 
 def detect(name: str, entry: SkillEntry, text: str) -> Literal["found", "unclear", "absent"]:
     
@@ -39,11 +39,12 @@ def requirement_levels(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[st
         if line.endswith(":"):
             current = "nice" if has_nice_marker(line) else "must"
             continue
-        level = "nice" if has_nice_marker(line) else current
-        for name, result in scan(line, ontology).items():
-            if result == "absent":
-                continue
-            if levels.get(name) == "must":
-                continue
-            levels[name] = level
+        for sentence in re.split(r"(?<=[.!?])\s+", line):
+            level = "nice" if has_nice_marker(sentence) else current
+            for name, result in scan(sentence, ontology).items():
+                if result == "absent":
+                    continue
+                if levels.get(name) == "must":
+                    continue
+                levels[name] = level
     return levels

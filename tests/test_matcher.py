@@ -6,6 +6,7 @@ ONTOLOGY = {
     "python": SkillEntry(aliases=(), ambiguous=False),
     "aws": SkillEntry(aliases=("amazon web services",), ambiguous=False),
     "kubernetes": SkillEntry(aliases=("k8s", "kube"), ambiguous=False),
+    "javascript": SkillEntry(aliases=("js",), ambiguous=False),
 }
 
 @pytest.mark.parametrize("name, entry, text, expected", [
@@ -37,7 +38,8 @@ def test_scan_reports_every_skill():
     ("Python is required.\nExperience with Python and AWS is a plus.", {"python": "must", "aws": "nice"}),
     ("Requirements:\n- Python\nKubernetes is nice to have.\n- AWS", {"python": "must", "kubernetes": "nice", "aws": "must"}),
     ("We value curiosity and teamwork.", {}),
-
+    ("Python is required. Experience with Python and AWS is a plus.", {"python": "must", "aws": "nice"}),
+    ("Node.js and Python are required.", {"python": "must"}),
 ])
 def test_requirement_levels(jd_text, expected):
    
