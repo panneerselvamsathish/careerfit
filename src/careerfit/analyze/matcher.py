@@ -23,3 +23,27 @@ def scan(text: str, ontology: dict[str, SkillEntry]) -> dict[str, Literal["found
     for name, entry in ontology.items():
         results[name] = detect(name, entry, text)
     return results
+
+NICE_TO_HAVE_MARKERS = ("nice to have", "optional", "bonus", "preferred","a plus", "preferable")
+
+def has_nice_marker(text: str) -> bool:
+    return any(mentions(marker, text) for marker in NICE_TO_HAVE_MARKERS)
+
+def requirement_levels(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, Literal["must", "nice"]]:
+    levels = {}
+    current = "must"
+    for line in jd_text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.endswith(":"):
+            current = "nice" if has_nice_marker(line) else "must"
+            continue
+        level = "nice" if has_nice_marker(line) else current
+        for name, result in scan(line, ontology).items():
+            if result == "absent":
+                continue
+            if levels.get(name) == "must":
+                continue
+            levels[name] = level
+    return levels

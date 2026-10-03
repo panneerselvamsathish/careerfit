@@ -23,6 +23,9 @@ javascript:
   aliases: ["js"]
   ambiguous: false
 
+django:
+  aliases: []
+  ambiguous: false
 
 go:
   aliases: ["golang"]

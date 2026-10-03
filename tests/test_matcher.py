@@ -1,6 +1,12 @@
 import pytest
-from careerfit.analyze.matcher import detect, scan
+from careerfit.analyze.matcher import detect, requirement_levels, scan
 from careerfit.analyze.ontology import SkillEntry
+
+ONTOLOGY = {
+    "python": SkillEntry(aliases=(), ambiguous=False),
+    "aws": SkillEntry(aliases=("amazon web services",), ambiguous=False),
+    "kubernetes": SkillEntry(aliases=("k8s", "kube"), ambiguous=False),
+}
 
 @pytest.mark.parametrize("name, entry, text, expected", [
     ("java", SkillEntry(aliases=(), ambiguous=False), "Senior Java developer", "found"),
@@ -24,3 +30,15 @@ def test_scan_reports_every_skill():
     }
     result = scan("Python services, we go live weekly", ontology)
     assert result == {"python": "found", "go": "unclear", "java": "absent"}
+
+
+@pytest.mark.parametrize("jd_text, expected", [
+    ("Requirements:\n- Python\n- AWS\nNice to have:\n- Kubernetes", {"python": "must", "aws": "must", "kubernetes": "nice"}),
+    ("Python is required.\nExperience with Python and AWS is a plus.", {"python": "must", "aws": "nice"}),
+    ("Requirements:\n- Python\nKubernetes is nice to have.\n- AWS", {"python": "must", "kubernetes": "nice", "aws": "must"}),
+    ("We value curiosity and teamwork.", {}),
+
+])
+def test_requirement_levels(jd_text, expected):
+   
+    assert requirement_levels(jd_text, ONTOLOGY) == expected
