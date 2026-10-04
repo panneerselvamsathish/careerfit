@@ -65,3 +65,10 @@ def decide_status(jd_result: str, resume_result: str, scanned: bool) -> SkillSta
         return SkillStatus.MATCHED
     # resume_result == "absent"
     return SkillStatus.NOT_ASSESSED if scanned else SkillStatus.GAP
+
+def first_mention_line(name: str, entry: SkillEntry, text: str) -> int | None:
+        for i, line in enumerate(text.splitlines(), start=1):
+            if detect(name, entry, line) != "absent":
+                return i
+        return None
+
