@@ -28,6 +28,8 @@ class SkillObservation(BaseModel):
     confidence: float | None = None
     jd_evidence: Provenance | None = None
     resume_evidence: Provenance | None = None
+    requirement: Literal["must", "nice"]
+
 
     @model_validator(mode="after")
     def check_evidence(self) -> "SkillObservation":

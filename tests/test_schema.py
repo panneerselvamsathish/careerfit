@@ -36,18 +36,18 @@ def test_fit_score_requires_explanation():
 
 def test_skill_observation_gap_requires_evidence():
     with pytest.raises(ValidationError, match="gap status requires jd_evidence"):
-        schema.SkillObservation(skill="test", status=schema.SkillStatus.GAP) # type: ignore[call-arg]
+        schema.SkillObservation(skill="test", status=schema.SkillStatus.GAP, requirement="must") # type: ignore[call-arg]
 
 def test_skill_observation_not_assessed_rejects_confidence():
     with pytest.raises(ValidationError, match="confidence should not be set for not_assessed status"):
-        schema.SkillObservation(skill="test", status=schema.SkillStatus.NOT_ASSESSED,confidence=0.5) # type: ignore[call-arg]
+        schema.SkillObservation(skill="test", status=schema.SkillStatus.NOT_ASSESSED,confidence=0.5,requirement="must") # type: ignore[call-arg]
 
 def test_skill_observation_valid_matched():
-    schema.SkillObservation(skill="test", status=schema.SkillStatus.MATCHED, resume_evidence=schema.Provenance(source="resume", locator="experience[0]", retrieved_at=datetime.now()))
+    schema.SkillObservation(skill="test", status=schema.SkillStatus.MATCHED, resume_evidence=schema.Provenance(source="resume", locator="experience[0]", retrieved_at=datetime.now()),requirement="must")
 
 def test_skill_observation_matched_requires_evidence():
     with pytest.raises(ValidationError, match="matched status requires resume_evidence"):
-        schema.SkillObservation(skill="test", status=schema.SkillStatus.MATCHED) # type: ignore[call-arg]
+        schema.SkillObservation(skill="test", status=schema.SkillStatus.MATCHED,requirement="must") # type: ignore[call-arg]
 
 def test_gap_analysis_facts_llm_true_allows_fit_score():   
     schema.GapAnalysisFacts(llm_used=True, fit_score=schema.FitScore(overall=0.5, must_have_coverage=0.5, nice_to_have_coverage=0.5, explanation="test"),resume_source="test",jd_source="jd test",analyzed_at=datetime.now(),skill_observations=[],perspective="candidate")
