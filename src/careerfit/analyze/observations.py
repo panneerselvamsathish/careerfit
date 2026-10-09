@@ -18,6 +18,7 @@ def build_observations(
     for name, level in requirement_levels(jd_text, ontology).items():
         entry = ontology[name]
         jd_result = detect(name, entry, jd_text)
+        assert jd_result != "absent", "requirement_levels only returns skills the JD mentions"
         resume_result = detect(name, entry, resume_text)
         status = decide_status(jd_result, resume_result, scanned)
 
