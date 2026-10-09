@@ -41,6 +41,9 @@ def test_scan_reports_every_skill():
     ("We value curiosity and teamwork.", {}),
     ("Python is required. Experience with Python and AWS is a plus.", {"python": "must", "aws": "nice"}),
     ("Node.js and Python are required.", {"python": "must"}),
+    ("Python is preferred, but AWS is required.", {"python": "nice", "aws": "must"}),
+    ("Experience with Python, AWS and Kubernetes is a plus.", {"python": "nice", "aws": "nice", "kubernetes": "nice"}),
+    ("Nice to have:\n- Kubernetes\n- AWS is required", {"kubernetes": "nice", "aws": "must"}),
 ])
 def test_requirement_levels(jd_text, expected):
    

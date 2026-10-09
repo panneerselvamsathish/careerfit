@@ -24,3 +24,14 @@ def test_load_ontology_rejects_misspelled_field(tmp_path):
 
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         load_ontology(bad)
+
+@pytest.mark.parametrize("content, message", [
+    ("", "got NoneType"),
+    ("- python\n- aws\n", "got list"),
+    ("python: yes\n", "entry for 'python'"),
+])
+def test_load_ontology_rejects_wrong_shape(tmp_path, content, message):
+    bad = tmp_path / "skills.yaml"
+    bad.write_text(content, encoding="utf-8")
+    with pytest.raises(ValueError, match=message):
+        load_ontology(bad)

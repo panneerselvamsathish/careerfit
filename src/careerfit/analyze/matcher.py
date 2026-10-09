@@ -29,8 +29,20 @@ def scan(text: str, ontology: dict[str, SkillEntry]) -> dict[str, DetectResult]:
 
 NICE_TO_HAVE_MARKERS = ("nice to have", "optional", "bonus", "preferred","a plus", "preferable")
 
+MUST_HAVE_MARKERS = ("required", "must", "mandatory")
+
 def has_nice_marker(text: str) -> bool:
     return any(mentions(marker, text) for marker in NICE_TO_HAVE_MARKERS)
+
+def has_must_marker(text: str) -> bool:
+    return any(mentions(marker, text) for marker in MUST_HAVE_MARKERS)
+
+def clauses(sentence: str) -> list[str]:
+    # Only split a sentence that mixes both kinds of marker; splitting every comma
+    # would cut "Experience with Python, AWS and Docker is a plus" away from its marker.
+    if has_nice_marker(sentence) and has_must_marker(sentence):
+        return [c for c in re.split(r",|;|\bbut\b", sentence) if c.strip()]
+    return [sentence]
 
 def requirement_levels(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, Literal["must", "nice"]]:
     levels = {}
@@ -43,13 +55,19 @@ def requirement_levels(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[st
             current = "nice" if has_nice_marker(line) else "must"
             continue
         for sentence in re.split(r"(?<=[.!?])\s+", line):
-            level = "nice" if has_nice_marker(sentence) else current
-            for name, result in scan(sentence, ontology).items():
-                if result == "absent":
-                    continue
-                if levels.get(name) == "must":
-                    continue
-                levels[name] = level
+            for clause in clauses(sentence):
+                if has_must_marker(clause):
+                    level = "must"
+                elif has_nice_marker(clause):
+                    level = "nice"
+                else:
+                    level = current
+                for name, result in scan(clause, ontology).items():
+                    if result == "absent":
+                        continue
+                    if levels.get(name) == "must":
+                        continue
+                    levels[name] = level
     return levels
 
 def decide_status(
