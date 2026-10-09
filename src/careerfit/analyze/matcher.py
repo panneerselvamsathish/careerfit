@@ -53,7 +53,6 @@ def requirement_levels(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[st
             continue
         if line.endswith(":"):
             current = "nice" if has_nice_marker(line) else "must"
-            continue
         for sentence in re.split(r"(?<=[.!?])\s+", line):
             for clause in clauses(sentence):
                 if has_must_marker(clause):
@@ -85,8 +84,13 @@ def decide_status(
     return SkillStatus.NOT_ASSESSED if scanned else SkillStatus.GAP
 
 def first_mention_line(name: str, entry: SkillEntry, text: str) -> int | None:
-        for i, line in enumerate(text.splitlines(), start=1):
-            if detect(name, entry, line) != "absent":
-                return i
-        return None
+    # A "found" line is preferred so evidence supports the status; "unclear" is only a fallback.
+    unclear_line = None
+    for i, line in enumerate(text.splitlines(), start=1):
+        result = detect(name, entry, line)
+        if result == "found":
+            return i
+        if result == "unclear" and unclear_line is None:
+            unclear_line = i
+    return unclear_line
 
