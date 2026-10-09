@@ -83,6 +83,8 @@ class GapAnalysisFacts(BaseModel):
 
     resume_source: str
     jd_source: str
+    resume_coverage: Coverage
+    jd_coverage: Coverage
     analyzed_at: datetime
     llm_used: bool
     schema_version: str = "0.1.0"

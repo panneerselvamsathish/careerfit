@@ -10,6 +10,10 @@ FACTS_MODELS = [
     if issubclass(cls, BaseModel) and cls.__module__ == schema.__name__
 ]
 
+TXT_COVERAGE = schema.Coverage(
+    source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=10, known_blind_spots=()
+)
+
 @pytest.mark.parametrize("model", FACTS_MODELS, ids=lambda m: m.__name__)
 def test_facts_models_forbid_extra_and_are_frozen(model):
     assert model.model_config.get("extra") == "forbid"
@@ -50,18 +54,18 @@ def test_skill_observation_matched_requires_evidence():
         schema.SkillObservation(skill="test", status=schema.SkillStatus.MATCHED,requirement="must") # type: ignore[call-arg]
 
 def test_gap_analysis_facts_llm_true_allows_fit_score():   
-    schema.GapAnalysisFacts(llm_used=True, fit_score=schema.FitScore(overall=0.5, must_have_coverage=0.5, nice_to_have_coverage=0.5, explanation="test"),resume_source="test",jd_source="jd test",analyzed_at=datetime.now(),skill_observations=[],perspective="candidate")
+    schema.GapAnalysisFacts(llm_used=True, fit_score=schema.FitScore(overall=0.5, must_have_coverage=0.5, nice_to_have_coverage=0.5, explanation="test"),resume_source="test",jd_source="jd test",analyzed_at=datetime.now(),skill_observations=(),perspective="candidate", resume_coverage=TXT_COVERAGE, jd_coverage=TXT_COVERAGE)
 
 def test_gap_analysis_facts_llm_false_rejects_fit_score():
     with pytest.raises(ValidationError, match="fit_score should not be set if llm_used is False"):
-        schema.GapAnalysisFacts(llm_used=False, fit_score=schema.FitScore(overall=0.5, must_have_coverage=0.5, nice_to_have_coverage=0.5, explanation="test"),resume_source="test",jd_source="jd test",analyzed_at=datetime.now(),skill_observations=[],perspective="candidate") # type: ignore[call-arg]    
+        schema.GapAnalysisFacts(llm_used=False, fit_score=schema.FitScore(overall=0.5, must_have_coverage=0.5, nice_to_have_coverage=0.5, explanation="test"),resume_source="test",jd_source="jd test",analyzed_at=datetime.now(),skill_observations=(),perspective="candidate", resume_coverage=TXT_COVERAGE, jd_coverage=TXT_COVERAGE) # type: ignore[call-arg]    
 
 def test_gap_analysis_facts_llm_false_rejects_learning_steps():
     with pytest.raises(ValidationError, match="learning_steps should not be set if llm_used is False"):
-        schema.GapAnalysisFacts(llm_used=False, learning_steps=[schema.LearningStep(skill="Python", priority=1, why_it_matters="needed", resources=(), estimated_weeks=4)],resume_source="test",jd_source="jd test",analyzed_at=datetime.now(),skill_observations=[],perspective="candidate") # type: ignore[call-arg]
+        schema.GapAnalysisFacts(llm_used=False, learning_steps=[schema.LearningStep(skill="Python", priority=1, why_it_matters="needed", resources=(), estimated_weeks=4)],resume_source="test",jd_source="jd test",analyzed_at=datetime.now(),skill_observations=(),perspective="candidate", resume_coverage=TXT_COVERAGE, jd_coverage=TXT_COVERAGE) # type: ignore[call-arg]
 
 def test_gap_analysis_facts_fails_append_to_tuples():
-    gaf = schema.GapAnalysisFacts(llm_used=True, fit_score=None, resume_source="test", jd_source="jd test", analyzed_at=datetime.now(), skill_observations=[], perspective="candidate")
+    gaf = schema.GapAnalysisFacts(llm_used=True, fit_score=None, resume_source="test", jd_source="jd test", analyzed_at=datetime.now(), skill_observations=(), perspective="candidate", resume_coverage=TXT_COVERAGE, jd_coverage=TXT_COVERAGE)
     with pytest.raises(AttributeError):
         gaf.skill_observations.append(schema.SkillObservation(skill="test", status=schema.SkillStatus.MATCHED, resume_evidence=schema.Provenance(source="resume", locator="experience[0]", retrieved_at=datetime.now()))) # type: ignore[call-arg]
     with pytest.raises(AttributeError):

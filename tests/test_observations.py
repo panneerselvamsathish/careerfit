@@ -1,8 +1,8 @@
 from datetime import datetime
 
-from careerfit.analyze.observations import build_observations
+from careerfit.analyze.observations import build_facts, build_observations
 from careerfit.analyze.ontology import SkillEntry
-from careerfit.facts.schema import Coverage, SkillStatus
+from careerfit.facts.schema import Coverage, GapAnalysisFacts, SkillStatus
 
 ONTOLOGY = {
     "python": SkillEntry(aliases=(), ambiguous=False),
@@ -56,3 +56,40 @@ def test_build_observations_is_deterministic():
     first = build_observations(RESUME, TEXT_COVERAGE, JD, ONTOLOGY, AT)
     second = build_observations(RESUME, TEXT_COVERAGE, JD, ONTOLOGY, AT)
     assert first == second
+
+
+def make_facts(resume_coverage=TEXT_COVERAGE, jd_coverage=TEXT_COVERAGE):
+    return build_facts(
+        resume_text=RESUME,
+        resume_coverage=resume_coverage,
+        resume_source="resume.txt",
+        jd_text=JD,
+        jd_coverage=jd_coverage,
+        jd_source="jd.txt",
+        ontology=ONTOLOGY,
+        at=AT,
+        perspective="candidate",
+    )
+
+
+def test_build_facts_is_keyword_only_free_tier():
+    facts = make_facts()
+    assert facts.llm_used is False
+    assert facts.fit_score is None
+    assert facts.learning_steps == ()
+    assert facts.analyzed_at == AT
+    assert facts.skill_observations == build_observations(RESUME, TEXT_COVERAGE, JD, ONTOLOGY, AT)
+
+
+def test_build_facts_keeps_both_coverages():
+    jd_scanned = Coverage(
+        source_format="pdf", pages_total=2, pages_with_text=1, chars_extracted=17, known_blind_spots=("scanned_pages",)
+    )
+    facts = make_facts(jd_coverage=jd_scanned)
+    assert facts.resume_coverage == TEXT_COVERAGE
+    assert facts.jd_coverage == jd_scanned
+
+
+def test_build_facts_survives_json_round_trip():
+    facts = make_facts()
+    assert GapAnalysisFacts.model_validate_json(facts.model_dump_json()) == facts
