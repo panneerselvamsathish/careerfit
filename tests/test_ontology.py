@@ -29,6 +29,8 @@ def test_load_ontology_rejects_misspelled_field(tmp_path):
     ("", "got NoneType"),
     ("- python\n- aws\n", "got list"),
     ("python: yes\n", "entry for 'python'"),
+    ('"":\n  aliases: []\n  ambiguous: false\n', "skill name '' must be"),
+    ("1:\n  aliases: []\n  ambiguous: false\n", "skill name 1 must be"),
 ])
 def test_load_ontology_rejects_wrong_shape(tmp_path, content, message):
     bad = tmp_path / "skills.yaml"

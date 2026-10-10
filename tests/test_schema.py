@@ -67,7 +67,7 @@ def test_gap_analysis_facts_llm_false_rejects_learning_steps():
 def test_gap_analysis_facts_fails_append_to_tuples():
     gaf = schema.GapAnalysisFacts(llm_used=True, fit_score=None, resume_source="test", jd_source="jd test", analyzed_at=datetime.now(), skill_observations=(), perspective="candidate", resume_coverage=TXT_COVERAGE, jd_coverage=TXT_COVERAGE)
     with pytest.raises(AttributeError):
-        gaf.skill_observations.append(schema.SkillObservation(skill="test", status=schema.SkillStatus.MATCHED, resume_evidence=schema.Provenance(source="resume", locator="experience[0]", retrieved_at=datetime.now()))) # type: ignore[call-arg]
+        gaf.skill_observations.append(schema.SkillObservation(skill="test", status=schema.SkillStatus.MATCHED, requirement="must", resume_evidence=schema.Provenance(source="resume", locator="experience[0]", retrieved_at=datetime.now())))  # type: ignore[attr-defined]
     with pytest.raises(AttributeError):
         gaf.learning_steps.append(schema.LearningStep(skill="test", priority=1, why_it_matters="needed", resources=(), estimated_weeks=4))
 

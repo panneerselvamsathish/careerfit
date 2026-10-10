@@ -23,6 +23,8 @@ def load_ontology(path: Path) -> dict[str, SkillEntry]:
 
     ontology: dict[str, SkillEntry] = {}
     for skill_name, skill_data in data.items():
+        if not isinstance(skill_name, str) or not skill_name.strip():
+            raise ValueError(f"{path.name}: skill name {skill_name!r} must be a non-empty string")
         if not isinstance(skill_data, dict):
             raise ValueError(f"{path.name}: entry for '{skill_name}' must have aliases and ambiguous fields")
         ontology[skill_name] = SkillEntry(**skill_data)
