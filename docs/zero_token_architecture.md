@@ -24,9 +24,11 @@ Kubernetes). Anything code can't decide must be `UNRESOLVABLE` /
 
 The design already follows this pattern:
 
-- `analyze/` must not call an LLM, hit the network or read the clock
-  (enforced by `tests/test_architecture.py`).
-- `judge/` is the only package allowed to call the Anthropic API.
+- `analyze/` must not call an LLM, hit the network or read the clock.
+  `tests/test_architecture.py` enforces a limited import boundary by rejecting
+  imports of `judge/` and listed LLM/network modules; it does not detect clock
+  reads or every possible network path.
+- `judge/` is intended to be the only package that calls the Anthropic API.
 - Free tier = `llm_used=False` (keyword pass). Paid tier = `llm_used=True`.
   The free tier *is* the zero-token path.
 
@@ -44,8 +46,12 @@ Rule to keep: aliases must never be ambiguous (see the top comment in
 
 ### 2. Cache judge results (Milestone 6/7)
 
-Key the cache on `hash(resume_text, jd_text, prompt_version, model)`. A repeat
-analysis costs zero tokens, which matters for paid-tier margins.
+Key the cache using a stable digest (such as SHA-256) of the canonical
+serialization of the complete judge input, including the observations sent to
+the judge, prompt version and model. This invalidates cached results whenever
+the actual judge input changes; do not use Python's process-randomized
+`hash()`. A repeat analysis costs zero tokens, which matters for paid-tier
+margins.
 
 - The cache belongs in the composition root (`cli.py` / `api.py`), not in
   `judge/`: it needs storage, and `judge/` should stay pure prompt → output.
@@ -54,8 +60,9 @@ analysis costs zero tokens, which matters for paid-tier margins.
 
 ### 3. Report the zero-token share as a metric
 
-Report "X of Y skills decided without an LLM" from the facts (count of
-non-`UNRESOLVABLE` observations). This:
+Report "X of Y skills decided without an LLM" from the facts, counting only
+`MATCHED`, `PARTIAL` and `GAP` observations as decided. Exclude both
+`NOT_ASSESSED` and `UNRESOLVABLE`, since neither represents a decision. This:
 
 - shows the free tier's value honestly
 - measures the upsell (`NOT_ASSESSED` / `UNRESOLVABLE` count) as a
