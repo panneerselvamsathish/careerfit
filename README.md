@@ -34,29 +34,64 @@ not conventions, not comments. A build constraint.
 
 - [x] Milestone 1: Scaffold — uv, src layout, AST boundary enforcement
 - [x] Milestone 2: Facts schema — Pydantic v2 models, five-status enum, model validators
-- [ ] Milestone 3: Ingest — PDF + plain text parsing, Coverage builder
-- [ ] Milestone 4: Analyze — pure skill extraction, keyword gap computation
+- [x] Milestone 3: Ingest — PDF + plain text parsing, Coverage builder
+- [x] Milestone 4: Analyze — pure skill extraction, keyword gap computation
 - [ ] Milestone 5: Evals — honesty invariants + golden expectations (two-layer eval design)
 - [ ] Milestone 6: Judge — Anthropic API with structured output, versioned prompt YAML files
-- [ ] Milestone 7: Report + CLI — rendering separation, composition root pattern
+- [ ] Milestone 7: Report + CLI — rendering separation, composition root pattern (CLI keyword pass works; report rendering to come)
 - [ ] Milestone 8: Web API + UI — FastAPI file upload, vanilla JS client
 
-## Running locally
+## Getting started
+
+You need [git](https://git-scm.com/) and [uv](https://docs.astral.sh/uv/getting-started/installation/).
+uv installs Python 3.12 for you if it isn't already on your machine.
 
 ```bash
-# Install dependencies
-uv sync --dev
+# 1. Clone and enter the repo
+git clone https://github.com/panneerselvamsathish/careerfit.git
+cd careerfit
 
-# Run tests
+# 2. Install dependencies (creates a local .venv)
+uv sync
+
+# 3. Run the tests
 uv run pytest
 
-# Analyse a resume against a JD (keyword pass, no LLM)
+# 4. Analyse the sample resume against the sample job description
 uv run careerfit --resume fixtures/resume.txt --jd fixtures/jd.txt -o facts.json
+```
 
-# Deep analysis with LLM (needs ANTHROPIC_API_KEY)
+Step 4 prints a one-line summary and writes the full result to `facts.json`:
+
+```text
+Wrote facts.json: 9 JD skills (3 gap, 4 matched, 2 unresolvable)
+```
+
+To try your own files, pass any `.pdf` or `.txt` resume and job description. Leave out `-o`
+to print the JSON to the terminal instead.
+
+### Reading the result
+
+Every skill the job description mentions gets one status, plus whether the JD treats it as
+**must** or **nice** to have, and the line in each document that supports the verdict.
+
+| Status | Meaning |
+|---|---|
+| `matched` | The JD asks for it and the resume clearly shows it |
+| `gap` | The JD asks for it and the resume doesn't mention it |
+| `unresolvable` | A word like "Go" or "React" could be the skill or an ordinary word, so the keyword pass doesn't guess. The LLM tier (Milestone 6) settles these |
+| `not_assessed` | Part of the resume couldn't be read (for example scanned PDF pages), so a missing skill is not reported as a gap |
+
+The keyword pass only knows the skills listed in `src/careerfit/ontology/skills.yaml`.
+Skills outside that list are not checked at all.
+
+### Planned commands
+
+```bash
+# Deep analysis with the LLM judge (Milestone 6; needs an API key)
 uv run careerfit --resume fixtures/resume.txt --jd fixtures/jd.txt --deep -o facts.json
 
-# Start the web server
+# Web server (Milestone 8)
 uv run careerfit-server
 ```
 
