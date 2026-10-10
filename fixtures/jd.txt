@@ -1,0 +1,20 @@
+Senior Backend Engineer - Checkout Platform
+
+About the role
+You will build and run the services behind our checkout platform, working closely with product and data teams.
+
+Requirements:
+- 5+ years building production services in Python
+- Strong experience with AWS
+- Running Kubernetes in production
+- Infrastructure as code with Terraform
+- PostgreSQL or another relational database
+- Experience designing REST APIs
+
+Nice to have:
+- Experience with Go
+- Kafka or another event streaming platform
+- React for internal dashboards
+
+Benefits:
+- Remote-first team and a yearly learning budget
