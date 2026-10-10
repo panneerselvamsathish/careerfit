@@ -26,15 +26,15 @@ class SkillObservation(BaseModel):
     skill: str
     status: SkillStatus
     confidence: float | None = None
-    jd_evidence: Provenance | None = None
+    jd_evidence: Provenance
     resume_evidence: Provenance | None = None
+    requirement: Literal["must", "nice"]
+
 
     @model_validator(mode="after")
     def check_evidence(self) -> "SkillObservation":
         if self.status == SkillStatus.MATCHED and self.resume_evidence is None:
             raise ValueError("matched status requires resume_evidence")
-        if self.status == SkillStatus.GAP and self.jd_evidence is None:
-            raise ValueError("gap status requires jd_evidence")
         return self
 
     @model_validator(mode="after")
@@ -81,9 +81,11 @@ class GapAnalysisFacts(BaseModel):
 
     resume_source: str
     jd_source: str
+    resume_coverage: Coverage
+    jd_coverage: Coverage
     analyzed_at: datetime
     llm_used: bool
-    schema_version: str = "0.1.0"
+    schema_version: str = "0.2.0"
     fit_score: FitScore | None = None
     skill_observations: tuple[SkillObservation, ...]
     learning_steps: tuple[LearningStep, ...] = ()
