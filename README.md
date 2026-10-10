@@ -72,8 +72,9 @@ to print the JSON to the terminal instead.
 
 ### Reading the result
 
-Every skill the job description mentions gets one status, plus whether the JD treats it as
-**must** or **nice** to have, and the line in each document that supports the verdict.
+Every skill the job description mentions gets one status and whether the JD treats it as
+**must** or **nice** to have. Each result cites the JD line that decided it; results where the
+resume mentions the skill also cite that resume line.
 
 | Status | Meaning |
 |---|---|

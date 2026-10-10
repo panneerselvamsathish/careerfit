@@ -145,3 +145,9 @@ def test_read_document_rejects_unsupported_type(tmp_path):
 
     with pytest.raises(ValueError, match="test.docx"):
         text, coverage = read_document(unsupported_path)
+
+def test_read_pdf_corrupt_file_raises_clear_error(tmp_path):
+    bad = tmp_path / "bad.pdf"
+    bad.write_text("not a pdf", encoding="utf-8")
+    with pytest.raises(ValueError, match="not a readable PDF"):
+        read_pdf(bad)

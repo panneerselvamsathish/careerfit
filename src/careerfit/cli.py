@@ -28,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         resume_text, resume_coverage = read_document(args.resume)
         jd_text, jd_coverage = read_document(args.jd)
-    except (FileNotFoundError, ValueError) as e:
+    except (OSError, ValueError) as e:
         print(f"careerfit: {e}", file=sys.stderr)
         return 2
 
@@ -49,7 +49,11 @@ def main(argv: list[str] | None = None) -> int:
         print(payload)
         return 0
 
-    args.output.write_text(payload + "\n", encoding="utf-8")
+    try:
+        args.output.write_text(payload + "\n", encoding="utf-8")
+    except OSError as e:
+        print(f"careerfit: could not write {args.output}: {e}", file=sys.stderr)
+        return 2
     counts = Counter(o.status.value for o in facts.skill_observations)
     summary = ", ".join(f"{n} {status}" for status, n in sorted(counts.items()))
     print(f"Wrote {args.output}: {len(facts.skill_observations)} JD skills ({summary})", file=sys.stderr)

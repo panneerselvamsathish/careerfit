@@ -59,3 +59,18 @@ def test_cli_prints_json_to_stdout_without_output_flag(capsys):
     assert main(["--resume", str(FIXTURES / "resume.txt"), "--jd", str(FIXTURES / "jd.txt")]) == 0
     facts = GapAnalysisFacts.model_validate_json(capsys.readouterr().out)
     assert len(facts.skill_observations) == len(EXPECTED)
+
+
+def test_cli_reports_unwritable_output_without_traceback(tmp_path, capsys):
+    out = tmp_path / "missing" / "facts.json"
+    exit_code = main(["--resume", str(FIXTURES / "resume.txt"), "--jd", str(FIXTURES / "jd.txt"), "-o", str(out)])
+    assert exit_code == 2
+    assert "could not write" in capsys.readouterr().err
+
+
+def test_cli_reports_unreadable_input_as_a_clean_error(tmp_path, capsys):
+    folder = tmp_path / "resume.txt"
+    folder.mkdir()
+    exit_code = main(["--resume", str(folder), "--jd", str(FIXTURES / "jd.txt")])
+    assert exit_code == 2
+    assert "resume.txt" in capsys.readouterr().err
