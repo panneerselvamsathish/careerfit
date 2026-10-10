@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from careerfit.analyze.matcher import decide_status, detect, first_mention_line, requirement_levels
+from careerfit.analyze.matcher import decide_status, detect, first_mention_line, requirement_evidence
 from careerfit.analyze.ontology import SkillEntry
 from careerfit.facts.schema import Coverage, GapAnalysisFacts, Provenance, SkillObservation
 
@@ -15,14 +15,13 @@ def build_observations(
 ) -> tuple[SkillObservation, ...]:
     scanned = "scanned_pages" in resume_coverage.known_blind_spots
     observations = []
-    for name, level in requirement_levels(jd_text, ontology).items():
+    for name, (level, jd_line) in requirement_evidence(jd_text, ontology).items():
         entry = ontology[name]
         jd_result = detect(name, entry, jd_text)
-        assert jd_result != "absent", "requirement_levels only returns skills the JD mentions"
+        assert jd_result != "absent", "requirement_evidence only returns skills the JD mentions"
         resume_result = detect(name, entry, resume_text)
         status = decide_status(jd_result, resume_result, scanned)
 
-        jd_line = first_mention_line(name, entry, jd_text)
         jd_evidence = Provenance(source="jd", locator=f"line {jd_line}", retrieved_at=at)
 
         resume_line = first_mention_line(name, entry, resume_text)

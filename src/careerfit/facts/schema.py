@@ -87,7 +87,7 @@ class GapAnalysisFacts(BaseModel):
     jd_coverage: Coverage
     analyzed_at: datetime
     llm_used: bool
-    schema_version: str = "0.1.0"
+    schema_version: str = "0.2.0"
     fit_score: FitScore | None = None
     skill_observations: tuple[SkillObservation, ...]
     learning_steps: tuple[LearningStep, ...] = ()

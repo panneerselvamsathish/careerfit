@@ -93,3 +93,12 @@ def test_build_facts_keeps_both_coverages():
 def test_build_facts_survives_json_round_trip():
     facts = make_facts()
     assert GapAnalysisFacts.model_validate_json(facts.model_dump_json()) == facts
+
+
+def test_jd_evidence_points_at_the_line_that_made_it_must():
+    jd = "Python is a plus.\nJava required.\nPython is required."
+    result = by_skill(build_observations(RESUME, TEXT_COVERAGE, jd, ONTOLOGY, AT))
+    python_jd = result["python"].jd_evidence
+    assert result["python"].requirement == "must"
+    assert python_jd is not None
+    assert python_jd.locator == "line 3"

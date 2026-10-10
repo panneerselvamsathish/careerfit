@@ -1,5 +1,5 @@
 import pytest
-from careerfit.analyze.matcher import decide_status, detect, first_mention_line, requirement_levels, scan
+from careerfit.analyze.matcher import decide_status, detect, first_mention_line, requirement_evidence, requirement_levels, scan
 from careerfit.facts.schema import SkillStatus
 from careerfit.analyze.ontology import SkillEntry
 
@@ -46,6 +46,7 @@ def test_scan_reports_every_skill():
     ("Nice to have:\n- Kubernetes\n- AWS is required", {"kubernetes": "nice", "aws": "must"}),
     ("Strong experience with Python:\n- 5 years building APIs", {"python": "must"}),
     ("Kubernetes is a plus:\n- AWS", {"kubernetes": "nice", "aws": "nice"}),
+    ("Python is preferred BUT AWS is required.", {"python": "nice", "aws": "must"}),
 ])
 def test_requirement_levels(jd_text, expected):
    
@@ -82,3 +83,12 @@ GO = SkillEntry(aliases=("golang",), ambiguous=True)
 ])
 def test_first_mention_line_prefers_found_over_unclear(text, expected):
     assert first_mention_line("go", GO, text) == expected
+
+
+@pytest.mark.parametrize("jd_text, ontology, expected", [
+    ("Python is a plus.\nAWS too.\nPython is required.", ONTOLOGY, {"python": ("must", 3), "aws": ("must", 2)}),
+    ("Requirements:\n- Python\nPython is a plus.", ONTOLOGY, {"python": ("must", 2)}),
+    ("We go live weekly.\nGolang is required.", {"go": GO}, {"go": ("must", 2)}),
+])
+def test_requirement_evidence_points_at_the_deciding_line(jd_text, ontology, expected):
+    assert requirement_evidence(jd_text, ontology) == expected

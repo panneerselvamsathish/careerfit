@@ -41,20 +41,24 @@ def clauses(sentence: str) -> list[str]:
     # Only split a sentence that mixes both kinds of marker; splitting every comma
     # would cut "Experience with Python, AWS and Docker is a plus" away from its marker.
     if has_nice_marker(sentence) and has_must_marker(sentence):
-        return [c for c in re.split(r",|;|\bbut\b", sentence) if c.strip()]
+        return [c for c in re.split(r",|;|\bbut\b", sentence, flags=re.IGNORECASE) if c.strip()]
     return [sentence]
 
-def requirement_levels(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, Literal["must", "nice"]]:
-    levels = {}
-    current = "must"
-    for line in jd_text.splitlines():
-        line = line.strip()
+def requirement_evidence(
+    jd_text: str, ontology: dict[str, SkillEntry]
+) -> dict[str, tuple[Literal["must", "nice"], int]]:
+    """Each JD skill's level, plus the line of the occurrence that decided it."""
+    best: dict[str, tuple[Literal["must", "nice"], int, DetectResult]] = {}
+    current: Literal["must", "nice"] = "must"
+    for line_no, raw_line in enumerate(jd_text.splitlines(), start=1):
+        line = raw_line.strip()
         if not line:
             continue
         if line.endswith(":"):
             current = "nice" if has_nice_marker(line) else "must"
         for sentence in re.split(r"(?<=[.!?])\s+", line):
             for clause in clauses(sentence):
+                level: Literal["must", "nice"]
                 if has_must_marker(clause):
                     level = "must"
                 elif has_nice_marker(clause):
@@ -64,10 +68,15 @@ def requirement_levels(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[st
                 for name, result in scan(clause, ontology).items():
                     if result == "absent":
                         continue
-                    if levels.get(name) == "must":
-                        continue
-                    levels[name] = level
-    return levels
+                    previous = best.get(name)
+                    upgrades = previous is not None and previous[0] == "nice" and level == "must"
+                    clearer = previous is not None and previous[0] == level and previous[2] == "unclear" and result == "found"
+                    if previous is None or upgrades or clearer:
+                        best[name] = (level, line_no, result)
+    return {name: (level, line_no) for name, (level, line_no, _) in best.items()}
+
+def requirement_levels(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, Literal["must", "nice"]]:
+    return {name: level for name, (level, _) in requirement_evidence(jd_text, ontology).items()}
 
 def decide_status(
     jd_result: Literal["found", "unclear"],
