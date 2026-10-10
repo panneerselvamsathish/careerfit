@@ -26,7 +26,7 @@ class SkillObservation(BaseModel):
     skill: str
     status: SkillStatus
     confidence: float | None = None
-    jd_evidence: Provenance | None = None
+    jd_evidence: Provenance
     resume_evidence: Provenance | None = None
     requirement: Literal["must", "nice"]
 
@@ -35,8 +35,6 @@ class SkillObservation(BaseModel):
     def check_evidence(self) -> "SkillObservation":
         if self.status == SkillStatus.MATCHED and self.resume_evidence is None:
             raise ValueError("matched status requires resume_evidence")
-        if self.status == SkillStatus.GAP and self.jd_evidence is None:
-            raise ValueError("gap status requires jd_evidence")
         return self
 
     @model_validator(mode="after")

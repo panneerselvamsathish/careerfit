@@ -86,9 +86,10 @@ def test_first_mention_line_prefers_found_over_unclear(text, expected):
 
 
 @pytest.mark.parametrize("jd_text, ontology, expected", [
-    ("Python is a plus.\nAWS too.\nPython is required.", ONTOLOGY, {"python": ("must", 3), "aws": ("must", 2)}),
-    ("Requirements:\n- Python\nPython is a plus.", ONTOLOGY, {"python": ("must", 2)}),
-    ("We go live weekly.\nGolang is required.", {"go": GO}, {"go": ("must", 2)}),
+    ("Python is a plus.\nAWS too.\nPython is required.", ONTOLOGY, {"python": ("must", 3, "found"), "aws": ("must", 2, "found")}),
+    ("Requirements:\n- Python\nPython is a plus.", ONTOLOGY, {"python": ("must", 2, "found")}),
+    ("We go live weekly.\nGolang is required.", {"go": GO}, {"go": ("must", 2, "found")}),
+    ("Golang is a plus.\nGo is required.", {"go": GO}, {"go": ("must", 2, "unclear")}),
 ])
 def test_requirement_evidence_points_at_the_deciding_line(jd_text, ontology, expected):
     assert requirement_evidence(jd_text, ontology) == expected

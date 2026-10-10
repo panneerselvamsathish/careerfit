@@ -46,9 +46,9 @@ def clauses(sentence: str) -> list[str]:
 
 def requirement_evidence(
     jd_text: str, ontology: dict[str, SkillEntry]
-) -> dict[str, tuple[Literal["must", "nice"], int]]:
-    """Each JD skill's level, plus the line of the occurrence that decided it."""
-    best: dict[str, tuple[Literal["must", "nice"], int, DetectResult]] = {}
+) -> dict[str, tuple[Literal["must", "nice"], int, Literal["found", "unclear"]]]:
+    """Each JD skill's level, with the line and detection result of the occurrence that decided it."""
+    best: dict[str, tuple[Literal["must", "nice"], int, Literal["found", "unclear"]]] = {}
     current: Literal["must", "nice"] = "must"
     for line_no, raw_line in enumerate(jd_text.splitlines(), start=1):
         line = raw_line.strip()
@@ -73,10 +73,10 @@ def requirement_evidence(
                     clearer = previous is not None and previous[0] == level and previous[2] == "unclear" and result == "found"
                     if previous is None or upgrades or clearer:
                         best[name] = (level, line_no, result)
-    return {name: (level, line_no) for name, (level, line_no, _) in best.items()}
+    return best
 
 def requirement_levels(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, Literal["must", "nice"]]:
-    return {name: level for name, (level, _) in requirement_evidence(jd_text, ontology).items()}
+    return {name: level for name, (level, _, _) in requirement_evidence(jd_text, ontology).items()}
 
 def decide_status(
     jd_result: Literal["found", "unclear"],

@@ -102,3 +102,12 @@ def test_jd_evidence_points_at_the_line_that_made_it_must():
     assert result["python"].requirement == "must"
     assert python_jd is not None
     assert python_jd.locator == "line 3"
+
+
+def test_status_uses_the_occurrence_that_decided_the_requirement():
+    go = SkillEntry(aliases=("golang",), ambiguous=True)
+    jd = "Golang is a plus.\nGo is required."
+    result = by_skill(build_observations("Python only", TEXT_COVERAGE, jd, {"go": go}, AT))
+    assert result["go"].requirement == "must"
+    assert result["go"].status == SkillStatus.UNRESOLVABLE
+    assert result["go"].jd_evidence.locator == "line 2"

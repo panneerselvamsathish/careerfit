@@ -15,10 +15,8 @@ def build_observations(
 ) -> tuple[SkillObservation, ...]:
     scanned = "scanned_pages" in resume_coverage.known_blind_spots
     observations = []
-    for name, (level, jd_line) in requirement_evidence(jd_text, ontology).items():
+    for name, (level, jd_line, jd_result) in requirement_evidence(jd_text, ontology).items():
         entry = ontology[name]
-        jd_result = detect(name, entry, jd_text)
-        assert jd_result != "absent", "requirement_evidence only returns skills the JD mentions"
         resume_result = detect(name, entry, resume_text)
         status = decide_status(jd_result, resume_result, scanned)
 
