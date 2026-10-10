@@ -76,6 +76,8 @@ def run_case(case: dict, ontology: dict[str, SkillEntry]) -> CaseResult:
     for skill in not_observed:
         if skill in actual:
             result.failed.append(f"{skill}: should not be reported, got {actual[skill].status.value}")
+        else:
+            result.passed.append(f"{skill}: correctly not reported")
     for skill in actual:
         if skill not in expected and skill not in not_observed:
             result.failed.append(f"{skill}: reported but not labelled in the golden file")
@@ -127,8 +129,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--golden-dir", type=Path, default=GOLDEN_DIR)
     args = parser.parse_args(argv)
 
+    cases = load_cases(args.golden_dir)
+    if not cases:
+        # An eval run that checks nothing must not look like a pass.
+        print(f"No golden cases found in {args.golden_dir}")
+        return 1
     ontology = load_ontology(ONTOLOGY_PATH)
-    results = [run_case(case, ontology) for case in load_cases(args.golden_dir)]
+    results = [run_case(case, ontology) for case in cases]
     print(report(results))
     return 1 if gate_failed(results) else 0
 

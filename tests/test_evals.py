@@ -99,3 +99,16 @@ def test_evidence_must_point_at_a_line_that_mentions_the_skill():
 def test_skill_outside_the_ontology_is_a_violation():
     facts = facts_with(obs("cobol", SkillStatus.GAP))
     assert invariants.check_evidence(facts, "", "COBOL", ONTOLOGY) == ["cobol: reported but not in the skill list"]
+
+
+def test_harness_fails_when_no_golden_cases_are_found(tmp_path, capsys):
+    assert harness.main(["--golden-dir", str(tmp_path / "typo")]) == 1
+    assert "No golden cases found" in capsys.readouterr().out
+
+
+def test_not_observed_expectations_count_as_passes():
+    ontology = harness.load_ontology(harness.ONTOLOGY_PATH)
+    case = yaml.safe_load((harness.GOLDEN_DIR / "frontend.yaml").read_text(encoding="utf-8"))
+    result = harness.run_case(case, ontology)
+    assert "java: correctly not reported" in result.passed
+    assert len(result.passed) == len(case["expected"]) + len(case["not_observed"])
