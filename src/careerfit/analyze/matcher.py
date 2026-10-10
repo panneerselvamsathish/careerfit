@@ -30,6 +30,7 @@ def scan(text: str, ontology: dict[str, SkillEntry]) -> dict[str, DetectResult]:
 NICE_TO_HAVE_MARKERS = ("nice to have", "optional", "bonus", "preferred","a plus", "preferable")
 
 MUST_HAVE_MARKERS = ("required", "must", "mandatory")
+MUST_HAVE_HEADINGS = ("requirements", "qualifications", "minimum", "essential")
 
 def has_nice_marker(text: str) -> bool:
     return any(mentions(marker, text) for marker in NICE_TO_HAVE_MARKERS)
@@ -55,7 +56,11 @@ def requirement_evidence(
         if not line:
             continue
         if line.endswith(":"):
-            current = "nice" if has_nice_marker(line) else "must"
+            # A heading with neither kind of marker ("Cloud:") is a sub-heading and keeps the current section.
+            if has_nice_marker(line):
+                current = "nice"
+            elif has_must_marker(line) or any(mentions(word, line) for word in MUST_HAVE_HEADINGS):
+                current = "must"
         for sentence in re.split(r"(?<=[.!?])\s+", line):
             for clause in clauses(sentence):
                 level: Literal["must", "nice"]

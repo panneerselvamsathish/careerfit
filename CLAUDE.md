@@ -43,7 +43,8 @@ src/careerfit/
   judge/       The ONLY package allowed to call the Anthropic API.
                Prompts are versioned YAML data files in judge/prompts/.
                MUST NOT: be imported by analyze/ or report/.
-  ontology/    skills.yaml — data file mapping skill → category → resources.
+  ontology/    skills.yaml — data file: skill name → aliases + ambiguous flag.
+               Learning resources per skill are added with the learning-path milestone.
                No logic lives here.
   report/      Renderers only. Zero logic.
                MUST NOT: call an LLM, import judge/, import analyze/.

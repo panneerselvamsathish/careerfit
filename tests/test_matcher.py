@@ -47,6 +47,9 @@ def test_scan_reports_every_skill():
     ("Strong experience with Python:\n- 5 years building APIs", {"python": "must"}),
     ("Kubernetes is a plus:\n- AWS", {"kubernetes": "nice", "aws": "nice"}),
     ("Python is preferred BUT AWS is required.", {"python": "nice", "aws": "must"}),
+    ("Requirements:\n- Python\nNice to have:\nCloud:\n- AWS\nContainers:\n- Kubernetes", {"python": "must", "aws": "nice", "kubernetes": "nice"}),
+    ("Nice to have:\n- Kubernetes\nMinimum qualifications:\n- AWS", {"kubernetes": "nice", "aws": "must"}),
+    ("Preferred qualifications:\n- Kubernetes", {"kubernetes": "nice"}),
 ])
 def test_requirement_levels(jd_text, expected):
    
