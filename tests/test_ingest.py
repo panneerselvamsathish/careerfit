@@ -4,6 +4,8 @@ from careerfit.ingest.text import read_text
 from careerfit.facts.schema import Coverage
 from careerfit.ingest.pdf import read_pdf
 from fpdf import FPDF
+from pypdf import PageObject
+from pypdf.errors import PdfReadError
 
 def test_read_text_returns_text_and_coverage(tmp_path):
     file_path = tmp_path / "test.txt"
@@ -151,3 +153,19 @@ def test_read_pdf_corrupt_file_raises_clear_error(tmp_path):
     bad.write_text("not a pdf", encoding="utf-8")
     with pytest.raises(ValueError, match="not a readable PDF"):
         read_pdf(bad)
+
+
+def test_read_pdf_page_that_fails_during_extraction_raises_clear_error(tmp_path, monkeypatch):
+    pdf_path = tmp_path / "damaged_page.pdf"
+    pdf = FPDF()
+    pdf.set_font("Helvetica", size=12)
+    pdf.add_page()
+    pdf.cell(text="Python and AWS")
+    pdf.output(pdf_path)
+
+    def broken_extract(self, *args, **kwargs):
+        raise PdfReadError("damaged content stream")
+
+    monkeypatch.setattr(PageObject, "extract_text", broken_extract)
+    with pytest.raises(ValueError, match="not a readable PDF"):
+        read_pdf(pdf_path)

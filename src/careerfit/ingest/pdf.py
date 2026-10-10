@@ -11,23 +11,22 @@ def read_pdf(path: Path) -> tuple[str, Coverage]:
     pages_with_text = 0
     pages_without_text = 0
     consolidated_text = ""
+    # pypdf parses page content lazily, so extraction can fail long after the file opens.
     try:
         reader = PdfReader(path)
         total_pages = len(reader.pages)
+        for page in reader.pages:
+            text = page.extract_text().strip()
+            if text:
+                pages_with_text += 1
+                consolidated_text += text + "\n"
+            else:
+                pages_without_text += 1
     except FileNotDecryptedError as e:
         raise ValueError(f"{path.name} is password-protected. Remove the password and upload it again.") from e
     except PdfReadError as e:
         raise ValueError(f"{path.name} is not a readable PDF. Re-export it or upload a .txt version.") from e
     known_blind_spots=("layout_order","graphics","tables")
-
-    for page in reader.pages:
-        text = page.extract_text().strip()
-        
-        if text:
-            pages_with_text += 1
-            consolidated_text += text + "\n"
-        else:
-           pages_without_text += 1 
 
     if pages_without_text > 0:
         known_blind_spots += ("scanned_pages",)
