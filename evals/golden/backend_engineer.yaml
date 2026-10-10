@@ -1,0 +1,23 @@
+# Typical case: a text resume against a JD with Requirements / Nice to have / Benefits sections.
+# Used while building M4 and the CLI, so it is NOT held out: it has already shaped the rules.
+case: backend_engineer
+doc_type: txt
+held_out: false
+resume: fixtures/resume.txt
+jd: fixtures/jd.txt
+labelled_by: sathish
+labelled_at: 2026-10-10
+
+expected:
+  python:     {status: matched,      requirement: must}
+  aws:        {status: matched,      requirement: must}
+  kubernetes: {status: gap,          requirement: must}
+  terraform:  {status: gap,          requirement: must}
+  postgresql: {status: matched,      requirement: must}
+  rest:       {status: matched,      requirement: must}   # "REST APIs" in both documents
+  go:         {status: unresolvable, requirement: nice}   # "Experience with Go" could be the verb
+  kafka:      {status: gap,          requirement: nice}
+  react:      {status: unresolvable, requirement: nice}   # "React" alone could be the verb
+
+# On the resume but never asked for by the JD: no verdict against this job.
+not_observed: [docker, git, sql, django, javascript]

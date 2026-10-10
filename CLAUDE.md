@@ -24,8 +24,8 @@ uv run careerfit --resume fixtures/resume.txt --jd fixtures/jd.txt --deep -o fac
 # Start the web server
 uv run careerfit-server
 
-# Run the eval harness against a facts file
-uv run python evals/harness.py facts.json
+# Run every golden case through the pipeline: expectations + honesty invariants (exit 1 on any failure)
+uv run python -m evals.harness
 ```
 
 ## Architecture

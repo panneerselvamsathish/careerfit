@@ -1,0 +1,22 @@
+# Hard case: the resume is a 2-page PDF whose second page has no extractable text, as a
+# scanned page would. Skills the JD asks for that aren't on page 1 must not be called gaps.
+case: scanned_resume
+doc_type: pdf
+held_out: false
+resume: evals/golden/cases/scanned_resume/resume.pdf
+jd: fixtures/jd.txt
+labelled_by: sathish
+labelled_at: 2026-10-10
+
+expected:
+  python:     {status: matched,      requirement: must}   # on the readable page
+  aws:        {status: matched,      requirement: must}   # on the readable page
+  kubernetes: {status: not_assessed, requirement: must}
+  terraform:  {status: not_assessed, requirement: must}
+  postgresql: {status: not_assessed, requirement: must}
+  rest:       {status: not_assessed, requirement: must}
+  go:         {status: unresolvable, requirement: nice}   # the JD's own mention is ambiguous
+  kafka:      {status: not_assessed, requirement: nice}
+  react:      {status: unresolvable, requirement: nice}
+
+not_observed: []

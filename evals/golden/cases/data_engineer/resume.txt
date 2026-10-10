@@ -1,0 +1,11 @@
+Priya Raman
+Data Engineer
+
+Experience
+Data Engineer, Northwind Retail (2020 - present)
+- Built nightly batch pipelines in Python and Spark that load 4 TB a day into Redshift on AWS.
+- Wrote and tuned complex SQL for the finance team.
+- Ran every job in Docker containers scheduled by Airflow.
+
+Skills
+Python, SQL, AWS, Docker, Airflow, Spark

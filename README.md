@@ -36,7 +36,7 @@ not conventions, not comments. A build constraint.
 - [x] Milestone 2: Facts schema — Pydantic v2 models, five-status enum, model validators
 - [x] Milestone 3: Ingest — PDF + plain text parsing, Coverage builder
 - [x] Milestone 4: Analyze — pure skill extraction, keyword gap computation
-- [ ] Milestone 5: Evals — honesty invariants + golden expectations (two-layer eval design)
+- [x] Milestone 5: Evals — honesty invariants + golden expectations (two-layer eval design)
 - [ ] Milestone 6: Judge — Anthropic API with structured output, versioned prompt YAML files
 - [ ] Milestone 7: Report + CLI — rendering separation, composition root pattern (CLI keyword pass works; report rendering to come)
 - [ ] Milestone 8: Web API + UI — FastAPI file upload, vanilla JS client
@@ -85,6 +85,28 @@ resume mentions the skill also cite that resume line.
 
 The keyword pass only knows the skills listed in `src/careerfit/ontology/skills.yaml`.
 Skills outside that list are not checked at all.
+
+### Checking quality: the evals
+
+```bash
+uv run python -m evals.harness
+```
+
+Two independent layers, both run in CI on every pull request:
+
+- **Honesty invariants** (`evals/invariants.py`) need no right answer, so they hold for any
+  resume. For example: `not_assessed` only appears when part of the resume really was
+  unreadable, no gap is claimed in that case, and every cited line exists and actually
+  mentions the skill.
+- **Golden cases** (`evals/golden/`) are hand-labelled resume/JD pairs with the expected
+  status and must/nice level for each skill. Development cases must all pass. Held-out cases
+  only measure the rules and are never used to tune them, so a miss is reported but doesn't
+  fail the build.
+
+The report breaks accuracy down by field (status, requirement level), by development vs
+held-out, and by document type (`txt`, `pdf`). The current cases were written alongside the
+rules, so their 100% is an upper bound; the real test is held-out cases built from real job
+descriptions.
 
 ### Planned commands
 

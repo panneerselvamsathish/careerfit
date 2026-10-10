@@ -1,0 +1,14 @@
+Data Engineer - Analytics Platform
+
+What you'll do:
+- Build batch and streaming pipelines in Python and SQL.
+- Own our Kafka topics and the jobs that consume them.
+
+Requirements:
+- 3+ years with Python and SQL
+- Experience with AWS (S3, Glue, Redshift)
+- Docker for local development
+
+Preferred qualifications:
+- Terraform
+- Experience with Go is a bonus

@@ -1,0 +1,6 @@
+Alex Kim
+Frontend Developer
+
+- Built a design system in React.js and TypeScript used by 12 product teams.
+- Wrote JavaScript for the checkout flow and integrated it with our RESTful services.
+- Reviewed pull requests daily in Git.
