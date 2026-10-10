@@ -103,3 +103,10 @@ uv run careerfit-server
 - [pypdf](https://pypdf.readthedocs.io/) — PDF parsing
 - [Anthropic API](https://docs.anthropic.com/) — LLM judge layer
 - [FastAPI](https://fastapi.tiangolo.com/) — web API
+
+## How this was built
+
+Built with [Claude Code](https://claude.com/claude-code) as a pair programmer. I own the
+design, schema and boundaries; architectural rules are enforced by tests
+(`tests/test_architecture.py`), not trust. Project rules for the agent live in `CLAUDE.md`
+and `.claude/`. PRs are reviewed by Copilot and by me.
