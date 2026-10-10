@@ -1,7 +1,10 @@
 """Scores every golden case against its hand-labelled expectations and the honesty invariants.
 
 Usage: uv run python -m evals.harness [--golden-dir DIR]
-Exits 1 if any expectation fails or any invariant is violated.
+
+Development cases are regression tests: every expectation must pass. Held-out cases measure
+the rules and are never used to tune them, so their misses are reported but don't fail the
+run. Honesty violations fail the run on any case.
 """
 
 import argparse
@@ -30,6 +33,9 @@ class CaseResult:
     passed: list[str] = field(default_factory=list)
     failed: list[str] = field(default_factory=list)
     violations: list[str] = field(default_factory=list)
+    status_correct: int = 0
+    requirement_correct: int = 0
+    labelled: int = 0
 
 
 def load_cases(golden_dir: Path = GOLDEN_DIR) -> list[dict]:
@@ -56,11 +62,14 @@ def run_case(case: dict, ontology: dict[str, SkillEntry]) -> CaseResult:
     not_observed: list[str] = case.get("not_observed", [])
 
     for skill, exp in expected.items():
+        result.labelled += 1
         want = f"{exp['status']}/{exp['requirement']}"
         obs = actual.get(skill)
         if obs is None:
             result.failed.append(f"{skill}: expected {want}, not reported")
             continue
+        result.status_correct += obs.status.value == exp["status"]
+        result.requirement_correct += obs.requirement == exp["requirement"]
         got = f"{obs.status.value}/{obs.requirement}"
         (result.passed if got == want else result.failed).append(f"{skill}: expected {want}, got {got}")
 
@@ -75,6 +84,17 @@ def run_case(case: dict, ontology: dict[str, SkillEntry]) -> CaseResult:
     return result
 
 
+def _pct(n: int, total: int) -> str:
+    return f"{n}/{total} ({100 * n // total}%)" if total else "n/a"
+
+
+def _accuracy_line(label: str, group: list[CaseResult]) -> str:
+    labelled = sum(r.labelled for r in group)
+    status = sum(r.status_correct for r in group)
+    requirement = sum(r.requirement_correct for r in group)
+    return f"  {label:<10} status {_pct(status, labelled):<14} requirement {_pct(requirement, labelled)}"
+
+
 def report(results: list[CaseResult]) -> str:
     lines = []
     for r in results:
@@ -82,13 +102,24 @@ def report(results: list[CaseResult]) -> str:
         honesty = "honesty clean" if not r.violations else f"{len(r.violations)} HONESTY VIOLATIONS"
         tag = ", held out" if r.held_out else ""
         lines.append(f"{r.name} ({r.doc_type}{tag}): {len(r.passed)}/{total} expectations passed, {honesty}")
-        lines += [f"  FAIL       {f}" for f in r.failed]
+        lines += [f"  {'MISS' if r.held_out else 'FAIL'}       {f}" for f in r.failed]
         lines += [f"  VIOLATION  {v}" for v in r.violations]
-    n_pass = sum(len(r.passed) for r in results)
-    n_total = n_pass + sum(len(r.failed) for r in results)
+
+    lines.append("Accuracy on labelled skills:")
+    for label, group in (("dev", [r for r in results if not r.held_out]), ("held-out", [r for r in results if r.held_out])):
+        if group:
+            lines.append(_accuracy_line(label, group))
+    for doc_type in sorted({r.doc_type for r in results}):
+        lines.append(_accuracy_line(doc_type, [r for r in results if r.doc_type == doc_type]))
+
     n_violations = sum(len(r.violations) for r in results)
-    lines.append(f"TOTAL: {n_pass}/{n_total} expectations across {len(results)} cases, {n_violations} honesty violations")
+    n_dev_failures = sum(len(r.failed) for r in results if not r.held_out)
+    lines.append(f"TOTAL: {len(results)} cases, {n_dev_failures} dev failures, {n_violations} honesty violations")
     return "\n".join(lines)
+
+
+def gate_failed(results: list[CaseResult]) -> bool:
+    return any(r.violations or (r.failed and not r.held_out) for r in results)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -99,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
     ontology = load_ontology(ONTOLOGY_PATH)
     results = [run_case(case, ontology) for case in load_cases(args.golden_dir)]
     print(report(results))
-    return 1 if any(r.failed or r.violations for r in results) else 0
+    return 1 if gate_failed(results) else 0
 
 
 if __name__ == "__main__":

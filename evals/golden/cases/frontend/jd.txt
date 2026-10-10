@@ -1,0 +1,10 @@
+Frontend Engineer
+
+Requirements:
+- Strong JavaScript and React.js
+- Building against REST APIs
+- Git and code review
+
+Nice to have:
+- Python for internal tooling
+- Familiarity with Docker

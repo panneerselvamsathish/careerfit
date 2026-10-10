@@ -1,0 +1,2 @@
+We are hiring a platform engineer. Kubernetes and Terraform are required, and AWS experience is a plus.
+You will automate deployments with Python. Kafka is preferred but Go is required.

@@ -1,0 +1,20 @@
+# Held out: "What you'll do:" duties section before Requirements, a "Preferred qualifications:"
+# heading, and resume skills (Spark, Airflow) that aren't in the skill list at all.
+case: data_engineer
+doc_type: txt
+held_out: true
+resume: evals/golden/cases/data_engineer/resume.txt
+jd: evals/golden/cases/data_engineer/jd.txt
+labelled_by: claude, reviewed by sathish
+labelled_at: 2026-10-10
+
+expected:
+  python:    {status: matched,      requirement: must}   # duties and Requirements
+  sql:       {status: matched,      requirement: must}
+  kafka:     {status: gap,          requirement: must}   # owning Kafka topics is a core duty
+  aws:       {status: matched,      requirement: must}
+  docker:    {status: matched,      requirement: must}
+  terraform: {status: gap,          requirement: nice}   # under "Preferred qualifications:"
+  go:        {status: unresolvable, requirement: nice}   # "Experience with Go" could be the verb
+
+not_observed: []

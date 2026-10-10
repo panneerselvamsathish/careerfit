@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install dependencies from the lock file
+        run: uv sync --locked
+      - name: Tests (includes the architecture boundary check)
+        run: uv run pytest
+      - name: Evals (golden cases + honesty invariants)
+        run: uv run python -m evals.harness

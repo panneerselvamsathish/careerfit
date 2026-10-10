@@ -1,0 +1,19 @@
+# Held out: dotted and suffixed aliases (React.js, RESTful), JavaScript next to the Java trap,
+# and a skill (TypeScript) that isn't in the skill list.
+case: frontend
+doc_type: txt
+held_out: true
+resume: evals/golden/cases/frontend/resume.txt
+jd: evals/golden/cases/frontend/jd.txt
+labelled_by: claude, reviewed by sathish
+labelled_at: 2026-10-10
+
+expected:
+  javascript: {status: matched, requirement: must}
+  react:      {status: matched, requirement: must}   # "React.js" in both is an unambiguous alias
+  rest:       {status: matched, requirement: must}   # JD "REST APIs", resume "RESTful"
+  git:        {status: matched, requirement: must}
+  python:     {status: gap,     requirement: nice}
+  docker:     {status: gap,     requirement: nice}
+
+not_observed: [java]   # "JavaScript" must never count as Java

@@ -1,0 +1,19 @@
+# Held out: a JD written as prose (no headings), mixed must/nice sentences, and a fully
+# readable two-page PDF resume.
+case: platform_pdf
+doc_type: pdf
+held_out: true
+resume: evals/golden/cases/platform_pdf/resume.pdf
+jd: evals/golden/cases/platform_pdf/jd.txt
+labelled_by: claude, reviewed by sathish
+labelled_at: 2026-10-10
+
+expected:
+  kubernetes: {status: matched,      requirement: must}
+  terraform:  {status: matched,      requirement: must}
+  aws:        {status: matched,      requirement: nice}   # "AWS experience is a plus"
+  python:     {status: matched,      requirement: must}
+  kafka:      {status: gap,          requirement: nice}   # "Kafka is preferred"
+  go:         {status: unresolvable, requirement: must}   # "Go is required": the JD's own word is ambiguous
+
+not_observed: []

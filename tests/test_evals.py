@@ -30,13 +30,25 @@ def facts_with(*observations: SkillObservation, resume_coverage: Coverage = TXT)
     )
 
 
-def test_every_golden_case_passes_and_is_honest():
+def test_dev_cases_pass_and_every_case_is_honest():
     ontology = harness.load_ontology(harness.ONTOLOGY_PATH)
     results = [harness.run_case(case, ontology) for case in harness.load_cases()]
-    assert len(results) >= 2
+    assert any(r.held_out for r in results) and any(not r.held_out for r in results)
     for r in results:
-        assert r.failed == [], r.name
         assert r.violations == [], r.name
+        if not r.held_out:
+            assert r.failed == [], r.name
+    assert not harness.gate_failed(results)
+
+
+def test_held_out_miss_is_reported_but_does_not_fail_the_run(tmp_path, capsys):
+    case = yaml.safe_load((harness.GOLDEN_DIR / "frontend.yaml").read_text(encoding="utf-8"))
+    case["expected"]["python"]["requirement"] = "must"
+    (tmp_path / "held_out.yaml").write_text(yaml.safe_dump(case), encoding="utf-8")
+    assert harness.main(["--golden-dir", str(tmp_path)]) == 0
+    out = " ".join(capsys.readouterr().out.split())
+    assert "MISS python: expected gap/must, got gap/nice" in out
+    assert "held-out status 6/6 (100%) requirement 5/6 (83%)" in out
 
 
 def test_harness_exits_nonzero_when_a_golden_expectation_is_wrong(tmp_path, capsys):
