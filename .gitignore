@@ -7,3 +7,10 @@ __pycache__/
 dist/
 .pytest_cache/
 scratch/
+
+# Local secrets (API keys for the judge/ milestone)
+.env
+.env.*
+
+# Shared Claude Code project settings must be committed (settings.local.json stays ignored)
+!.claude/settings.json

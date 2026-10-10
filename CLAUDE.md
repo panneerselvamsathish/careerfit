@@ -111,3 +111,9 @@ The CLI/API passes the current timestamp in. Same input → byte-identical outpu
 | 6 | Judge | Anthropic tool_use structured output, prompt versioning |
 | 7 | Report + CLI | Rendering separation, composition root pattern |
 | 8 | Web API + UI | FastAPI file upload, serving static files, client-side render |
+
+## Zero-token architecture
+
+Design notes on keeping the main path LLM-free, with `judge/` as an optional escalation. Imported so it is always in context:
+
+@docs/zero_token_architecture.md
