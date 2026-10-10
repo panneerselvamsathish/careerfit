@@ -38,3 +38,35 @@ swift:
 r:
   aliases: []
   ambiguous: true
+
+docker:
+  aliases: []
+  ambiguous: false
+
+terraform:
+  aliases: []
+  ambiguous: false
+
+postgresql:
+  aliases: ["postgres"]
+  ambiguous: false
+
+sql:
+  aliases: []
+  ambiguous: false
+
+kafka:
+  aliases: ["apache kafka"]
+  ambiguous: false
+
+react:
+  aliases: ["react.js", "reactjs"]
+  ambiguous: true
+
+rest:
+  aliases: ["rest api", "rest apis", "restful"]
+  ambiguous: true
+
+git:
+  aliases: []
+  ambiguous: false

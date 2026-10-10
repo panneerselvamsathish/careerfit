@@ -1,0 +1,20 @@
+Jordan Lee
+Backend Software Engineer
+jordan.lee@example.com | Austin, TX
+
+Summary
+Backend engineer with 6 years of experience building REST APIs and data services in Python.
+
+Experience
+Senior Software Engineer, Acme Payments (2021 - present)
+- Built payment APIs in Python and Django that serve 2 million requests a day.
+- Moved eight services to AWS (Lambda, S3, RDS) and cut hosting costs by 30%.
+- Containerised every service with Docker and wrote the CI/CD pipelines in GitHub Actions.
+- Tuned slow PostgreSQL queries for the reporting database, cutting report time from 40s to 3s.
+
+Software Engineer, Brightline Logistics (2018 - 2021)
+- Wrote internal tools in Python and JavaScript for the operations team.
+- Led the go-live of the new shipment tracking system.
+
+Skills
+Python, Django, PostgreSQL, SQL, Docker, AWS, Git, JavaScript
