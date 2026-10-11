@@ -3,6 +3,7 @@
 import argparse
 import os
 import sys
+import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,12 +21,18 @@ CACHE_DIR = Path(".cache") / "judge"
 
 
 def _same_file(a: Path, b: Path) -> bool:
-    if a.resolve() == b.resolve():
+    # Conservative on purpose: macOS and Windows treat names that differ only in case or Unicode
+    # normalisation as one file, even before either exists, so such names are refused everywhere.
+    if _path_key(a) == _path_key(b):
         return True
     try:
-        return a.samefile(b)  # catches hard links and case-only differences on macOS
+        return a.samefile(b)  # hard links
     except OSError:  # one of them doesn't exist yet
         return False
+
+
+def _path_key(path: Path) -> str:
+    return unicodedata.normalize("NFC", str(path.resolve())).casefold()
 
 
 def main(argv: list[str] | None = None) -> int:

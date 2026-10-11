@@ -138,12 +138,17 @@ def test_skill_names_from_a_custom_ontology_are_escaped_in_summaries():
     assert "<b>" not in report
 
 
-def test_output_and_report_cannot_be_the_same_file(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("output, report", [
+    ("out.md", "{tmp}/out.md"),
+    ("Out.md", "out.md"),                      # one file on macOS and Windows, even before it exists
+    ("caf\u00e9.md", "cafe\u0301.md"),       # é precomposed vs e + combining accent: one file on macOS
+], ids=["relative-vs-absolute", "case-only", "unicode-normalisation"])
+def test_output_and_report_cannot_be_the_same_file(tmp_path, monkeypatch, capsys, output, report):
     monkeypatch.chdir(tmp_path)
     args = ["--resume", str(FIXTURES / "resume.txt"), "--jd", str(FIXTURES / "jd.txt")]
-    assert main(args + ["-o", "out.md", "--report", str(tmp_path / "out.md")]) == 2
+    assert main(args + ["-o", output, "--report", report.format(tmp=tmp_path)]) == 2
     assert "-o and --report must be different files" in capsys.readouterr().err
-    assert not (tmp_path / "out.md").exists()
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_output_and_report_cannot_be_two_names_for_one_existing_file(tmp_path, capsys):
