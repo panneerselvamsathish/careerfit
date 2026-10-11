@@ -21,11 +21,15 @@ class CachingLLM:
         path = self.directory / f"{key}.json"
         stored = _read(path)
         if stored is not None:
-            return SimpleNamespace(stop_reason=stored["stop_reason"], content=stored["content"])
+            return SimpleNamespace(stop_reason=stored["stop_reason"], model=stored["model"], content=stored["content"])
         response = self.inner.create(**kwargs)
         if getattr(response, "stop_reason", None) == "end_turn":
             text_blocks = [{"type": "text", "text": b.text} for b in response.content if getattr(b, "type", None) == "text"]
-            _write_atomically(path, json.dumps({"stop_reason": "end_turn", "content": text_blocks}))
+            entry = {"stop_reason": "end_turn", "model": getattr(response, "model", None), "content": text_blocks}
+            try:
+                _write_atomically(path, json.dumps(entry))
+            except OSError:
+                pass  # Best-effort: an unwritable cache must never discard a paid, completed answer.
         return response
 
 
@@ -36,6 +40,8 @@ def _read(path: Path) -> dict | None:
     except (OSError, UnicodeError, json.JSONDecodeError):
         return None
     if not isinstance(stored, dict) or stored.get("stop_reason") != "end_turn":
+        return None
+    if not isinstance(stored.get("model"), (str, type(None))) or "model" not in stored:
         return None
     content = stored.get("content")
     if not isinstance(content, list) or not all(

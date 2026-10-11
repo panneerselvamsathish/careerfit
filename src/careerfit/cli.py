@@ -81,4 +81,7 @@ def main(argv: list[str] | None = None) -> int:
         dismissed = len(facts.judge.dismissed_skills)
         print(f"Judge ({facts.judge.model}): {fit}, {dismissed} dismissed, {len(facts.learning_steps)} learning steps",
               file=sys.stderr)
+        others = [m for m in facts.judge.served_by if m != facts.judge.model]
+        if others:
+            print(f"careerfit: judge answers were served by a fallback model: {', '.join(others)}", file=sys.stderr)
     return 0

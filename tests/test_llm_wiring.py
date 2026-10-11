@@ -97,7 +97,7 @@ def test_cache_only_stores_complete_answers(tmp_path):
     answered = FakeLLM({"verdicts": []})
     CachingLLM(answered, tmp_path).create(model="m", messages=[])
     stored = json.loads(next(tmp_path.iterdir()).read_text(encoding="utf-8"))
-    assert stored == {"stop_reason": "end_turn", "content": [{"type": "text", "text": '{"verdicts": []}'}]}
+    assert stored == {"stop_reason": "end_turn", "model": None, "content": [{"type": "text", "text": '{"verdicts": []}'}]}
 
 
 def test_unreadable_cache_entry_is_a_miss_and_gets_replaced(tmp_path):
@@ -126,3 +126,31 @@ def test_malformed_cache_entry_is_a_miss(tmp_path, entry):
     response = CachingLLM(again, tmp_path).create(model="m", messages=[])
     assert len(again.calls) == 1
     assert response.stop_reason == "end_turn"
+
+
+def test_cache_write_failure_does_not_lose_the_answer(tmp_path):
+    blocker = tmp_path / "not-a-folder"
+    blocker.write_text("x", encoding="utf-8")
+    answered = FakeLLM({"verdicts": []})
+    response = CachingLLM(answered, blocker / "judge").create(model="m", messages=[])
+    assert response.stop_reason == "end_turn"
+
+
+def test_cache_replays_the_model_that_answered(tmp_path):
+    served = SimpleNamespace(stop_reason="end_turn", model="claude-opus-4-8",
+                             content=[SimpleNamespace(type="text", text="{}")])
+    CachingLLM(FakeLLM(served), tmp_path).create(model="m", messages=[])
+    assert CachingLLM(FakeLLM(), tmp_path).create(model="m", messages=[]).model == "claude-opus-4-8"
+
+
+def test_fallback_model_is_reported_by_the_cli(tmp_path, monkeypatch, capsys):
+    import json as _json
+    def answer(payload, model):
+        return SimpleNamespace(stop_reason="end_turn", model=model,
+                               content=[SimpleNamespace(type="text", text=_json.dumps(payload))])
+    llm = FakeLLM(answer({"verdicts": [verdict("go"), verdict("react")]}, "claude-opus-4-8"),
+                  answer(plan(*GAPS_AFTER_JUDGE), "fake-model"))
+    facts = run_deep(tmp_path, monkeypatch, llm)
+    assert facts.judge is not None
+    assert facts.judge.served_by == ("claude-opus-4-8", "fake-model")
+    assert "served by a fallback model: claude-opus-4-8" in capsys.readouterr().err

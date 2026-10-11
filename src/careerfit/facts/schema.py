@@ -83,6 +83,7 @@ class JudgeRun(BaseModel):
 
     model: str
     prompt_versions: tuple[str, ...]
+    served_by: tuple[str, ...] = ()
     dismissed_skills: tuple[str, ...] = ()
     failures: tuple[str, ...] = ()
 

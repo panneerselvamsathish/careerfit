@@ -93,13 +93,14 @@ def judge_facts(
     prompts_used: list[str] = []
     dismissed: list[str] = []
     failures: list[str] = []
+    served_by: list[str] = []
 
     unresolved = [o for o in observations if o.status == SkillStatus.UNRESOLVABLE]
     if unresolved:
         prompts_used.append(skill_prompt.ref)
         try:
             verdicts = resolve_skills(unresolved, resume_text=resume_text, jd_text=jd_text,
-                                      llm=llm, model=model, prompt=skill_prompt)
+                                      llm=llm, model=model, prompt=skill_prompt, served_by=served_by)
         except JudgeFailure as e:
             failures.append(str(e))
             verdicts = {}
@@ -120,7 +121,7 @@ def judge_facts(
         prompts_used.append(plan_prompt.ref)
         try:
             steps = plan_learning(gaps, resume_text=resume_text, jd_text=jd_text,
-                                  llm=llm, model=model, prompt=plan_prompt)
+                                  llm=llm, model=model, prompt=plan_prompt, served_by=served_by)
         except JudgeFailure as e:
             failures.append(str(e))
 
@@ -130,7 +131,7 @@ def judge_facts(
         skill_observations=tuple(observations),
         fit_score=compute_fit_score(tuple(observations)),
         learning_steps=steps,
-        judge=JudgeRun(model=model, prompt_versions=tuple(prompts_used),
+        judge=JudgeRun(model=model, prompt_versions=tuple(prompts_used), served_by=tuple(dict.fromkeys(served_by)),
                        dismissed_skills=tuple(dismissed), failures=tuple(failures)),
     )
     return GapAnalysisFacts.model_validate(data)
@@ -144,6 +145,7 @@ def resolve_skills(
     llm: LLM,
     model: str,
     prompt: PromptSpec,
+    served_by: list[str] | None = None,
 ) -> dict[str, SkillVerdict]:
     names = [o.skill for o in unresolved]
     jd_lines = jd_text.splitlines()
@@ -169,7 +171,7 @@ def resolve_skills(
         return problems
 
     answer = _ask(llm, model=model, prompt=prompt, user=user, schema=prompt.schema_for(names),
-                  answer_type=SkillVerdicts, check=check)
+                  answer_type=SkillVerdicts, check=check, served_by=served_by)
     return {v.skill: v for v in answer.verdicts}
 
 
@@ -181,6 +183,7 @@ def plan_learning(
     llm: LLM,
     model: str,
     prompt: PromptSpec,
+    served_by: list[str] | None = None,
 ) -> tuple[LearningStep, ...]:
     names = [o.skill for o in gaps]
     requirements = {o.skill: o.requirement for o in gaps}
@@ -205,7 +208,7 @@ def plan_learning(
         return problems
 
     answer = _ask(llm, model=model, prompt=prompt, user=user, schema=prompt.schema_for(names),
-                  answer_type=LearningPlan, check=check)
+                  answer_type=LearningPlan, check=check, served_by=served_by)
     return tuple(
         LearningStep(skill=s.skill, priority=s.priority, why_it_matters=s.why_it_matters,
                      resources=tuple(s.resources), estimated_weeks=s.estimated_weeks or None)
@@ -216,7 +219,7 @@ def plan_learning(
 # A bare domain naming the publisher, e.g. "(kubernetes.io)", is allowed: it can't point at a page
 # that doesn't exist. Anything that addresses a specific location could be made up, so it's rejected.
 _LINK_PATTERNS = (
-    re.compile(r"\b[a-z][a-z0-9+.-]*://", re.IGNORECASE),        # any scheme: https://, ftp://
+    re.compile(r"\b[a-z][a-z0-9+.-]*:(?=\S)", re.IGNORECASE),     # any scheme: https:, ftp:, mailto:, doi:
     re.compile(r"\bwww\.", re.IGNORECASE),
     re.compile(r"\]\("),                                         # Markdown link [text](target)
     re.compile(r"\b[a-z0-9-]+(\.[a-z0-9-]+)+/\S", re.IGNORECASE),  # domain followed by a path
@@ -265,6 +268,7 @@ def _ask(
     schema: dict,
     answer_type: type[T],
     check: Callable[[T], list[str]],
+    served_by: list[str] | None = None,
 ) -> T:
     """One request, plus one retry that tells the model exactly what was wrong."""
     messages: list[dict[str, Any]] = [{"role": "user", "content": user}]
@@ -276,6 +280,9 @@ def _ask(
             messages=messages,
             output_config={"effort": EFFORT, "format": {"type": "json_schema", "schema": schema}},
         )
+        if served_by is not None:
+            # A server-side fallback can answer with a different model; record who actually did.
+            served_by.append(getattr(response, "model", None) or model)
         stop = getattr(response, "stop_reason", None)
         if stop == "refusal":
             raise JudgeFailure(f"{prompt.ref}: the model declined the request")

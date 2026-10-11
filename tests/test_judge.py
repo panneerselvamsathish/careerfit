@@ -226,6 +226,9 @@ def test_fit_score_is_none_when_nothing_was_decided():
     ("kubernetes.io/docs/tutorials", True),
     ("[Kubernetes docs](kubernetes.io)", True),
     ("www.example.com", True),
+    ("mailto:author@example.com", True),
+    ("urn:isbn:9781492043089", True),
+    ("doi:10.1145/3290605", True),
     ("Kubernetes official documentation (kubernetes.io)", False),
     ("Kafka: The Definitive Guide (O'Reilly)", False),
     ("A Tour of Go (go.dev)", False),
@@ -261,3 +264,9 @@ def test_one_word_quote_is_retried():
     facts = run(llm)
     assert "resume_quote must be at least 3 words" in llm.calls[1]["messages"][2]["content"]
     assert by_skill(facts)["go"].status == SkillStatus.MATCHED
+
+
+def test_served_by_falls_back_to_the_requested_model_when_the_response_has_none():
+    llm = FakeLLM({"verdicts": [verdict("go"), verdict("react", requires=False)]}, plan("kubernetes", "go"))
+    facts = run(llm)
+    assert facts.judge is not None and facts.judge.served_by == (MODEL,)
