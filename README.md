@@ -84,7 +84,7 @@ Every row quotes the line it relies on, so you can check a claim without opening
 |---|---|---|---|
 | python | Matched | line 7: "- 5+ years building production services in Python" | line 6: "Backend engineer with 6 years of experience building REST APIs and data services in Python." |
 | kubernetes | Gap | line 9: "- Running Kubernetes in production" | — |
-| go | Unresolved | line 15: "- Experience with Go" | line 17: "- Led the go-live of the new shipment tracking system." |
+| go | Ambiguous | line 15: "- Experience with Go" | line 17: "- Led the go-live of the new shipment tracking system." |
 ```
 
 `--perspective` picks who the report is for:

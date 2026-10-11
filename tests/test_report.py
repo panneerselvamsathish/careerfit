@@ -60,6 +60,31 @@ def test_judged_candidate_report_shows_fit_plan_dismissals_and_provenance():
     assert "1 was settled by Claude" in report
 
 
+def test_ambiguous_skills_are_labelled_ambiguous_not_as_a_conclusion():
+    report = render_markdown(sample_facts()[0])
+    assert '| go | Ambiguous | line 15: "- Experience with Go" |' in report
+    assert "- Nice-to-have skills: 1 gap, 2 ambiguous (of 3)" in report
+
+
+def test_failed_learning_plan_is_reported_as_missing_not_as_kept_keyword_results():
+    facts, resume_text, jd_text = sample_facts()
+    linked = plan("kubernetes", "terraform", "kafka", "react")
+    linked["steps"][0]["resources"] = ["https://kubernetes.io/docs"]
+    llm = FakeLLM({"verdicts": [verdict("go", requires=False), verdict("react", jd_line=17)]}, linked, linked)
+    judged = judge_facts(facts, resume_text=resume_text, jd_text=jd_text, llm=llm, model="claude-opus-5-5", at=AT,
+                         ontology=load_ontology(DEFAULT_ONTOLOGY))
+    report = render_markdown(judged)
+    assert ("- Part of the deep analysis failed, and its results are not in this report: "
+            r"learning\_path@2: answer still invalid after one retry") in report
+    assert "keyword results were kept" not in report
+    assert "## Learning plan" not in report
+
+
+def test_schema_version_is_shown_literally():
+    facts = sample_facts()[0].model_copy(update={"schema_version": "<b>0.4.0</b>"})
+    assert r"· schema \<b\>0.4.0\</b\>" in render_markdown(facts)
+
+
 def test_learning_plan_effort_reads_naturally():
     answer = plan("kubernetes", "terraform", "kafka", "react")
     answer["steps"][0]["estimated_weeks"], answer["steps"][1]["estimated_weeks"] = 1, 0
@@ -102,7 +127,10 @@ def test_readable_pdf_job_description_still_discloses_layout_limits():
     ("![pixel](https://evil.example/p.png)", r"!\[pixel\](https://evil.example/p.png)"),
     ("*bold* _it_ ~gone~ `code`", r"\*bold\* \_it\_ \~gone\~ \`code\`"),
     ("- 5+ years of C# & SQL!", "- 5+ years of C# & SQL!"),
-], ids=["pipe-and-newline", "backslash-before-pipe", "plain-backslash", "html", "image", "emphasis", "plain-text"])
+    ("safe\r# forged heading", "safe # forged heading"),  # a bare \r also ends a Markdown line
+    ("a\r\nb\u2028c", "a b c"),  # \r\n, and a Unicode line separator some viewers break on
+], ids=["pipe-and-newline", "backslash-before-pipe", "plain-backslash", "html", "image", "emphasis", "plain-text",
+        "bare-carriage-return", "crlf-and-line-separator"])
 def test_cells_show_untrusted_text_literally(text, expected):
     assert cell(text) == expected
 

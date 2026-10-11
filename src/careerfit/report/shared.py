@@ -9,7 +9,7 @@ STATUS_LABEL = {
     SkillStatus.MATCHED: "Matched",
     SkillStatus.PARTIAL: "Partly shown",
     SkillStatus.GAP: "Gap",
-    SkillStatus.UNRESOLVABLE: "Unresolved",
+    SkillStatus.UNRESOLVABLE: "Ambiguous",  # never a conclusion: see "GAP ≠ UNRESOLVABLE" in CLAUDE.md
     SkillStatus.NOT_ASSESSED: "Not assessed",
 }
 STATUS_ORDER = [SkillStatus.MATCHED, SkillStatus.PARTIAL, SkillStatus.GAP, SkillStatus.UNRESOLVABLE,
@@ -29,8 +29,9 @@ def cell(text: str) -> str:
     Excerpts come straight from the resume and JD, so an <img> tag or ![](...) in them must be
     displayed, not rendered: rendered, it could inject markup or fetch a remote image.
     """
+    # Every line boundary is flattened, not just \n: Markdown also ends a line at a bare \r.
     # Backslashes are escaped in the same pass, so a backslash in the source cannot cancel a pipe's escape.
-    return _MARKDOWN_ACTIVE.sub(r"\\\1", text).replace("\n", " ")
+    return _MARKDOWN_ACTIVE.sub(r"\\\1", " ".join(text.splitlines()))
 
 
 def names(items: Iterable[str]) -> str:
@@ -67,7 +68,7 @@ def mode_line(facts: GapAnalysisFacts) -> str:
 
 def header(facts: GapAnalysisFacts, title: str) -> list[str]:
     return [f"# {title}", "",
-            f"{mode_line(facts)} · analysed {facts.analyzed_at:%Y-%m-%d} · schema {facts.schema_version}", ""]
+            f"{mode_line(facts)} · analysed {facts.analyzed_at:%Y-%m-%d} · schema {cell(facts.schema_version)}", ""]
 
 
 def blind_spots(facts: GapAnalysisFacts) -> list[str]:
@@ -98,7 +99,9 @@ def blind_spots(facts: GapAnalysisFacts) -> list[str]:
             notes.append(f"Not counted: {cell(skill)}. The job description uses the word in its everyday sense, "
                          "not as a skill.")
         for failure in facts.judge.failures:
-            notes.append(f"Part of the deep analysis failed, so some keyword results were kept: {cell(failure)}")
+            # Says only what is true for every step: a failed skill match leaves its skills Ambiguous
+            # (noted above), and a failed learning plan leaves the plan out. Neither is filled in by keywords.
+            notes.append(f"Part of the deep analysis failed, and its results are not in this report: {cell(failure)}")
     return ["## What this analysis could not see", "", *(f"- {n}" for n in notes), ""]
 
 
