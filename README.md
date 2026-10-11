@@ -125,8 +125,8 @@ gaps.
 
 **What leaves your machine:** each `--deep` run sends the **full text of the resume and the job
 description** to Claude through the provider you chose (Amazon Bedrock or the Anthropic API), in
-up to two requests: one to settle the unresolvable skills, one for the learning plan. Without
-`--deep`, nothing is sent anywhere. Answers are cached locally in `.cache/judge/`; delete that
+up to four requests: one each for skill matching and the learning plan, plus one retry for each
+when an answer is invalid. Without `--deep`, nothing is sent anywhere. Answers are cached locally in `.cache/judge/`; delete that
 folder to remove them.
 
 - **Every positive verdict quotes the resume**, and the quote is checked in code before it is
