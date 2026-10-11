@@ -1,5 +1,7 @@
 """Formatting shared by both perspectives. Presentation only: no verdict is decided here."""
 
+import re
+
 from careerfit.facts.schema import Coverage, GapAnalysisFacts, Provenance, SkillObservation, SkillStatus
 
 STATUS_LABEL = {
@@ -13,12 +15,19 @@ STATUS_ORDER = [SkillStatus.MATCHED, SkillStatus.PARTIAL, SkillStatus.GAP, Skill
                 SkillStatus.NOT_ASSESSED]
 DECIDED = (SkillStatus.MATCHED, SkillStatus.PARTIAL, SkillStatus.GAP)
 LAYOUT_BLIND_SPOTS = ("layout_order", "graphics", "tables")
+# What can start HTML or inline Markdown: tags and autolinks (< >), links and images ([ ]),
+# emphasis, strikethrough and code (* _ ~ `), the table delimiter (|), and the backslash itself.
+_MARKDOWN_ACTIVE = re.compile(r"([\\`*_~\[\]<>|])")
 
 
 def cell(text: str) -> str:
-    """Make text safe inside a Markdown table cell."""
-    # Backslashes first: otherwise a source "\\|" becomes "\\\\|", and the pipe splits the cell.
-    return text.replace("\\", "\\\\").replace("|", "\\|").replace("\n", " ")
+    """Show untrusted text literally in Markdown, in a table cell or a list item.
+
+    Excerpts come straight from the resume and JD, so an <img> tag or ![](...) in them must be
+    displayed, not rendered: rendered, it could inject markup or fetch a remote image.
+    """
+    # Backslashes are escaped in the same pass, so a backslash in the source cannot cancel a pipe's escape.
+    return _MARKDOWN_ACTIVE.sub(r"\\\1", text).replace("\n", " ")
 
 
 def cite(evidence: Provenance | None) -> str:
@@ -82,7 +91,7 @@ def blind_spots(facts: GapAnalysisFacts) -> list[str]:
             notes.append(f"Not counted: {skill}. The job description uses the word in its everyday sense, "
                          "not as a skill.")
         for failure in facts.judge.failures:
-            notes.append(f"Part of the deep analysis failed, so some keyword results were kept: {failure}")
+            notes.append(f"Part of the deep analysis failed, so some keyword results were kept: {cell(failure)}")
     return ["## What this analysis could not see", "", *(f"- {n}" for n in notes), ""]
 
 

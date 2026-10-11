@@ -14,6 +14,7 @@ from tests.test_cli import FIXTURES
 from tests.test_judge import FakeLLM, plan, verdict
 
 AT = datetime(2026, 10, 11, tzinfo=timezone.utc)
+TXT = Coverage(source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=50, known_blind_spots=())
 SCANNED = Coverage(source_format="pdf", pages_total=3, pages_with_text=1, chars_extracted=50,
                    known_blind_spots=("layout_order", "graphics", "tables", "scanned_pages"))
 
@@ -97,9 +98,24 @@ def test_readable_pdf_job_description_still_discloses_layout_limits():
     ("a | b\nc", r"a \| b c"),
     (r"a\|b", r"a\\\|b"),  # an existing backslash must not cancel the pipe's escape
     (r"C:\tools", r"C:\\tools"),
-], ids=["pipe-and-newline", "backslash-before-pipe", "plain-backslash"])
-def test_table_cells_escape_pipes_backslashes_and_newlines(text, expected):
+    ('<img src="https://evil.example/p.png">', r'\<img src="https://evil.example/p.png"\>'),
+    ("![pixel](https://evil.example/p.png)", r"!\[pixel\](https://evil.example/p.png)"),
+    ("*bold* _it_ ~gone~ `code`", r"\*bold\* \_it\_ \~gone\~ \`code\`"),
+    ("- 5+ years of C# & SQL!", "- 5+ years of C# & SQL!"),
+], ids=["pipe-and-newline", "backslash-before-pipe", "plain-backslash", "html", "image", "emphasis", "plain-text"])
+def test_cells_show_untrusted_text_literally(text, expected):
     assert cell(text) == expected
+
+
+def test_markup_in_a_cited_resume_line_is_shown_not_rendered():
+    resume = 'Python developer <img src="https://evil.example/p.png"> ![x](https://evil.example/t.png)'
+    facts = build_facts(resume_text=resume, resume_coverage=TXT, resume_source="r.txt", jd_text="Requirements:\n- Python",
+                        jd_coverage=TXT, jd_source="j.txt", ontology=load_ontology(DEFAULT_ONTOLOGY), at=AT,
+                        perspective="candidate")
+    report = render_markdown(facts)
+    assert r'\<img src="https://evil.example/p.png"\>' in report
+    assert r"!\[x\](https://evil.example/t.png)" in report
+    assert "<img" not in report.replace(r"\<img", "") and "![" not in report
 
 
 def test_cli_writes_the_report(tmp_path, capsys):
