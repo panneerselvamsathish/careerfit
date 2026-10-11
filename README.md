@@ -119,8 +119,15 @@ export CAREERFIT_LLM_PROVIDER=anthropic
 uv run careerfit --resume fixtures/resume.txt --jd fixtures/jd.txt --deep -o facts.json
 ```
 
-The keyword pass runs first and costs nothing. `--deep` then sends only the skills it marked
-`unresolvable` to Claude, and writes a fit score and a learning plan for the gaps.
+The keyword pass runs first and costs nothing. `--deep` then asks Claude to settle only the
+skills the keyword pass marked `unresolvable`, and writes a fit score and a learning plan for the
+gaps.
+
+**What leaves your machine:** each `--deep` run sends the **full text of the resume and the job
+description** to Claude through the provider you chose (Amazon Bedrock or the Anthropic API), in
+up to two requests: one to settle the unresolvable skills, one for the learning plan. Without
+`--deep`, nothing is sent anywhere. Answers are cached locally in `.cache/judge/`; delete that
+folder to remove them.
 
 - **Every positive verdict quotes the resume**, and the quote is checked in code before it is
   accepted. A wrong or missing quote is sent back once with the reason; if it's still wrong,

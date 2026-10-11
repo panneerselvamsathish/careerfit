@@ -12,11 +12,14 @@ import pathlib
 #PKG = pathlib.Path(__file__).parent().parent() / "src" / "careerfit"
 PKG = pathlib.Path(__file__).parent.parent / "src" / "careerfit"
 
+# Raw HTTP clients, including httpx2 (what the Anthropic SDK itself is built on).
+RAW_HTTP = {"requests", "httpx", "httpx2", "aiohttp", "urllib3", "urllib.request", "http.client"}
+
 FORBIDDEN = {
-    "analyze": {"careerfit.judge", "anthropic", "openai", "requests", "httpx"},
-    "ingest": {"careerfit.judge", "careerfit.analyze", "anthropic", "openai", "requests", "httpx"},
-    "report": {"careerfit.judge", "careerfit.analyze", "anthropic", "openai", "requests", "httpx"},
-    "judge": {"careerfit.ingest", "careerfit.report", "careerfit.cli", "careerfit.api", "requests", "httpx"}
+    "analyze": {"careerfit.judge", "anthropic", "openai"} | RAW_HTTP,
+    "ingest": {"careerfit.judge", "careerfit.analyze", "anthropic", "openai"} | RAW_HTTP,
+    "report": {"careerfit.judge", "careerfit.analyze", "anthropic", "openai"} | RAW_HTTP,
+    "judge": {"careerfit.ingest", "careerfit.report", "careerfit.cli", "careerfit.api"} | RAW_HTTP,
 }
 
 def imports_of(path: pathlib.Path) -> set[str]:
