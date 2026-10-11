@@ -76,6 +76,18 @@ class Coverage(BaseModel):
             if self.pages_with_text > self.pages_total:
                 raise ValueError("pages_with_text cannot be greater than pages_total")
         return self
+class JudgeRun(BaseModel):
+    """Audit record of an LLM judge pass: what ran, and what it could not do."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    model: str
+    prompt_versions: tuple[str, ...]
+    served_by: tuple[str, ...] = ()
+    dismissed_skills: tuple[str, ...] = ()
+    failures: tuple[str, ...] = ()
+
+
 class GapAnalysisFacts(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -85,8 +97,9 @@ class GapAnalysisFacts(BaseModel):
     jd_coverage: Coverage
     analyzed_at: datetime
     llm_used: bool
-    schema_version: str = "0.2.0"
+    schema_version: str = "0.3.0"
     fit_score: FitScore | None = None
+    judge: JudgeRun | None = None
     skill_observations: tuple[SkillObservation, ...]
     learning_steps: tuple[LearningStep, ...] = ()
     perspective: Literal["candidate", "hiring_manager"]
@@ -98,4 +111,11 @@ class GapAnalysisFacts(BaseModel):
                 raise ValueError("fit_score should not be set if llm_used is False")
             if self.learning_steps:
                 raise ValueError("learning_steps should not be set if llm_used is False")
+            if self.judge is not None:
+                raise ValueError("judge should not be set if llm_used is False")
+        elif self.judge is None:
+            raise ValueError("judge is required when llm_used is True")
+        dismissed = set(self.judge.dismissed_skills) if self.judge else set()
+        if dismissed & {o.skill for o in self.skill_observations}:
+            raise ValueError("a dismissed skill cannot also be observed")
         return self

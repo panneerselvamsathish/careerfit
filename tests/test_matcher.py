@@ -96,3 +96,11 @@ def test_first_mention_line_prefers_found_over_unclear(text, expected):
 ])
 def test_requirement_evidence_points_at_the_deciding_line(jd_text, ontology, expected):
     assert requirement_evidence(jd_text, ontology) == expected
+
+
+def test_requirement_occurrences_lists_every_mention_in_order():
+    from careerfit.analyze.matcher import requirement_occurrences
+
+    go = SkillEntry(aliases=("golang",), ambiguous=True)
+    jd = "Requirements:\n- You must go onsite\nNice to have:\n- Golang experience"
+    assert requirement_occurrences(jd, {"go": go}) == {"go": [("must", 2, "unclear"), ("nice", 4, "found")]}
