@@ -38,7 +38,7 @@ not conventions, not comments. A build constraint.
 - [x] Milestone 4: Analyze — pure skill extraction, keyword gap computation
 - [x] Milestone 5: Evals — honesty invariants + golden expectations (two-layer eval design)
 - [x] Milestone 6: Judge — Anthropic API with structured output, versioned prompt YAML files
-- [ ] Milestone 7: Report + CLI — rendering separation, composition root pattern (CLI keyword pass works; report rendering to come)
+- [x] Milestone 7: Report + CLI — Markdown reports for two perspectives, every claim quoted, blind spots disclosed
 - [ ] Milestone 8: Web API + UI — FastAPI file upload, vanilla JS client
 
 ## Getting started
@@ -69,6 +69,36 @@ Wrote facts.json: 9 JD skills (3 gap, 4 matched, 2 unresolvable)
 
 To try your own files, pass any `.pdf` or `.txt` resume and job description. Leave out `-o`
 to print the JSON to the terminal instead.
+
+### A readable report
+
+```bash
+uv run careerfit --resume fixtures/resume.txt --jd fixtures/jd.txt --report report.md
+```
+
+`--report` writes a Markdown report; it works alongside `-o`, and with or without `--deep`.
+Every row quotes the line it relies on, so you can check a claim without opening the files:
+
+```markdown
+| Skill | Status | The job description says | Your resume shows |
+|---|---|---|---|
+| python | Matched | line 7: "- 5+ years building production services in Python" | line 6: "Backend engineer with 6 years of experience building REST APIs and data services in Python." |
+| kubernetes | Gap | line 9: "- Running Kubernetes in production" | — |
+| go | Unresolved | line 15: "- Experience with Go" | line 17: "- Led the go-live of the new shipment tracking system." |
+```
+
+`--perspective` picks who the report is for:
+
+- `candidate` (default): your fit, must-have and nice-to-have skills, and with `--deep` a
+  learning plan for the gaps.
+- `hiring_manager`: missing must-haves first, then the skills that need a human check, then
+  every requirement with its evidence. No learning plan.
+
+Both end with **What this analysis could not see** (skills outside the skill list, unreadable
+PDF pages, skills the keyword pass couldn't decide, anything the LLM judge dismissed or failed
+on) and **How this was decided** (how many skills were settled by keywords vs by Claude, which
+model and prompt versions). A gap list that hides its blind spots overclaims, so these sections
+are always present.
 
 ### Reading the result
 

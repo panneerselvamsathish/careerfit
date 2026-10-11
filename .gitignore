@@ -4,6 +4,8 @@ __pycache__/
 .venv/
 .cache/
 *.json
+# Reports quote resume lines; keep them out of the repo
+/report*.md
 dist/
 .pytest_cache/
 scratch/

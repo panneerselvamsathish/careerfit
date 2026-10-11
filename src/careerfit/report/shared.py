@@ -1,0 +1,94 @@
+"""Formatting shared by both perspectives. Presentation only: no verdict is decided here."""
+
+from careerfit.facts.schema import GapAnalysisFacts, Provenance, SkillObservation, SkillStatus
+
+STATUS_LABEL = {
+    SkillStatus.MATCHED: "Matched",
+    SkillStatus.PARTIAL: "Partly shown",
+    SkillStatus.GAP: "Gap",
+    SkillStatus.UNRESOLVABLE: "Unresolved",
+    SkillStatus.NOT_ASSESSED: "Not assessed",
+}
+STATUS_ORDER = [SkillStatus.MATCHED, SkillStatus.PARTIAL, SkillStatus.GAP, SkillStatus.UNRESOLVABLE,
+                SkillStatus.NOT_ASSESSED]
+DECIDED = (SkillStatus.MATCHED, SkillStatus.PARTIAL, SkillStatus.GAP)
+
+
+def cell(text: str) -> str:
+    """Make text safe inside a Markdown table cell."""
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
+def cite(evidence: Provenance | None) -> str:
+    if evidence is None:
+        return "—"
+    source = " (Claude)" if evidence.source == "llm_judge" else ""
+    return cell(f'{evidence.locator}{source}: "{evidence.excerpt}"')
+
+
+def by_requirement(facts: GapAnalysisFacts, requirement: str) -> list[SkillObservation]:
+    rows = [o for o in facts.skill_observations if o.requirement == requirement]
+    return sorted(rows, key=lambda o: (STATUS_ORDER.index(o.status), o.skill))
+
+
+def status_counts(observations: list[SkillObservation]) -> str:
+    def label(status: SkillStatus, n: int) -> str:
+        text = STATUS_LABEL[status].lower()
+        return f"{n} {text}s" if status == SkillStatus.GAP and n != 1 else f"{n} {text}"
+
+    parts = [label(s, sum(o.status == s for o in observations))
+             for s in STATUS_ORDER if any(o.status == s for o in observations)]
+    return ", ".join(parts) + f" (of {len(observations)})" if observations else "none listed"
+
+
+def mode_line(facts: GapAnalysisFacts) -> str:
+    if facts.judge is None:
+        return "Keyword pass only (no LLM)"
+    return f"Deep analysis with Claude ({facts.judge.model})"
+
+
+def header(facts: GapAnalysisFacts, title: str) -> list[str]:
+    return [f"# {title}", "",
+            f"{mode_line(facts)} · analysed {facts.analyzed_at:%Y-%m-%d} · schema {facts.schema_version}", ""]
+
+
+def blind_spots(facts: GapAnalysisFacts) -> list[str]:
+    """What the run could not see. Shown in every report, because a gap list without it overclaims."""
+    notes = ["Only skills in careerfit's skill list were checked. Anything else the job asks for is not shown here."]
+    resume, jd = facts.resume_coverage, facts.jd_coverage
+    if "scanned_pages" in resume.known_blind_spots:
+        unread = (resume.pages_total or 0) - (resume.pages_with_text or 0)
+        notes.append(f"{unread} of {resume.pages_total} resume pages had no readable text, so skills that may be on "
+                     "them are marked Not assessed rather than Gap.")
+    if resume.source_format == "pdf":
+        notes.append("The resume is a PDF: skills shown only in tables, graphics or unusual layouts can be missed.")
+    if "scanned_pages" in jd.known_blind_spots:
+        notes.append("Part of the job description could not be read, so its list of requirements may be incomplete.")
+    unresolved = [o.skill for o in facts.skill_observations if o.status == SkillStatus.UNRESOLVABLE]
+    if unresolved and facts.judge is None:
+        notes.append(f"{len(unresolved)} skill(s) could not be decided from keywords alone ({', '.join(unresolved)}). "
+                     "Run with --deep to have Claude settle them.")
+    elif unresolved:
+        notes.append(f"Claude could not settle {len(unresolved)} skill(s) either: {', '.join(unresolved)}.")
+    if facts.judge is not None:
+        for skill in facts.judge.dismissed_skills:
+            notes.append(f"Not counted: {skill}. The job description uses the word in its everyday sense, "
+                         "not as a skill.")
+        for failure in facts.judge.failures:
+            notes.append(f"Part of the deep analysis failed, so some keyword results were kept: {failure}")
+    return ["## What this analysis could not see", "", *(f"- {n}" for n in notes), ""]
+
+
+def provenance_section(facts: GapAnalysisFacts) -> list[str]:
+    decided = [o for o in facts.skill_observations if o.status in DECIDED]
+    by_keywords = sum(o.confidence is None for o in decided)
+    lines = ["## How this was decided", "",
+             f"- {by_keywords} of {len(decided)} decided skills were settled by keyword matching, without an LLM."]
+    if facts.judge is not None:
+        by_claude = len(decided) - by_keywords
+        served = ", ".join(facts.judge.served_by) or facts.judge.model
+        lines.append(f"- {by_claude} {'was' if by_claude == 1 else 'were'} settled by Claude (served by {served}; "
+                     f"prompts {', '.join(facts.judge.prompt_versions) or 'none needed'}). Every match Claude made "
+                     "quotes a resume line, and the quote was checked in code.")
+    lines += [f"- Sources: resume `{facts.resume_source}`, job description `{facts.jd_source}`.", ""]
+    return lines

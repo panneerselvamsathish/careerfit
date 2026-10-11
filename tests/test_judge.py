@@ -205,8 +205,8 @@ def test_find_quote_line(quote, expected):
 
 def _obs(skill, status, requirement="must"):
     from careerfit.facts.schema import Provenance
-    jd = Provenance(source="jd", locator="line 1", retrieved_at=AT)
-    resume = Provenance(source="resume", locator="line 1", retrieved_at=AT) if status == SkillStatus.MATCHED else None
+    jd = Provenance(source="jd", locator="line 1", excerpt="x", retrieved_at=AT)
+    resume = Provenance(source="resume", locator="line 1", excerpt="x", retrieved_at=AT) if status == SkillStatus.MATCHED else None
     return SkillObservation(skill=skill, status=status, requirement=requirement, jd_evidence=jd, resume_evidence=resume)
 
 

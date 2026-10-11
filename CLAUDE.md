@@ -18,6 +18,9 @@ uv run pytest tests/test_architecture.py -v
 # Run the CLI — keyword analysis only (no LLM)
 uv run careerfit --resume fixtures/resume.txt --jd fixtures/jd.txt -o facts.json
 
+# Write a Markdown report (candidate view; add --perspective hiring_manager for the other)
+uv run careerfit --resume fixtures/resume.txt --jd fixtures/jd.txt --report report.md
+
 # Run the CLI — with LLM judge (needs Bedrock or Anthropic API credentials)
 uv run careerfit --resume fixtures/resume.txt --jd fixtures/jd.txt --deep -o facts.json
 # (provider: CAREERFIT_LLM_PROVIDER=bedrock|anthropic; answers cached in .cache/judge/, --fresh bypasses)
@@ -50,7 +53,8 @@ src/careerfit/
   ontology/    skills.yaml — data file: skill name → aliases + ambiguous flag.
                Learning resources per skill are added with the learning-path milestone.
                No logic lives here.
-  report/      Renderers only. Zero logic.
+  report/      Renderers only. Zero logic. candidate.py and hiring_manager.py over shared.py;
+               render_markdown() picks one from facts.perspective.
                MUST NOT: call an LLM, import judge/, import analyze/.
   cli.py       Composition root for terminal use.
   api.py       FastAPI composition root for web use.

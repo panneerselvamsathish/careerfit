@@ -76,6 +76,8 @@ def _evidence_problem(skill: str, entry: SkillEntry, evidence: Provenance, text:
     line_no = int(number)
     if not 1 <= line_no <= len(lines):
         return f"points past the end of the document ({len(lines)} lines)"
+    if evidence.excerpt != lines[line_no - 1].strip():
+        return f"quotes {evidence.excerpt!r}, but that line reads {lines[line_no - 1].strip()!r}"
     # The judge may match a paraphrase, so its lines needn't contain the keyword; it must still
     # cite real text. Keyword evidence must mention the skill on the cited line.
     if evidence.source == "llm_judge":

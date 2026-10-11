@@ -14,18 +14,21 @@ def build_observations(
     at: datetime,
 ) -> tuple[SkillObservation, ...]:
     scanned = "scanned_pages" in resume_coverage.known_blind_spots
+    jd_lines, resume_lines = jd_text.splitlines(), resume_text.splitlines()
     observations = []
     for name, (level, jd_line, jd_result) in requirement_evidence(jd_text, ontology).items():
         entry = ontology[name]
         resume_result = detect(name, entry, resume_text)
         status = decide_status(jd_result, resume_result, scanned)
 
-        jd_evidence = Provenance(source="jd", locator=f"line {jd_line}", retrieved_at=at)
+        jd_evidence = Provenance(source="jd", locator=f"line {jd_line}", excerpt=jd_lines[jd_line - 1].strip(),
+                                 retrieved_at=at)
 
         resume_line = first_mention_line(name, entry, resume_text)
         resume_evidence = None
         if resume_line is not None:
-            resume_evidence = Provenance(source="resume", locator=f"line {resume_line}", retrieved_at=at)
+            resume_evidence = Provenance(source="resume", locator=f"line {resume_line}",
+                                         excerpt=resume_lines[resume_line - 1].strip(), retrieved_at=at)
 
         observations.append(SkillObservation(
             skill=name,
