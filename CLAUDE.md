@@ -54,6 +54,8 @@ src/careerfit/
                MUST NOT: call an LLM, import judge/, import analyze/.
   cli.py       Composition root for terminal use.
   api.py       FastAPI composition root for web use.
+  cache.py     Disk cache of judge answers, used by the composition roots. Kept out of
+               judge/ because it needs storage; it never imports an LLM SDK.
 ```
 
 ### The enforced boundary

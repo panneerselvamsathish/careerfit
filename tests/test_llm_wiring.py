@@ -8,7 +8,8 @@ import pytest
 from careerfit import cli
 from careerfit.facts.schema import GapAnalysisFacts, SkillStatus
 from careerfit.judge.scorer import JudgeFailure
-from careerfit.llm import CachingLLM, LLMConfigError, SdkLLM, make_llm
+from careerfit.cache import CachingLLM
+from careerfit.judge.llm import LLMConfigError, SdkLLM, make_llm
 from tests.test_cli import FIXTURES
 from tests.test_judge import FakeLLM, plan, verdict
 
@@ -97,3 +98,17 @@ def test_cache_only_stores_complete_answers(tmp_path):
     CachingLLM(answered, tmp_path).create(model="m", messages=[])
     stored = json.loads(next(tmp_path.iterdir()).read_text(encoding="utf-8"))
     assert stored == {"stop_reason": "end_turn", "content": [{"type": "text", "text": '{"verdicts": []}'}]}
+
+
+def test_unreadable_cache_entry_is_a_miss_and_gets_replaced(tmp_path):
+    answered = FakeLLM({"verdicts": []})
+    cache = CachingLLM(answered, tmp_path)
+    cache.create(model="m", messages=[])
+    entry = next(tmp_path.iterdir())
+    entry.write_text('{"stop_reason": "end_tu', encoding="utf-8")
+
+    again = FakeLLM({"verdicts": []})
+    CachingLLM(again, tmp_path).create(model="m", messages=[])
+    assert len(again.calls) == 1
+    assert json.loads(entry.read_text(encoding="utf-8"))["stop_reason"] == "end_turn"
+    assert [p.name for p in tmp_path.iterdir()] == [entry.name]

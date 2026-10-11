@@ -42,3 +42,16 @@ def test_no_forbidden_imports(package: str, banned: set[str]) -> None:
             if any(imp == ban or imp.startswith(ban + ".") for ban in banned)
         }
         assert not intersection, f"{file} imports forbidden modules: {intersection}"
+
+LLM_SDKS = {"anthropic", "openai"}
+
+
+def test_only_judge_imports_an_llm_sdk() -> None:
+    offenders = {}
+    for file in PKG.glob("**/*.py"):
+        if (PKG / "judge") in file.parents:
+            continue
+        sdk_imports = {imp for imp in imports_of(file) if imp.split(".")[0] in LLM_SDKS}
+        if sdk_imports:
+            offenders[str(file.relative_to(PKG))] = sdk_imports
+    assert not offenders, f"only judge/ may import an LLM SDK: {offenders}"

@@ -14,3 +14,28 @@ system: |
     Prefer official documentation and long-established courses or books.
   - estimated_weeks: a realistic number of weeks of part-time study to reach working
     knowledge, or 0 if you cannot reasonably estimate it.
+
+user: |
+  $documents
+
+  Plan learning for these gaps:
+  $skills
+
+# The `skill` enum is filled at run time with exactly the gaps being planned.
+output_schema:
+  type: object
+  additionalProperties: false
+  required: [steps]
+  properties:
+    steps:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required: [skill, priority, why_it_matters, resources, estimated_weeks]
+        properties:
+          skill: {type: string}
+          priority: {type: integer}
+          why_it_matters: {type: string}
+          resources: {type: array, items: {type: string}}
+          estimated_weeks: {type: integer}

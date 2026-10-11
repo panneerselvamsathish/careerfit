@@ -8,7 +8,7 @@ from careerfit.analyze.observations import build_facts
 from careerfit.analyze.ontology import SkillEntry
 from careerfit.facts.schema import Coverage, SkillObservation, SkillStatus
 from careerfit.judge.fit import compute_fit_score
-from careerfit.judge.scorer import find_quote_line, judge_facts
+from careerfit.judge.scorer import find_quote_line, judge_facts, looks_like_link
 from evals import invariants
 
 AT = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -158,7 +158,7 @@ def test_learning_plan_with_urls_is_retried_then_kept():
                                 verdict("react", requires=False)]},
                   with_url, plan("kubernetes"))
     facts = run(llm)
-    assert "not URLs" in llm.calls[2]["messages"][2]["content"]
+    assert "'https://kubernetes.io/docs' contains a link" in llm.calls[2]["messages"][2]["content"]
     assert [s.skill for s in facts.learning_steps] == ["kubernetes"]
     assert facts.learning_steps[0].estimated_weeks == 4
 
@@ -217,3 +217,31 @@ def test_fit_score_weights_must_haves_and_skips_undecided_skills():
 
 def test_fit_score_is_none_when_nothing_was_decided():
     assert compute_fit_score((_obs("a", SkillStatus.UNRESOLVABLE),)) is None
+
+
+@pytest.mark.parametrize("resource, is_link", [
+    ("https://kubernetes.io/docs", True),
+    ("ftp://example.org/course", True),
+    ("kubernetes.io/docs/tutorials", True),
+    ("[Kubernetes docs](kubernetes.io)", True),
+    ("www.example.com", True),
+    ("Kubernetes official documentation (kubernetes.io)", False),
+    ("Kafka: The Definitive Guide (O'Reilly)", False),
+    ("A Tour of Go (go.dev)", False),
+])
+def test_looks_like_link(resource, is_link):
+    assert looks_like_link(resource) is is_link
+
+
+def test_nice_to_have_ahead_of_a_must_have_is_retried():
+    def step(skill, priority):
+        return {"skill": skill, "priority": priority, "why_it_matters": "x",
+                "resources": [f"{skill} official documentation"], "estimated_weeks": 4}
+
+    react_first = {"steps": [step("react", 1), step("kubernetes", 2), step("go", 3)]}
+    llm = FakeLLM({"verdicts": [verdict("go"), verdict("react")]},
+                  react_first, plan("kubernetes", "go", "react"))
+    facts = run(llm)
+    assert by_skill(facts)["react"].requirement == "nice"
+    assert "every must-have gap must have a higher priority" in llm.calls[2]["messages"][2]["content"]
+    assert [s.skill for s in facts.learning_steps] == ["kubernetes", "go", "react"]

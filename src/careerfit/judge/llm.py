@@ -1,14 +1,10 @@
-"""Builds the judge's LLM client from environment settings, plus a disk cache of answers.
+"""The Anthropic SDK adapter: the only place the SDK is constructed and called.
 
-Composition-root code, shared by cli.py (and later api.py). judge/ never reads the
-environment or touches disk; it only receives an object with create().
+The composition root passes in its environment mapping; this module never reads os.environ
+itself and never touches disk.
 """
 
-import hashlib
-import json
 from collections.abc import Callable, Mapping
-from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
 import anthropic
@@ -59,32 +55,3 @@ def make_llm(env: Mapping[str, str]) -> tuple[SdkLLM, str]:
         return client.beta.messages.create(betas=[FALLBACK_BETA], fallbacks="default", **kwargs)
 
     return SdkLLM(create_with_fallback), model
-
-
-class CachingLLM:
-    """Replays a stored answer when the exact same request was made before. Zero tokens."""
-
-    def __init__(self, inner: Any, directory: Path):
-        self.inner = inner
-        self.directory = directory
-
-    def create(self, **kwargs: Any) -> Any:
-        key = hashlib.sha256(json.dumps(kwargs, sort_keys=True, default=_jsonable).encode()).hexdigest()
-        path = self.directory / f"{key}.json"
-        if path.exists():
-            stored = json.loads(path.read_text(encoding="utf-8"))
-            return SimpleNamespace(stop_reason=stored["stop_reason"], content=stored["content"])
-        response = self.inner.create(**kwargs)
-        if getattr(response, "stop_reason", None) == "end_turn":
-            text_blocks = [{"type": "text", "text": b.text} for b in response.content if getattr(b, "type", None) == "text"]
-            self.directory.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps({"stop_reason": "end_turn", "content": text_blocks}), encoding="utf-8")
-        return response
-
-
-def _jsonable(value: Any) -> Any:
-    if hasattr(value, "model_dump"):
-        return value.model_dump()
-    if isinstance(value, SimpleNamespace):
-        return vars(value)
-    return str(value)

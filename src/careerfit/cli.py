@@ -11,7 +11,8 @@ from careerfit.analyze.observations import build_facts
 from careerfit.analyze.ontology import load_ontology
 from careerfit.ingest.document import read_document
 from careerfit.judge.scorer import judge_facts
-from careerfit.llm import CachingLLM, LLMConfigError, make_llm
+from careerfit.cache import CachingLLM
+from careerfit.judge.llm import LLMConfigError, make_llm
 
 DEFAULT_ONTOLOGY = Path(__file__).parent / "ontology" / "skills.yaml"
 CACHE_DIR = Path(".cache") / "judge"

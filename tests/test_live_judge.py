@@ -11,7 +11,7 @@ from careerfit.cli import DEFAULT_ONTOLOGY
 from careerfit.facts.schema import SkillStatus
 from careerfit.ingest.document import read_document
 from careerfit.judge.scorer import judge_facts
-from careerfit.llm import make_llm
+from careerfit.judge.llm import make_llm
 from evals import invariants
 from tests.test_cli import FIXTURES
 

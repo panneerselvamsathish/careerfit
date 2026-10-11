@@ -42,3 +42,31 @@ examples: |
   Example C. JD line: "React for internal dashboards". Resume: "Skills: React, Redux".
   -> skill "react": jd_requires_skill true, resume_status "partial" (listed, no use shown),
      resume_quote "Skills: React, Redux", confidence 0.7.
+
+user: |
+  $documents
+
+  Decide these skills, which the keyword matcher could not settle:
+  $skills
+
+  Return exactly one verdict per skill.
+
+# The `skill` enum is filled at run time with exactly the skills being judged.
+output_schema:
+  type: object
+  additionalProperties: false
+  required: [verdicts]
+  properties:
+    verdicts:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        required: [skill, jd_requires_skill, resume_status, resume_quote, confidence, reason]
+        properties:
+          skill: {type: string}
+          jd_requires_skill: {type: boolean}
+          resume_status: {type: string, enum: [matched, partial, absent, unclear]}
+          resume_quote: {type: string}
+          confidence: {type: number}
+          reason: {type: string}
