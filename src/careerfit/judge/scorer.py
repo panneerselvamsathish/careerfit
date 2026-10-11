@@ -13,6 +13,8 @@ from typing import Any, Literal, Protocol, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from careerfit.analyze.matcher import detect
+from careerfit.analyze.ontology import SkillEntry
 from careerfit.facts.schema import (
     GapAnalysisFacts,
     JudgeRun,
@@ -83,6 +85,7 @@ def judge_facts(
     llm: LLM,
     model: str,
     at: datetime,
+    ontology: dict[str, SkillEntry],
 ) -> GapAnalysisFacts:
     """Return a judged copy of keyword-only facts (llm_used=True), with fit score and learning path."""
     if facts.llm_used:
@@ -99,8 +102,8 @@ def judge_facts(
     if unresolved:
         prompts_used.append(skill_prompt.ref)
         try:
-            verdicts = resolve_skills(unresolved, resume_text=resume_text, jd_text=jd_text,
-                                      llm=llm, model=model, prompt=skill_prompt, served_by=served_by)
+            verdicts = resolve_skills(unresolved, resume_text=resume_text, jd_text=jd_text, llm=llm, model=model,
+                                      prompt=skill_prompt, ontology=ontology, served_by=served_by)
         except JudgeFailure as e:
             failures.append(str(e))
             verdicts = {}
@@ -145,12 +148,14 @@ def resolve_skills(
     llm: LLM,
     model: str,
     prompt: PromptSpec,
+    ontology: dict[str, SkillEntry],
     served_by: list[str] | None = None,
 ) -> dict[str, SkillVerdict]:
     names = [o.skill for o in unresolved]
     jd_lines = jd_text.splitlines()
     resume_lines = resume_text.splitlines()
     asks = []
+    jd_line_of = {o.skill: _line_text(jd_lines, o.jd_evidence.locator) for o in unresolved}
     for o in unresolved:
         jd_line = _line_text(jd_lines, o.jd_evidence.locator)
         resume_line = _line_text(resume_lines, o.resume_evidence.locator) if o.resume_evidence else None
@@ -161,6 +166,12 @@ def resolve_skills(
     def check(answer: SkillVerdicts) -> list[str]:
         problems = _coverage_problems([v.skill for v in answer.verdicts], names)
         for v in answer.verdicts:
+            # Enforced in code, so no instruction hidden in a document can override it: a skill the
+            # JD names unambiguously (e.g. "Golang") is a real requirement and cannot be dismissed.
+            entry = ontology.get(v.skill)
+            if not v.jd_requires_skill and entry and detect(v.skill, entry, jd_line_of[v.skill]) == "found":
+                problems.append(f"{v.skill}: the job description names it unambiguously "
+                                f"(\"{jd_line_of[v.skill]}\"), so it cannot be dismissed")
             if v.resume_status in ("matched", "partial"):
                 if len(v.resume_quote.split()) < MIN_QUOTE_WORDS:
                     problems.append(f"{v.skill}: resume_quote must be at least {MIN_QUOTE_WORDS} words copied "
@@ -313,8 +324,13 @@ def _coverage_problems(answered: list[str], expected: list[str]) -> list[str]:
     return problems
 
 
+# Documents are untrusted: they must not be able to open or close the sections that frame them.
+_FRAME_TAG = re.compile(r"<\s*/?\s*(resume|job_description)\s*>", re.IGNORECASE)
+
+
 def _documents(jd_text: str, resume_text: str) -> str:
-    return f"<job_description>\n{jd_text}\n</job_description>\n\n<resume>\n{resume_text}\n</resume>"
+    jd, resume = _FRAME_TAG.sub("[tag removed]", jd_text), _FRAME_TAG.sub("[tag removed]", resume_text)
+    return f"<job_description>\n{jd}\n</job_description>\n\n<resume>\n{resume}\n</resume>"
 
 
 def _line_text(lines: list[str], locator: str) -> str:

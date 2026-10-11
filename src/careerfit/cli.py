@@ -40,6 +40,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     at = datetime.now(timezone.utc)
+    ontology = load_ontology(args.ontology)
     facts = build_facts(
         resume_text=resume_text,
         resume_coverage=resume_coverage,
@@ -47,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
         jd_text=jd_text,
         jd_coverage=jd_coverage,
         jd_source=str(args.jd),
-        ontology=load_ontology(args.ontology),
+        ontology=ontology,
         at=at,
         perspective=args.perspective,
     )
@@ -59,7 +60,8 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         if not args.fresh:
             llm = CachingLLM(llm, CACHE_DIR)
-        facts = judge_facts(facts, resume_text=resume_text, jd_text=jd_text, llm=llm, model=model, at=at)
+        facts = judge_facts(facts, resume_text=resume_text, jd_text=jd_text, llm=llm, model=model, at=at,
+                            ontology=ontology)
         for failure in facts.judge.failures if facts.judge else ():
             print(f"careerfit: judge warning: {failure}", file=sys.stderr)
     payload = facts.model_dump_json(indent=2)

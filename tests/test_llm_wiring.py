@@ -35,7 +35,7 @@ def test_deep_run_produces_judged_facts(tmp_path, monkeypatch, capsys):
     observed = {o.skill: o for o in facts.skill_observations}
     assert facts.llm_used is True
     assert facts.judge is not None and facts.judge.model == "fake-model"
-    assert facts.judge.prompt_versions == ("skill_match@1", "learning_path@1")
+    assert facts.judge.prompt_versions == ("skill_match@2", "learning_path@2")
     assert observed["go"].status == SkillStatus.GAP and observed["go"].confidence == 0.8
     assert [s.skill for s in facts.learning_steps] == list(GAPS_AFTER_JUDGE)
     assert facts.fit_score is not None
