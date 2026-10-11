@@ -1,6 +1,7 @@
 """Formatting shared by both perspectives. Presentation only: no verdict is decided here."""
 
 import re
+from collections.abc import Iterable
 
 from careerfit.facts.schema import Coverage, GapAnalysisFacts, Provenance, SkillObservation, SkillStatus
 
@@ -23,11 +24,17 @@ _MARKDOWN_ACTIVE = re.compile(r"([\\`*_~\[\]<>|])")
 def cell(text: str) -> str:
     """Show untrusted text literally in Markdown, in a table cell or a list item.
 
+    Every value taken from the facts goes through here; only report/'s own wording and numbers don't.
+
     Excerpts come straight from the resume and JD, so an <img> tag or ![](...) in them must be
     displayed, not rendered: rendered, it could inject markup or fetch a remote image.
     """
     # Backslashes are escaped in the same pass, so a backslash in the source cannot cancel a pipe's escape.
     return _MARKDOWN_ACTIVE.sub(r"\\\1", text).replace("\n", " ")
+
+
+def names(items: Iterable[str]) -> str:
+    return ", ".join(cell(i) for i in items)
 
 
 def cite(evidence: Provenance | None) -> str:
@@ -55,7 +62,7 @@ def status_counts(observations: list[SkillObservation]) -> str:
 def mode_line(facts: GapAnalysisFacts) -> str:
     if facts.judge is None:
         return "Keyword pass only (no LLM)"
-    return f"Deep analysis with Claude ({facts.judge.model})"
+    return f"Deep analysis with Claude ({cell(facts.judge.model)})"
 
 
 def header(facts: GapAnalysisFacts, title: str) -> list[str]:
@@ -82,13 +89,13 @@ def blind_spots(facts: GapAnalysisFacts) -> list[str]:
         notes.append("Part of the job description could not be read, so its list of requirements may be incomplete.")
     unresolved = [o.skill for o in facts.skill_observations if o.status == SkillStatus.UNRESOLVABLE]
     if unresolved and facts.judge is None:
-        notes.append(f"{len(unresolved)} skill(s) could not be decided from keywords alone ({', '.join(unresolved)}). "
+        notes.append(f"{len(unresolved)} skill(s) could not be decided from keywords alone ({names(unresolved)}). "
                      "Run with --deep to have Claude settle them.")
     elif unresolved:
-        notes.append(f"Claude could not settle {len(unresolved)} skill(s) either: {', '.join(unresolved)}.")
+        notes.append(f"Claude could not settle {len(unresolved)} skill(s) either: {names(unresolved)}.")
     if facts.judge is not None:
         for skill in facts.judge.dismissed_skills:
-            notes.append(f"Not counted: {skill}. The job description uses the word in its everyday sense, "
+            notes.append(f"Not counted: {cell(skill)}. The job description uses the word in its everyday sense, "
                          "not as a skill.")
         for failure in facts.judge.failures:
             notes.append(f"Part of the deep analysis failed, so some keyword results were kept: {cell(failure)}")
@@ -102,11 +109,11 @@ def provenance_section(facts: GapAnalysisFacts) -> list[str]:
              f"- {by_keywords} of {len(decided)} decided skills were settled by keyword matching, without an LLM."]
     if facts.judge is not None:
         by_claude = len(decided) - by_keywords
-        served = ", ".join(facts.judge.served_by) or facts.judge.model
+        served = names(facts.judge.served_by) or cell(facts.judge.model)
         lines.append(f"- {by_claude} {'was' if by_claude == 1 else 'were'} settled by Claude (served by {served}; "
-                     f"prompts {', '.join(facts.judge.prompt_versions) or 'none needed'}). Every match Claude made "
+                     f"prompts {names(facts.judge.prompt_versions) or 'none needed'}). Every match Claude made "
                      "quotes a resume line, and the quote was checked in code.")
-    lines += [f"- Sources: resume `{facts.resume_source}`, job description `{facts.jd_source}`.", ""]
+    lines += [f"- Sources: resume {cell(facts.resume_source)}, job description {cell(facts.jd_source)}.", ""]
     return lines
 
 

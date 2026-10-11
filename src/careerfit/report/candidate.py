@@ -10,7 +10,7 @@ def render(facts: GapAnalysisFacts) -> str:
     lines = header(facts, "Your fit for this job")
     lines += ["## Summary", ""]
     if facts.fit_score is not None:
-        lines.append(f"- Fit: **{facts.fit_score.overall:.0%}**. {facts.fit_score.explanation}")
+        lines.append(f"- Fit: **{facts.fit_score.overall:.0%}**. {cell(facts.fit_score.explanation)}")
     lines += [f"- Must-have skills: {status_counts(must)}", f"- Nice-to-have skills: {status_counts(nice)}", ""]
     for title, rows in (("Must-have skills", must), ("Nice-to-have skills", nice)):
         if not rows:

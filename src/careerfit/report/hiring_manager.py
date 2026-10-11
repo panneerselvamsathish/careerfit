@@ -1,7 +1,7 @@
 """Hiring-manager view: which requirements this candidate meets, misses, or leaves uncertain."""
 
 from careerfit.facts.schema import GapAnalysisFacts, SkillStatus
-from careerfit.report.shared import (STATUS_LABEL, blind_spots, by_requirement, cell, cite, header,
+from careerfit.report.shared import (STATUS_LABEL, blind_spots, by_requirement, cell, cite, header, names,
                                      provenance_section, status_counts)
 
 UNCERTAIN = (SkillStatus.UNRESOLVABLE, SkillStatus.NOT_ASSESSED)
@@ -16,10 +16,10 @@ def render(facts: GapAnalysisFacts) -> str:
     lines += ["## Summary", ""]
     if facts.fit_score is not None:
         lines.append(f"- Fit: **{facts.fit_score.overall:.0%}** "
-                     f"(must-have coverage {facts.fit_score.must_have_coverage:.0%}). {facts.fit_score.explanation}")
+                     f"(must-have coverage {facts.fit_score.must_have_coverage:.0%}). {cell(facts.fit_score.explanation)}")
     lines += [f"- Must-have requirements: {status_counts(must)}",
-              f"- Missing must-haves: {', '.join(missing) if missing else 'none'}",
-              f"- Needs a human check: {', '.join(uncertain) if uncertain else 'nothing'}",
+              f"- Missing must-haves: {names(missing) if missing else 'none'}",
+              f"- Needs a human check: {names(uncertain) if uncertain else 'nothing'}",
               f"- Nice-to-have requirements: {status_counts(nice)}", ""]
     lines += ["## Requirements", "", "| Requirement | Level | Status | Evidence in the resume | Asked for in the JD |",
               "|---|---|---|---|---|"]

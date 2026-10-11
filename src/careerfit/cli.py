@@ -19,6 +19,15 @@ DEFAULT_ONTOLOGY = Path(__file__).parent / "ontology" / "skills.yaml"
 CACHE_DIR = Path(".cache") / "judge"
 
 
+def _same_file(a: Path, b: Path) -> bool:
+    if a.resolve() == b.resolve():
+        return True
+    try:
+        return a.samefile(b)  # catches hard links and case-only differences on macOS
+    except OSError:  # one of them doesn't exist yet
+        return False
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="careerfit",
@@ -33,6 +42,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--fresh", action="store_true", help="with --deep: ignore cached judge answers")
     parser.add_argument("--ontology", type=Path, default=DEFAULT_ONTOLOGY, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    if args.output is not None and args.report is not None and _same_file(args.output, args.report):
+        print("careerfit: -o and --report must be different files", file=sys.stderr)
+        return 2
 
     try:
         resume_text, resume_coverage = read_document(args.resume)

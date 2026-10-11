@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 
 from careerfit.analyze.observations import build_facts
-from careerfit.analyze.ontology import load_ontology
+from careerfit.analyze.ontology import SkillEntry, load_ontology
 from careerfit.cli import DEFAULT_ONTOLOGY, main
 from careerfit.facts.schema import Coverage
 from careerfit.ingest.document import read_document
@@ -116,6 +116,42 @@ def test_markup_in_a_cited_resume_line_is_shown_not_rendered():
     assert r'\<img src="https://evil.example/p.png"\>' in report
     assert r"!\[x\](https://evil.example/t.png)" in report
     assert "<img" not in report.replace(r"\<img", "") and "![" not in report
+
+
+def test_crafted_file_names_cannot_inject_markup():
+    source = "cv`![x](https://evil.example/p.png)`.txt"
+    facts = build_facts(resume_text="Python developer", resume_coverage=TXT, resume_source=source,
+                        jd_text="Requirements:\n- Python", jd_coverage=TXT, jd_source="j.txt",
+                        ontology=load_ontology(DEFAULT_ONTOLOGY), at=AT, perspective="hiring_manager")
+    report = render_markdown(facts)
+    assert r"- Sources: resume cv\`!\[x\](https://evil.example/p.png)\`.txt, job description j.txt." in report
+    assert "![" not in report
+
+
+def test_skill_names_from_a_custom_ontology_are_escaped_in_summaries():
+    ontology = {"<b>x</b>": SkillEntry(aliases=(), ambiguous=False)}
+    facts = build_facts(resume_text="Python developer", resume_coverage=TXT, resume_source="r.txt",
+                        jd_text="Requirements:\n- <b>x</b>", jd_coverage=TXT, jd_source="j.txt",
+                        ontology=ontology, at=AT, perspective="hiring_manager")
+    report = render_markdown(facts)
+    assert r"- Missing must-haves: \<b\>x\</b\>" in report
+    assert "<b>" not in report
+
+
+def test_output_and_report_cannot_be_the_same_file(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    args = ["--resume", str(FIXTURES / "resume.txt"), "--jd", str(FIXTURES / "jd.txt")]
+    assert main(args + ["-o", "out.md", "--report", str(tmp_path / "out.md")]) == 2
+    assert "-o and --report must be different files" in capsys.readouterr().err
+    assert not (tmp_path / "out.md").exists()
+
+
+def test_output_and_report_cannot_be_two_names_for_one_existing_file(tmp_path, capsys):
+    (tmp_path / "out.md").write_text("keep me", encoding="utf-8")
+    (tmp_path / "alias.md").hardlink_to(tmp_path / "out.md")
+    args = ["--resume", str(FIXTURES / "resume.txt"), "--jd", str(FIXTURES / "jd.txt")]
+    assert main(args + ["-o", str(tmp_path / "out.md"), "--report", str(tmp_path / "alias.md")]) == 2
+    assert (tmp_path / "out.md").read_text(encoding="utf-8") == "keep me"
 
 
 def test_cli_writes_the_report(tmp_path, capsys):
