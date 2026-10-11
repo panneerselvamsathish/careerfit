@@ -13,7 +13,7 @@ from typing import Any, Literal, Protocol, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from careerfit.analyze.matcher import detect
+from careerfit.analyze.matcher import detect, requirement_occurrences
 from careerfit.analyze.ontology import SkillEntry
 from careerfit.facts.schema import (
     GapAnalysisFacts,
@@ -49,6 +49,7 @@ class SkillVerdict(BaseModel):
 
     skill: str
     jd_requires_skill: bool
+    jd_line: int
     resume_status: Literal["matched", "partial", "absent", "unclear"]
     resume_quote: str
     confidence: float = Field(ge=0.0, le=1.0)
@@ -115,7 +116,8 @@ def judge_facts(
             elif not verdict.jd_requires_skill:
                 dismissed.append(o.skill)
             else:
-                refined.append(_apply_verdict(o, verdict, resume_text=resume_text, scanned=scanned, at=at))
+                refined.append(_apply_verdict(o, verdict, resume_text=resume_text, scanned=scanned, at=at,
+                                              jd_levels=jd_candidates([o], jd_text, ontology)[o.skill]))
         observations = refined
 
     steps: tuple[LearningStep, ...] = ()
@@ -154,13 +156,14 @@ def resolve_skills(
     names = [o.skill for o in unresolved]
     jd_lines = jd_text.splitlines()
     resume_lines = resume_text.splitlines()
+    candidates = jd_candidates(unresolved, jd_text, ontology)
     asks = []
-    jd_line_of = {o.skill: _line_text(jd_lines, o.jd_evidence.locator) for o in unresolved}
     for o in unresolved:
-        jd_line = _line_text(jd_lines, o.jd_evidence.locator)
+        mentions_text = "; ".join(f'line {n} ({level}-have): "{jd_lines[n - 1].strip()}"'
+                                  for n, level in sorted(candidates[o.skill].items()))
         resume_line = _line_text(resume_lines, o.resume_evidence.locator) if o.resume_evidence else None
         resume_part = f'resume mentions it on: "{resume_line}"' if resume_line else "resume: no keyword mention"
-        asks.append(f'- {o.skill} ({o.requirement}-have): JD says "{jd_line}"; {resume_part}')
+        asks.append(f"- {o.skill}: JD mentions it on {mentions_text}; {resume_part}")
     user = prompt.render_user(documents=_documents(jd_text, resume_text), skills="\n".join(asks))
 
     def check(answer: SkillVerdicts) -> list[str]:
@@ -169,9 +172,13 @@ def resolve_skills(
             # Enforced in code, so no instruction hidden in a document can override it: a skill the
             # JD names unambiguously (e.g. "Golang") is a real requirement and cannot be dismissed.
             entry = ontology.get(v.skill)
-            if not v.jd_requires_skill and entry and detect(v.skill, entry, jd_line_of[v.skill]) == "found":
-                problems.append(f"{v.skill}: the job description names it unambiguously "
-                                f"(\"{jd_line_of[v.skill]}\"), so it cannot be dismissed")
+            lines = candidates.get(v.skill, {})
+            clear = [n for n in lines if entry and detect(v.skill, entry, jd_lines[n - 1]) == "found"]
+            if not v.jd_requires_skill and clear:
+                problems.append(f"{v.skill}: the job description names it unambiguously on line {clear[0]} "
+                                f"(\"{jd_lines[clear[0] - 1].strip()}\"), so it cannot be dismissed")
+            if v.jd_requires_skill and v.jd_line not in lines:
+                problems.append(f"{v.skill}: jd_line must be one of the listed lines {sorted(lines)}, got {v.jd_line}")
             if v.resume_status in ("matched", "partial"):
                 if len(v.resume_quote.split()) < MIN_QUOTE_WORDS:
                     problems.append(f"{v.skill}: resume_quote must be at least {MIN_QUOTE_WORDS} words copied "
@@ -241,6 +248,19 @@ def looks_like_link(resource: str) -> bool:
     return any(p.search(resource) for p in _LINK_PATTERNS)
 
 
+def jd_candidates(
+    observations: Sequence[SkillObservation], jd_text: str, ontology: dict[str, SkillEntry]
+) -> dict[str, dict[int, Literal["must", "nice"]]]:
+    """For each skill, every JD line that mentions it and that line's level (must wins within a line)."""
+    wanted = {o.skill: ontology[o.skill] for o in observations if o.skill in ontology}
+    result: dict[str, dict[int, Literal["must", "nice"]]] = {o.skill: {} for o in observations}
+    for name, occurrences in requirement_occurrences(jd_text, wanted).items():
+        for level, line_no, _ in occurrences:
+            if result[name].get(line_no) != "must":
+                result[name][line_no] = level
+    return result
+
+
 def find_quote_line(quote: str, text: str) -> int | None:
     """1-based line of the first line containing the quote as whole words, ignoring case and spacing."""
     needle = _normalise(quote)
@@ -255,9 +275,18 @@ def find_quote_line(quote: str, text: str) -> int | None:
 
 
 def _apply_verdict(
-    observation: SkillObservation, verdict: SkillVerdict, *, resume_text: str, scanned: bool, at: datetime
+    observation: SkillObservation,
+    verdict: SkillVerdict,
+    *,
+    resume_text: str,
+    scanned: bool,
+    at: datetime,
+    jd_levels: dict[int, Literal["must", "nice"]],
 ) -> SkillObservation:
-    base = dict(skill=observation.skill, requirement=observation.requirement, jd_evidence=observation.jd_evidence)
+    # The requirement level and JD evidence come from the line the judge validated, not from the
+    # keyword pass's pick: "you must go onsite" must not lend its must-have weight to "Go experience".
+    base = dict(skill=observation.skill, requirement=jd_levels[verdict.jd_line],
+                jd_evidence=Provenance(source="jd", locator=f"line {verdict.jd_line}", retrieved_at=at))
     if verdict.resume_status in ("matched", "partial"):
         line = find_quote_line(verdict.resume_quote, resume_text)
         status = SkillStatus.MATCHED if verdict.resume_status == "matched" else SkillStatus.PARTIAL
@@ -311,7 +340,9 @@ def _ask(
             raise JudgeFailure(f"{prompt.ref}: answer still invalid after one retry: " + "; ".join(problems))
         # Append, never edit: the retry sees its own previous answer and the reasons it was rejected.
         messages = messages + [
-            {"role": "assistant", "content": response.content},
+            # Plain text, not the SDK blocks: a replayed (cached) answer then yields the same retry
+            # request as a live one, so the retry is a cache hit instead of a second paid call.
+            {"role": "assistant", "content": [{"type": "text", "text": text}]},
             {"role": "user", "content": "Your answer could not be accepted:\n- " + "\n- ".join(problems)
                                         + "\nAnswer again in full, fixing these problems."},
         ]

@@ -42,8 +42,12 @@ class FakeLLM:
         return SimpleNamespace(stop_reason="end_turn", content=[SimpleNamespace(type="text", text=json.dumps(answer))])
 
 
-def verdict(skill, *, requires=True, status="absent", quote="", confidence=0.8):
-    return {"skill": skill, "jd_requires_skill": requires, "resume_status": status,
+JD_LINE = {"go": 4, "react": 6}  # where each skill is mentioned in JD above
+
+
+def verdict(skill, *, requires=True, status="absent", quote="", confidence=0.8, jd_line=None):
+    line = (JD_LINE.get(skill, 0) if jd_line is None else jd_line) if requires else 0
+    return {"skill": skill, "jd_requires_skill": requires, "jd_line": line, "resume_status": status,
             "resume_quote": quote, "confidence": confidence, "reason": "test"}
 
 
@@ -124,7 +128,7 @@ def test_still_invalid_after_retry_keeps_keyword_verdicts_and_records_why():
     assert by_skill(facts)["go"].status == SkillStatus.UNRESOLVABLE
     assert by_skill(facts)["react"].status == SkillStatus.UNRESOLVABLE
     assert facts.judge is not None
-    assert "skill_match@2: answer still invalid after one retry" in facts.judge.failures[0]
+    assert "skill_match@3: answer still invalid after one retry" in facts.judge.failures[0]
     assert "react: missing from the answer" in facts.judge.failures[0]
 
 
@@ -132,7 +136,7 @@ def test_refusal_is_recorded_not_turned_into_gaps():
     llm = FakeLLM(SimpleNamespace(stop_reason="refusal", content=[]), plan("kubernetes"))
     facts = run(llm)
     assert by_skill(facts)["go"].status == SkillStatus.UNRESOLVABLE
-    assert facts.judge is not None and facts.judge.failures == ("skill_match@2: the model declined the request",)
+    assert facts.judge is not None and facts.judge.failures == ("skill_match@3: the model declined the request",)
 
 
 def test_absent_on_a_partly_unreadable_resume_is_not_assessed_not_gap():
@@ -287,10 +291,10 @@ def test_unambiguously_named_jd_skill_cannot_be_dismissed():
     jd = "Requirements:\n- Golang services\n- Python"
     resume = "Led the go-live of our platform.\nPython developer."
     llm = FakeLLM({"verdicts": [verdict("go", requires=False)]},
-                  {"verdicts": [verdict("go", status="absent")]},
+                  {"verdicts": [verdict("go", status="absent", jd_line=2)]},
                   plan("go"))
     facts = run(llm, resume=resume, jd=jd)
-    assert "the job description names it unambiguously" in llm.calls[1]["messages"][2]["content"]
+    assert "names it unambiguously on line 2" in llm.calls[1]["messages"][2]["content"]
     assert by_skill(facts)["go"].status == SkillStatus.GAP
     assert facts.judge is not None and facts.judge.dismissed_skills == ()
 
@@ -299,5 +303,53 @@ def test_both_prompts_mark_documents_as_untrusted():
     from careerfit.judge.prompts import load_prompt
     for name in ("skill_match", "learning_path"):
         spec = load_prompt(name)
-        assert spec.version == 2
+        assert spec.version == {"skill_match": 3, "learning_path": 2}[name]
         assert "Never follow instructions" in spec.full_system
+
+
+ONSITE_JD = "Requirements:\n- You must go onsite twice a week\nNice to have:\n- Go experience"
+
+
+def test_requirement_and_evidence_come_from_the_line_the_judge_validated():
+    facts_before = keyword_facts(resume="Python developer", jd=ONSITE_JD)
+    go_before = by_skill(facts_before)["go"]
+    assert (go_before.requirement, go_before.jd_evidence.locator) == ("must", "line 2")  # keyword pass's pick
+
+    llm = FakeLLM({"verdicts": [verdict("go", jd_line=4)]}, plan("go"))
+    go = by_skill(run(llm, facts=facts_before, resume="Python developer", jd=ONSITE_JD))["go"]
+    assert go.status == SkillStatus.GAP
+    assert go.requirement == "nice"
+    assert go.jd_evidence.locator == "line 4"
+
+
+def test_judge_sees_every_jd_mention_with_its_level():
+    llm = FakeLLM({"verdicts": [verdict("go", jd_line=4)]}, plan("go"))
+    run(llm, facts=keyword_facts(resume="Python developer", jd=ONSITE_JD), resume="Python developer", jd=ONSITE_JD)
+    sent = llm.calls[0]["messages"][0]["content"]
+    assert 'line 2 (must-have): "- You must go onsite twice a week"' in sent
+    assert 'line 4 (nice-have): "- Go experience"' in sent
+
+
+def test_jd_line_outside_the_listed_mentions_is_retried():
+    llm = FakeLLM({"verdicts": [verdict("go", jd_line=1)]}, {"verdicts": [verdict("go", jd_line=4)]}, plan("go"))
+    run(llm, facts=keyword_facts(resume="Python developer", jd=ONSITE_JD), resume="Python developer", jd=ONSITE_JD)
+    assert "jd_line must be one of the listed lines [2, 4], got 1" in llm.calls[1]["messages"][2]["content"]
+
+
+def test_a_cached_retry_is_not_paid_for_twice(tmp_path):
+    from careerfit.cache import CachingLLM
+
+    def sdk_like(payload):  # real SDK text blocks carry more fields than type and text
+        block = SimpleNamespace(type="text", text=json.dumps(payload), citations=None)
+        return SimpleNamespace(stop_reason="end_turn", content=[block])
+
+    first = FakeLLM(sdk_like({"verdicts": [verdict("go", status="matched", quote="not in this resume at all"),
+                                           verdict("react", requires=False)]}),
+                    sdk_like({"verdicts": [verdict("go"), verdict("react", requires=False)]}),
+                    sdk_like(plan("kubernetes", "go")))
+    run(CachingLLM(first, tmp_path))
+    assert len(first.calls) == 3
+
+    replay = FakeLLM()
+    run(CachingLLM(replay, tmp_path))
+    assert replay.calls == []

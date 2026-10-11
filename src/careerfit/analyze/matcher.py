@@ -45,11 +45,12 @@ def clauses(sentence: str) -> list[str]:
         return [c for c in re.split(r",|;|\bbut\b", sentence, flags=re.IGNORECASE) if c.strip()]
     return [sentence]
 
-def requirement_evidence(
-    jd_text: str, ontology: dict[str, SkillEntry]
-) -> dict[str, tuple[Literal["must", "nice"], int, Literal["found", "unclear"]]]:
-    """Each JD skill's level, with the line and detection result of the occurrence that decided it."""
-    best: dict[str, tuple[Literal["must", "nice"], int, Literal["found", "unclear"]]] = {}
+Occurrence = tuple[Literal["must", "nice"], int, Literal["found", "unclear"]]
+
+
+def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, list[Occurrence]]:
+    """Every place the JD mentions each skill, as (level, line, detection result), in document order."""
+    found: dict[str, list[Occurrence]] = {}
     current: Literal["must", "nice"] = "must"
     for line_no, raw_line in enumerate(jd_text.splitlines(), start=1):
         line = raw_line.strip()
@@ -71,14 +72,23 @@ def requirement_evidence(
                 else:
                     level = current
                 for name, result in scan(clause, ontology).items():
-                    if result == "absent":
-                        continue
-                    previous = best.get(name)
-                    upgrades = previous is not None and previous[0] == "nice" and level == "must"
-                    clearer = previous is not None and previous[0] == level and previous[2] == "unclear" and result == "found"
-                    if previous is None or upgrades or clearer:
-                        best[name] = (level, line_no, result)
+                    if result != "absent":
+                        found.setdefault(name, []).append((level, line_no, result))
+    return found
+
+
+def requirement_evidence(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, Occurrence]:
+    """Each JD skill's deciding occurrence: must beats nice, then a clear mention beats an unclear one."""
+    best: dict[str, Occurrence] = {}
+    for name, occurrences in requirement_occurrences(jd_text, ontology).items():
+        for level, line_no, result in occurrences:
+            previous = best.get(name)
+            upgrades = previous is not None and previous[0] == "nice" and level == "must"
+            clearer = previous is not None and previous[0] == level and previous[2] == "unclear" and result == "found"
+            if previous is None or upgrades or clearer:
+                best[name] = (level, line_no, result)
     return best
+
 
 def requirement_levels(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, Literal["must", "nice"]]:
     return {name: level for name, (level, _, _) in requirement_evidence(jd_text, ontology).items()}

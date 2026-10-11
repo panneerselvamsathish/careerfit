@@ -17,7 +17,7 @@ GAPS_AFTER_JUDGE = ("kubernetes", "terraform", "go", "kafka", "react")
 
 
 def answers():
-    return [{"verdicts": [verdict("go"), verdict("react")]}, plan(*GAPS_AFTER_JUDGE)]
+    return [{"verdicts": [verdict("go", jd_line=15), verdict("react", jd_line=17)]}, plan(*GAPS_AFTER_JUDGE)]
 
 
 def run_deep(tmp_path, monkeypatch, llm, *extra):
@@ -35,7 +35,7 @@ def test_deep_run_produces_judged_facts(tmp_path, monkeypatch, capsys):
     observed = {o.skill: o for o in facts.skill_observations}
     assert facts.llm_used is True
     assert facts.judge is not None and facts.judge.model == "fake-model"
-    assert facts.judge.prompt_versions == ("skill_match@2", "learning_path@2")
+    assert facts.judge.prompt_versions == ("skill_match@3", "learning_path@2")
     assert observed["go"].status == SkillStatus.GAP and observed["go"].confidence == 0.8
     assert [s.skill for s in facts.learning_steps] == list(GAPS_AFTER_JUDGE)
     assert facts.fit_score is not None
@@ -148,7 +148,7 @@ def test_fallback_model_is_reported_by_the_cli(tmp_path, monkeypatch, capsys):
     def answer(payload, model):
         return SimpleNamespace(stop_reason="end_turn", model=model,
                                content=[SimpleNamespace(type="text", text=_json.dumps(payload))])
-    llm = FakeLLM(answer({"verdicts": [verdict("go"), verdict("react")]}, "claude-opus-4-8"),
+    llm = FakeLLM(answer({"verdicts": [verdict("go", jd_line=15), verdict("react", jd_line=17)]}, "claude-opus-4-8"),
                   answer(plan(*GAPS_AFTER_JUDGE), "fake-model"))
     facts = run_deep(tmp_path, monkeypatch, llm)
     assert facts.judge is not None
