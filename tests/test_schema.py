@@ -10,7 +10,7 @@ FACTS_MODELS = [
     if issubclass(cls, BaseModel) and cls.__module__ == schema.__name__
 ]
 
-JD_EVIDENCE = schema.Provenance(source="jd", locator="line 1", retrieved_at=datetime(2026, 10, 10))
+JD_EVIDENCE = schema.Provenance(source="jd", locator="line 1", excerpt="- Python", retrieved_at=datetime(2026, 10, 10))
 
 JUDGE = schema.JudgeRun(model="claude-opus-5-5", prompt_versions=("skill_match@1",))
 
@@ -51,7 +51,7 @@ def test_skill_observation_not_assessed_rejects_confidence():
         schema.SkillObservation(skill="test", status=schema.SkillStatus.NOT_ASSESSED,confidence=0.5, requirement="must", jd_evidence=JD_EVIDENCE)
 
 def test_skill_observation_valid_matched():
-    schema.SkillObservation(skill="test", status=schema.SkillStatus.MATCHED, resume_evidence=schema.Provenance(source="resume", locator="experience[0]", retrieved_at=datetime.now()), requirement="must", jd_evidence=JD_EVIDENCE)
+    schema.SkillObservation(skill="test", status=schema.SkillStatus.MATCHED, resume_evidence=schema.Provenance(source="resume", locator="experience[0]", excerpt="Built APIs in Python", retrieved_at=datetime.now()), requirement="must", jd_evidence=JD_EVIDENCE)
 
 def test_skill_observation_matched_requires_evidence():
     with pytest.raises(ValidationError, match="matched status requires resume_evidence"):
@@ -71,7 +71,7 @@ def test_gap_analysis_facts_llm_false_rejects_learning_steps():
 def test_gap_analysis_facts_fails_append_to_tuples():
     gaf = schema.GapAnalysisFacts(llm_used=True, judge=JUDGE, fit_score=None, resume_source="test", jd_source="jd test", analyzed_at=datetime.now(), skill_observations=(), perspective="candidate", resume_coverage=TXT_COVERAGE, jd_coverage=TXT_COVERAGE)
     with pytest.raises(AttributeError):
-        gaf.skill_observations.append(schema.SkillObservation(skill="test", status=schema.SkillStatus.MATCHED, requirement="must", jd_evidence=JD_EVIDENCE, resume_evidence=schema.Provenance(source="resume", locator="experience[0]", retrieved_at=datetime.now())))  # type: ignore[attr-defined]
+        gaf.skill_observations.append(schema.SkillObservation(skill="test", status=schema.SkillStatus.MATCHED, requirement="must", jd_evidence=JD_EVIDENCE, resume_evidence=schema.Provenance(source="resume", locator="experience[0]", excerpt="Built APIs in Python", retrieved_at=datetime.now())))  # type: ignore[attr-defined]
     with pytest.raises(AttributeError):
         gaf.learning_steps.append(schema.LearningStep(skill="test", priority=1, why_it_matters="needed", resources=(), estimated_weeks=4))
 

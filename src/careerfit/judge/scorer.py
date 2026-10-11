@@ -116,8 +116,8 @@ def judge_facts(
             elif not verdict.jd_requires_skill:
                 dismissed.append(o.skill)
             else:
-                refined.append(_apply_verdict(o, verdict, resume_text=resume_text, scanned=scanned, at=at,
-                                              jd_levels=jd_candidates([o], jd_text, ontology)[o.skill]))
+                refined.append(_apply_verdict(o, verdict, resume_text=resume_text, jd_text=jd_text, scanned=scanned,
+                                              at=at, jd_levels=jd_candidates([o], jd_text, ontology)[o.skill]))
         observations = refined
 
     steps: tuple[LearningStep, ...] = ()
@@ -279,18 +279,22 @@ def _apply_verdict(
     verdict: SkillVerdict,
     *,
     resume_text: str,
+    jd_text: str,
     scanned: bool,
     at: datetime,
     jd_levels: dict[int, Literal["must", "nice"]],
 ) -> SkillObservation:
     # The requirement level and JD evidence come from the line the judge validated, not from the
     # keyword pass's pick: "you must go onsite" must not lend its must-have weight to "Go experience".
+    jd_excerpt = jd_text.splitlines()[verdict.jd_line - 1].strip()
     base = dict(skill=observation.skill, requirement=jd_levels[verdict.jd_line],
-                jd_evidence=Provenance(source="jd", locator=f"line {verdict.jd_line}", retrieved_at=at))
+                jd_evidence=Provenance(source="jd", locator=f"line {verdict.jd_line}", excerpt=jd_excerpt,
+                                       retrieved_at=at))
     if verdict.resume_status in ("matched", "partial"):
         line = find_quote_line(verdict.resume_quote, resume_text)
         status = SkillStatus.MATCHED if verdict.resume_status == "matched" else SkillStatus.PARTIAL
-        evidence = Provenance(source="llm_judge", locator=f"line {line}", retrieved_at=at)
+        evidence = Provenance(source="llm_judge", locator=f"line {line}",
+                              excerpt=resume_text.splitlines()[line - 1].strip(), retrieved_at=at)
         return SkillObservation(**base, status=status, confidence=verdict.confidence, resume_evidence=evidence)
     if verdict.resume_status == "absent":
         if scanned:

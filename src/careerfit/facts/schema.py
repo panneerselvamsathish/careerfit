@@ -18,6 +18,7 @@ class Provenance(BaseModel):
 
     source: Literal["resume", "jd", "derived", "llm_judge"]
     locator: str
+    excerpt: str  # the cited text itself, so a reader can check the claim without the source file
     retrieved_at: datetime
 
 class SkillObservation(BaseModel):
@@ -97,7 +98,7 @@ class GapAnalysisFacts(BaseModel):
     jd_coverage: Coverage
     analyzed_at: datetime
     llm_used: bool
-    schema_version: str = "0.3.0"
+    schema_version: str = "0.4.0"
     fit_score: FitScore | None = None
     judge: JudgeRun | None = None
     skill_observations: tuple[SkillObservation, ...]

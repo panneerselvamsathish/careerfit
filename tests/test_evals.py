@@ -15,8 +15,8 @@ SCANNED = Coverage(
 ONTOLOGY = {"python": SkillEntry(aliases=(), ambiguous=False), "aws": SkillEntry(aliases=(), ambiguous=False)}
 
 
-def jd_line(n: int) -> Provenance:
-    return Provenance(source="jd", locator=f"line {n}", retrieved_at=AT)
+def jd_line(n: int, excerpt: str = "- Python") -> Provenance:
+    return Provenance(source="jd", locator=f"line {n}", excerpt=excerpt, retrieved_at=AT)
 
 
 def obs(skill: str, status: SkillStatus, **extra) -> SkillObservation:
@@ -86,7 +86,8 @@ def test_duplicate_skill_is_a_violation():
 def test_evidence_must_point_at_a_line_that_mentions_the_skill():
     jd = "Requirements:\n- Python"
     good = facts_with(SkillObservation(skill="python", status=SkillStatus.GAP, requirement="must", jd_evidence=jd_line(2)))
-    wrong_line = facts_with(SkillObservation(skill="python", status=SkillStatus.GAP, requirement="must", jd_evidence=jd_line(1)))
+    wrong_line = facts_with(SkillObservation(skill="python", status=SkillStatus.GAP, requirement="must",
+                                             jd_evidence=jd_line(1, excerpt="Requirements:")))
     past_end = facts_with(SkillObservation(skill="python", status=SkillStatus.GAP, requirement="must", jd_evidence=jd_line(9)))
 
     assert invariants.check_evidence(good, "", jd, ONTOLOGY) == []
@@ -112,3 +113,12 @@ def test_not_observed_expectations_count_as_passes():
     result = harness.run_case(case, ontology)
     assert "java: correctly not reported" in result.passed
     assert len(result.passed) == len(case["expected"]) + len(case["not_observed"])
+
+
+def test_excerpt_must_match_the_cited_line():
+    jd = "Requirements:\n- Python"
+    forged = facts_with(SkillObservation(skill="python", status=SkillStatus.GAP, requirement="must",
+                                         jd_evidence=jd_line(2, excerpt="- Python, 10 years required")))
+    assert invariants.check_evidence(forged, "", jd, ONTOLOGY) == [
+        "python: jd evidence 'line 2' quotes '- Python, 10 years required', but that line reads '- Python'"
+    ]
