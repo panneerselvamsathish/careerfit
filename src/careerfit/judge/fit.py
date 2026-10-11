@@ -11,7 +11,7 @@ def _coverage(observations: list[SkillObservation]) -> float:
         return 0.0
     credit = sum(1.0 if o.status == SkillStatus.MATCHED else 0.5 if o.status == SkillStatus.PARTIAL else 0.0
                  for o in observations)
-    return round(credit / len(observations), 3)
+    return credit / len(observations)
 
 
 def _describe(label: str, observations: list[SkillObservation]) -> str:
@@ -32,7 +32,7 @@ def compute_fit_score(observations: tuple[SkillObservation, ...]) -> FitScore | 
     nice = [o for o in decided if o.requirement == "nice"]
     must_cov, nice_cov = _coverage(must), _coverage(nice)
     if must and nice:
-        overall = round(MUST_WEIGHT * must_cov + (1 - MUST_WEIGHT) * nice_cov, 3)
+        overall = MUST_WEIGHT * must_cov + (1 - MUST_WEIGHT) * nice_cov
     else:
         overall = must_cov if must else nice_cov
 
@@ -41,5 +41,6 @@ def compute_fit_score(observations: tuple[SkillObservation, ...]) -> FitScore | 
     if excluded:
         parts.append(f"{excluded} skill{'s' if excluded != 1 else ''} could not be assessed and "
                      f"{'are' if excluded != 1 else 'is'} not counted.")
-    return FitScore(overall=overall, must_have_coverage=must_cov, nice_to_have_coverage=nice_cov,
-                    explanation=" ".join(parts))
+    # Round once, at the end: combining already-rounded coverages can shift the overall score.
+    return FitScore(overall=round(overall, 3), must_have_coverage=round(must_cov, 3),
+                    nice_to_have_coverage=round(nice_cov, 3), explanation=" ".join(parts))

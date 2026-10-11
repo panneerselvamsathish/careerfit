@@ -296,7 +296,8 @@ def _apply_verdict(
         if scanned:
             return SkillObservation(**base, status=SkillStatus.NOT_ASSESSED)
         return SkillObservation(**base, status=SkillStatus.GAP, confidence=verdict.confidence)
-    return observation
+    # Still unclear on the resume side, but the JD line and level the judge validated still apply.
+    return SkillObservation(**base, status=SkillStatus.UNRESOLVABLE, resume_evidence=observation.resume_evidence)
 
 
 def _ask(

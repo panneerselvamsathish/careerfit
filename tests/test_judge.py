@@ -353,3 +353,20 @@ def test_a_cached_retry_is_not_paid_for_twice(tmp_path):
     replay = FakeLLM()
     run(CachingLLM(replay, tmp_path))
     assert replay.calls == []
+
+
+def test_unclear_resume_still_uses_the_validated_jd_line():
+    llm = FakeLLM({"verdicts": [verdict("go", status="unclear", jd_line=4)]}, plan("go"))
+    go = by_skill(run(llm, facts=keyword_facts(resume="Python developer", jd=ONSITE_JD),
+                      resume="Python developer", jd=ONSITE_JD))["go"]
+    assert go.status == SkillStatus.UNRESOLVABLE
+    assert (go.requirement, go.jd_evidence.locator) == ("nice", "line 4")
+
+
+def test_fit_score_rounds_once_at_the_end():
+    observations = (_obs("m", SkillStatus.GAP),
+                    *(_obs(f"n{i}", SkillStatus.MATCHED, "nice") for i in range(5)),
+                    *(_obs(f"g{i}", SkillStatus.GAP, "nice") for i in range(2)))
+    fit = compute_fit_score(observations)
+    assert fit is not None
+    assert (fit.must_have_coverage, fit.nice_to_have_coverage, fit.overall) == (0.0, 0.714, 0.179)
