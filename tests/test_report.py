@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+import pytest
+
 from careerfit.analyze.observations import build_facts
 from careerfit.analyze.ontology import load_ontology
 from careerfit.cli import DEFAULT_ONTOLOGY, main
@@ -79,10 +81,25 @@ def test_unreadable_resume_pages_and_scanned_jd_are_disclosed():
     assert "2 of 3 resume pages had no readable text" in report
     assert "The resume is a PDF: skills shown only in tables, graphics or unusual layouts can be missed." in report
     assert "its list of requirements may be incomplete" in report
+    assert "The job description is a PDF:" in report
 
 
-def test_table_cells_escape_pipes_and_newlines():
-    assert cell("a | b\nc") == "a \\| b c"
+def test_readable_pdf_job_description_still_discloses_layout_limits():
+    readable_pdf = Coverage(source_format="pdf", pages_total=2, pages_with_text=2, chars_extracted=900,
+                            known_blind_spots=("layout_order", "graphics", "tables"))
+    report = render_markdown(sample_facts(jd_coverage=readable_pdf)[0])
+    assert "The job description is a PDF: requirements shown only in tables or graphics can be missed" in report
+    assert "its list of requirements may be incomplete" not in report
+    assert "The resume is a" not in report  # the resume here is plain text
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("a | b\nc", r"a \| b c"),
+    (r"a\|b", r"a\\\|b"),  # an existing backslash must not cancel the pipe's escape
+    (r"C:\tools", r"C:\\tools"),
+], ids=["pipe-and-newline", "backslash-before-pipe", "plain-backslash"])
+def test_table_cells_escape_pipes_backslashes_and_newlines(text, expected):
+    assert cell(text) == expected
 
 
 def test_cli_writes_the_report(tmp_path, capsys):

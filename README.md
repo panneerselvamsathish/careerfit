@@ -95,9 +95,9 @@ Every row quotes the line it relies on, so you can check a claim without opening
   every requirement with its evidence. No learning plan.
 
 Both end with **What this analysis could not see** (skills outside the skill list, unreadable
-PDF pages, skills the keyword pass couldn't decide, anything the LLM judge dismissed or failed
-on) and **How this was decided** (how many skills were settled by keywords vs by Claude, which
-model and prompt versions). A gap list that hides its blind spots overclaims, so these sections
+PDF pages, PDF layout limits for the resume or JD, skills the keyword pass couldn't decide,
+anything the LLM judge dismissed or failed on) and **How this was decided** (how many skills
+were settled by keywords vs by Claude, which model and prompt versions). A gap list that hides its blind spots overclaims, so these sections
 are always present.
 
 ### Reading the result

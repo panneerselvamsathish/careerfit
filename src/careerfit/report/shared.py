@@ -1,6 +1,6 @@
 """Formatting shared by both perspectives. Presentation only: no verdict is decided here."""
 
-from careerfit.facts.schema import GapAnalysisFacts, Provenance, SkillObservation, SkillStatus
+from careerfit.facts.schema import Coverage, GapAnalysisFacts, Provenance, SkillObservation, SkillStatus
 
 STATUS_LABEL = {
     SkillStatus.MATCHED: "Matched",
@@ -12,11 +12,13 @@ STATUS_LABEL = {
 STATUS_ORDER = [SkillStatus.MATCHED, SkillStatus.PARTIAL, SkillStatus.GAP, SkillStatus.UNRESOLVABLE,
                 SkillStatus.NOT_ASSESSED]
 DECIDED = (SkillStatus.MATCHED, SkillStatus.PARTIAL, SkillStatus.GAP)
+LAYOUT_BLIND_SPOTS = ("layout_order", "graphics", "tables")
 
 
 def cell(text: str) -> str:
     """Make text safe inside a Markdown table cell."""
-    return text.replace("|", "\\|").replace("\n", " ")
+    # Backslashes first: otherwise a source "\\|" becomes "\\\\|", and the pipe splits the cell.
+    return text.replace("\\", "\\\\").replace("|", "\\|").replace("\n", " ")
 
 
 def cite(evidence: Provenance | None) -> str:
@@ -60,8 +62,13 @@ def blind_spots(facts: GapAnalysisFacts) -> list[str]:
         unread = (resume.pages_total or 0) - (resume.pages_with_text or 0)
         notes.append(f"{unread} of {resume.pages_total} resume pages had no readable text, so skills that may be on "
                      "them are marked Not assessed rather than Gap.")
-    if resume.source_format == "pdf":
-        notes.append("The resume is a PDF: skills shown only in tables, graphics or unusual layouts can be missed.")
+    if _layout_limited(resume):
+        notes.append(f"The resume is a {resume.source_format.upper()}: skills shown only in tables, graphics or "
+                     "unusual layouts can be missed.")
+    if _layout_limited(jd):
+        notes.append(f"The job description is a {jd.source_format.upper()}: requirements shown only in tables or "
+                     "graphics can be missed, and an unusual layout can put one under the wrong heading "
+                     "(must-have vs nice-to-have).")
     if "scanned_pages" in jd.known_blind_spots:
         notes.append("Part of the job description could not be read, so its list of requirements may be incomplete.")
     unresolved = [o.skill for o in facts.skill_observations if o.status == SkillStatus.UNRESOLVABLE]
@@ -92,3 +99,7 @@ def provenance_section(facts: GapAnalysisFacts) -> list[str]:
                      "quotes a resume line, and the quote was checked in code.")
     lines += [f"- Sources: resume `{facts.resume_source}`, job description `{facts.jd_source}`.", ""]
     return lines
+
+
+def _layout_limited(coverage: Coverage) -> bool:
+    return any(spot in coverage.known_blind_spots for spot in LAYOUT_BLIND_SPOTS)
