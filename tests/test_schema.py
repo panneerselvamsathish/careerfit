@@ -12,6 +12,8 @@ FACTS_MODELS = [
 
 JD_EVIDENCE = schema.Provenance(source="jd", locator="line 1", retrieved_at=datetime(2026, 10, 10))
 
+JUDGE = schema.JudgeRun(model="claude-opus-5-5", prompt_versions=("skill_match@1",))
+
 TXT_COVERAGE = schema.Coverage(
     source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=10, known_blind_spots=()
 )
@@ -56,7 +58,7 @@ def test_skill_observation_matched_requires_evidence():
         schema.SkillObservation(skill="test", status=schema.SkillStatus.MATCHED, requirement="must", jd_evidence=JD_EVIDENCE)
 
 def test_gap_analysis_facts_llm_true_allows_fit_score():   
-    schema.GapAnalysisFacts(llm_used=True, fit_score=schema.FitScore(overall=0.5, must_have_coverage=0.5, nice_to_have_coverage=0.5, explanation="test"),resume_source="test",jd_source="jd test",analyzed_at=datetime.now(),skill_observations=(),perspective="candidate", resume_coverage=TXT_COVERAGE, jd_coverage=TXT_COVERAGE)
+    schema.GapAnalysisFacts(llm_used=True, judge=JUDGE, fit_score=schema.FitScore(overall=0.5, must_have_coverage=0.5, nice_to_have_coverage=0.5, explanation="test"),resume_source="test",jd_source="jd test",analyzed_at=datetime.now(),skill_observations=(),perspective="candidate", resume_coverage=TXT_COVERAGE, jd_coverage=TXT_COVERAGE)
 
 def test_gap_analysis_facts_llm_false_rejects_fit_score():
     with pytest.raises(ValidationError, match="fit_score should not be set if llm_used is False"):
@@ -67,7 +69,7 @@ def test_gap_analysis_facts_llm_false_rejects_learning_steps():
         schema.GapAnalysisFacts(llm_used=False, learning_steps=[schema.LearningStep(skill="Python", priority=1, why_it_matters="needed", resources=(), estimated_weeks=4)],resume_source="test",jd_source="jd test",analyzed_at=datetime.now(),skill_observations=(),perspective="candidate", resume_coverage=TXT_COVERAGE, jd_coverage=TXT_COVERAGE) # type: ignore[call-arg]
 
 def test_gap_analysis_facts_fails_append_to_tuples():
-    gaf = schema.GapAnalysisFacts(llm_used=True, fit_score=None, resume_source="test", jd_source="jd test", analyzed_at=datetime.now(), skill_observations=(), perspective="candidate", resume_coverage=TXT_COVERAGE, jd_coverage=TXT_COVERAGE)
+    gaf = schema.GapAnalysisFacts(llm_used=True, judge=JUDGE, fit_score=None, resume_source="test", jd_source="jd test", analyzed_at=datetime.now(), skill_observations=(), perspective="candidate", resume_coverage=TXT_COVERAGE, jd_coverage=TXT_COVERAGE)
     with pytest.raises(AttributeError):
         gaf.skill_observations.append(schema.SkillObservation(skill="test", status=schema.SkillStatus.MATCHED, requirement="must", jd_evidence=JD_EVIDENCE, resume_evidence=schema.Provenance(source="resume", locator="experience[0]", retrieved_at=datetime.now())))  # type: ignore[attr-defined]
     with pytest.raises(AttributeError):
@@ -90,3 +92,26 @@ def test_coverage_rejects_unknown_blind_spot():
 def test_coverage_requires_blind_spots():
     with pytest.raises(ValidationError):
         schema.Coverage(source_format="pdf", pages_total=3, pages_with_text=2, chars_extracted=100) # type: ignore[call-arg]
+
+
+def _facts(**overrides):
+    base = dict(resume_source="r", jd_source="j", analyzed_at=datetime(2026, 1, 1), skill_observations=(),
+                perspective="candidate", resume_coverage=TXT_COVERAGE, jd_coverage=TXT_COVERAGE)
+    return schema.GapAnalysisFacts(**{**base, **overrides})
+
+
+def test_gap_analysis_facts_llm_true_requires_judge_record():
+    with pytest.raises(ValidationError, match="judge is required when llm_used is True"):
+        _facts(llm_used=True)
+
+
+def test_gap_analysis_facts_llm_false_rejects_judge_record():
+    with pytest.raises(ValidationError, match="judge should not be set if llm_used is False"):
+        _facts(llm_used=False, judge=JUDGE)
+
+
+def test_dismissed_skill_cannot_also_be_observed():
+    obs = schema.SkillObservation(skill="go", status=schema.SkillStatus.UNRESOLVABLE, requirement="nice", jd_evidence=JD_EVIDENCE)
+    judge = schema.JudgeRun(model="m", prompt_versions=("skill_match@1",), dismissed_skills=("go",))
+    with pytest.raises(ValidationError, match="a dismissed skill cannot also be observed"):
+        _facts(llm_used=True, judge=judge, skill_observations=(obs,))

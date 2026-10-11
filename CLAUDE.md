@@ -18,8 +18,12 @@ uv run pytest tests/test_architecture.py -v
 # Run the CLI — keyword analysis only (no LLM)
 uv run careerfit --resume fixtures/resume.txt --jd fixtures/jd.txt -o facts.json
 
-# Run the CLI — with LLM judge (needs ANTHROPIC_API_KEY)
+# Run the CLI — with LLM judge (needs Bedrock or Anthropic API credentials)
 uv run careerfit --resume fixtures/resume.txt --jd fixtures/jd.txt --deep -o facts.json
+# (provider: CAREERFIT_LLM_PROVIDER=bedrock|anthropic; answers cached in .cache/judge/, --fresh bypasses)
+
+# Live judge smoke test against the real API (skipped unless opted in; costs a few cents)
+CAREERFIT_LIVE_LLM=1 uv run pytest tests/test_live_judge.py
 
 # Start the web server
 uv run careerfit-server

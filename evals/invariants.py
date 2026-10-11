@@ -33,6 +33,12 @@ def check(facts: GapAnalysisFacts) -> list[str]:
             if o.confidence is not None:
                 bad.append(f"{o.skill}: confidence {o.confidence} in a keyword-only run")
 
+        judged = o.resume_evidence is not None and o.resume_evidence.source == "llm_judge"
+        if judged and not facts.llm_used:
+            bad.append(f"{o.skill}: judge evidence in a keyword-only run")
+        if judged and o.confidence is None:
+            bad.append(f"{o.skill}: judge verdict without a confidence")
+
     return bad
 
 
@@ -70,6 +76,10 @@ def _evidence_problem(skill: str, entry: SkillEntry, evidence: Provenance, text:
     line_no = int(number)
     if not 1 <= line_no <= len(lines):
         return f"points past the end of the document ({len(lines)} lines)"
+    # The judge may match a paraphrase, so its lines needn't contain the keyword; it must still
+    # cite real text. Keyword evidence must mention the skill on the cited line.
+    if evidence.source == "llm_judge":
+        return "points at a blank line" if not lines[line_no - 1].strip() else None
     if detect(skill, entry, lines[line_no - 1]) == "absent":
         return "points at a line that does not mention the skill"
     return None

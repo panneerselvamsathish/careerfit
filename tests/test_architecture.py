@@ -15,7 +15,8 @@ PKG = pathlib.Path(__file__).parent.parent / "src" / "careerfit"
 FORBIDDEN = {
     "analyze": {"careerfit.judge", "anthropic", "openai", "requests", "httpx"},
     "ingest": {"careerfit.judge", "careerfit.analyze", "anthropic", "openai", "requests", "httpx"},
-    "report": {"careerfit.judge", "careerfit.analyze", "anthropic", "openai", "requests", "httpx"}
+    "report": {"careerfit.judge", "careerfit.analyze", "anthropic", "openai", "requests", "httpx"},
+    "judge": {"careerfit.ingest", "careerfit.report", "careerfit.cli", "careerfit.api", "requests", "httpx"}
 }
 
 def imports_of(path: pathlib.Path) -> set[str]:

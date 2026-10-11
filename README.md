@@ -37,7 +37,7 @@ not conventions, not comments. A build constraint.
 - [x] Milestone 3: Ingest — PDF + plain text parsing, Coverage builder
 - [x] Milestone 4: Analyze — pure skill extraction, keyword gap computation
 - [x] Milestone 5: Evals — honesty invariants + golden expectations (two-layer eval design)
-- [ ] Milestone 6: Judge — Anthropic API with structured output, versioned prompt YAML files
+- [x] Milestone 6: Judge — Anthropic API with structured output, versioned prompt YAML files
 - [ ] Milestone 7: Report + CLI — rendering separation, composition root pattern (CLI keyword pass works; report rendering to come)
 - [ ] Milestone 8: Web API + UI — FastAPI file upload, vanilla JS client
 
@@ -80,7 +80,7 @@ resume mentions the skill also cite that resume line.
 |---|---|
 | `matched` | The JD asks for it and the resume clearly shows it |
 | `gap` | The JD asks for it and the resume doesn't mention it |
-| `unresolvable` | A word like "Go" or "React" could be the skill or an ordinary word, so the keyword pass doesn't guess. The LLM tier (Milestone 6) settles these |
+| `unresolvable` | A word like "Go" or "React" could be the skill or an ordinary word, so the keyword pass doesn't guess. `--deep` asks the LLM judge to settle these |
 | `not_assessed` | Part of the resume couldn't be read (for example scanned PDF pages), so a missing skill is not reported as a gap |
 
 The keyword pass only knows the skills listed in `src/careerfit/ontology/skills.yaml`.
@@ -108,12 +108,38 @@ held-out, and by document type (`txt`, `pdf`). The current cases were written al
 rules, so their 100% is an upper bound; the real test is held-out cases built from real job
 descriptions.
 
-### Planned commands
+### Deep analysis with the LLM judge
 
 ```bash
-# Deep analysis with the LLM judge (Milestone 6; needs an API key)
-uv run careerfit --resume fixtures/resume.txt --jd fixtures/jd.txt --deep -o facts.json
+# Amazon Bedrock (needs AWS_REGION plus AWS credentials)
+export CAREERFIT_LLM_PROVIDER=bedrock
+# or the Anthropic API (needs ANTHROPIC_API_KEY or an `ant auth login` profile)
+export CAREERFIT_LLM_PROVIDER=anthropic
 
+uv run careerfit --resume fixtures/resume.txt --jd fixtures/jd.txt --deep -o facts.json
+```
+
+The keyword pass runs first and costs nothing. `--deep` then sends only the skills it marked
+`unresolvable` to Claude, and writes a fit score and a learning plan for the gaps.
+
+- **Every positive verdict quotes the resume**, and the quote is checked in code before it is
+  accepted. A wrong or missing quote is sent back once with the reason; if it's still wrong,
+  the skill keeps its keyword verdict and the failure is recorded in `judge.failures`.
+- **A skill the JD doesn't really ask for** ("we go live weekly") is dismissed and listed in
+  `judge.dismissed_skills`, not silently dropped.
+- **The fit score is plain arithmetic** over decided skills (must-haves weighted 75%), with a
+  sentence saying how many skills couldn't be assessed.
+- **Prompts are versioned data** in `src/careerfit/judge/prompts/`; the versions used are
+  recorded in `judge.prompt_versions`.
+- **Answers are cached** in `.cache/judge/`, keyed by a SHA-256 of the full request, so a repeat
+  analysis costs nothing. Add `--fresh` to bypass the cache.
+
+Optional: `CAREERFIT_MODEL` overrides the model (default `claude-opus-5-5`, or the global
+cross-region inference profile `global.anthropic.claude-opus-5-5` on Bedrock).
+
+### Planned
+
+```bash
 # Web server (Milestone 8)
 uv run careerfit-server
 ```
