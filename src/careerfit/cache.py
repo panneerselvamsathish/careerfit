@@ -30,11 +30,19 @@ class CachingLLM:
 
 
 def _read(path: Path) -> dict | None:
-    """A missing or unreadable entry is a cache miss, never an error."""
+    """A missing, unreadable or malformed entry is a cache miss, never an error."""
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError):
+        stored = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
         return None
+    if not isinstance(stored, dict) or stored.get("stop_reason") != "end_turn":
+        return None
+    content = stored.get("content")
+    if not isinstance(content, list) or not all(
+        isinstance(b, dict) and b.get("type") == "text" and isinstance(b.get("text"), str) for b in content
+    ):
+        return None
+    return stored
 
 
 def _write_atomically(path: Path, text: str) -> None:

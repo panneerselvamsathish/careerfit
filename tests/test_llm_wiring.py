@@ -112,3 +112,17 @@ def test_unreadable_cache_entry_is_a_miss_and_gets_replaced(tmp_path):
     assert len(again.calls) == 1
     assert json.loads(entry.read_text(encoding="utf-8"))["stop_reason"] == "end_turn"
     assert [p.name for p in tmp_path.iterdir()] == [entry.name]
+
+
+@pytest.mark.parametrize("entry", ["{}", "[]", '{"stop_reason": "end_turn"}',
+                                   '{"stop_reason": "end_turn", "content": [{"type": "text"}]}',
+                                   '{"stop_reason": "refusal", "content": []}'])
+def test_malformed_cache_entry_is_a_miss(tmp_path, entry):
+    answered = FakeLLM({"verdicts": []})
+    CachingLLM(answered, tmp_path).create(model="m", messages=[])
+    next(tmp_path.iterdir()).write_text(entry, encoding="utf-8")
+
+    again = FakeLLM({"verdicts": []})
+    response = CachingLLM(again, tmp_path).create(model="m", messages=[])
+    assert len(again.calls) == 1
+    assert response.stop_reason == "end_turn"

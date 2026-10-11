@@ -192,6 +192,7 @@ def test_judging_twice_is_refused():
     ("BACKEND   services in go", 2),
     ("services in Go and Python. I react", None),
     ("", None),
+    ("services in G", None),
 ])
 def test_find_quote_line(quote, expected):
     assert find_quote_line(quote, RESUME) == expected
@@ -245,3 +246,18 @@ def test_nice_to_have_ahead_of_a_must_have_is_retried():
     assert by_skill(facts)["react"].requirement == "nice"
     assert "every must-have gap must have a higher priority" in llm.calls[2]["messages"][2]["content"]
     assert [s.skill for s in facts.learning_steps] == ["kubernetes", "go", "react"]
+
+
+def test_quote_inside_a_longer_word_is_not_found():
+    assert find_quote_line("Go", "Deployed on Google Cloud") is None
+    assert find_quote_line("on Google Cloud", "Deployed on Google Cloud") == 1
+
+
+def test_one_word_quote_is_retried():
+    llm = FakeLLM({"verdicts": [verdict("go", status="matched", quote="Go"), verdict("react", requires=False)]},
+                  {"verdicts": [verdict("go", status="matched", quote="backend services in Go"),
+                                verdict("react", requires=False)]},
+                  plan("kubernetes"))
+    facts = run(llm)
+    assert "resume_quote must be at least 3 words" in llm.calls[1]["messages"][2]["content"]
+    assert by_skill(facts)["go"].status == SkillStatus.MATCHED

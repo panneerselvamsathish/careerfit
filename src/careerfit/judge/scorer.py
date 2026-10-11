@@ -27,6 +27,7 @@ from careerfit.judge.prompts import PromptSpec, load_prompt
 MAX_TOKENS = 16000
 EFFORT = "medium"
 MAX_RESOURCES = 3
+MIN_QUOTE_WORDS = 3
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -159,8 +160,9 @@ def resolve_skills(
         problems = _coverage_problems([v.skill for v in answer.verdicts], names)
         for v in answer.verdicts:
             if v.resume_status in ("matched", "partial"):
-                if not v.resume_quote.strip():
-                    problems.append(f"{v.skill}: resume_status is {v.resume_status} but resume_quote is empty")
+                if len(v.resume_quote.split()) < MIN_QUOTE_WORDS:
+                    problems.append(f"{v.skill}: resume_quote must be at least {MIN_QUOTE_WORDS} words copied "
+                                    f"from the resume, got {v.resume_quote!r}")
                 elif find_quote_line(v.resume_quote, resume_text) is None:
                     problems.append(f"{v.skill}: resume_quote {v.resume_quote!r} is not on any single line "
                                     "of the resume; copy the exact words")
@@ -226,12 +228,14 @@ def looks_like_link(resource: str) -> bool:
 
 
 def find_quote_line(quote: str, text: str) -> int | None:
-    """1-based line number of the first line containing the quote, ignoring case and spacing."""
+    """1-based line of the first line containing the quote as whole words, ignoring case and spacing."""
     needle = _normalise(quote)
     if not needle:
         return None
+    # Whole words only: a quote of "Go" must not be "found" inside "Google".
+    pattern = re.compile(rf"(?<!\w){re.escape(needle)}(?!\w)")
     for line_no, line in enumerate(text.splitlines(), start=1):
-        if needle in _normalise(line):
+        if pattern.search(_normalise(line)):
             return line_no
     return None
 
