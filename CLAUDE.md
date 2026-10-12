@@ -57,7 +57,10 @@ src/careerfit/
                render_markdown() picks one from facts.perspective.
                MUST NOT: call an LLM, import judge/, import analyze/.
   cli.py       Composition root for terminal use.
-  api.py       FastAPI composition root for web use.
+  api.py       FastAPI composition root for web use. Keyword pass only (no judge/ until there is
+               identity, metering and rate limits). The web framework is banned everywhere else.
+  web/         Static page: index.html, app.js, style.css. Presentation only; document text is
+               set with textContent, never parsed as HTML. No inline script (strict CSP).
   cache.py     Disk cache of judge answers, used by the composition roots. Kept out of
                judge/ because it needs storage; it never imports an LLM SDK.
 ```

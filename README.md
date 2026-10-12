@@ -39,7 +39,7 @@ not conventions, not comments. A build constraint.
 - [x] Milestone 5: Evals — honesty invariants + golden expectations (two-layer eval design)
 - [x] Milestone 6: Judge — Anthropic API with structured output, versioned prompt YAML files
 - [x] Milestone 7: Report + CLI — Markdown reports for two perspectives, every claim quoted, blind spots disclosed
-- [ ] Milestone 8: Web API + UI — FastAPI file upload, vanilla JS client
+- [x] Milestone 8: Web API + UI — FastAPI file upload, vanilla JS client, strict CSP
 
 ## Getting started
 
@@ -174,12 +174,31 @@ folder to remove them.
 Optional: `CAREERFIT_MODEL` overrides the model (default `claude-opus-5-5`, or the global
 cross-region inference profile `global.anthropic.claude-opus-5-5` on Bedrock).
 
-### Planned
+### The web app
 
 ```bash
-# Web server (Milestone 8)
-uv run careerfit-server
+uv run careerfit-server          # then open http://127.0.0.1:8000/
 ```
+
+Upload a resume (`.pdf` or `.txt`), then upload the job description or paste it, and pick who
+the report is for. The page shows the must-have and nice-to-have tables with the quoted lines,
+the same **What this analysis could not see** notes as the Markdown report, and links to download
+the report (`.md`) and the facts (`.json`). It uses the same pipeline as the CLI, so the same
+files give the same verdicts.
+
+- **Keyword pass only.** The web app never calls an LLM, so nothing leaves the server. `--deep`
+  stays in the CLI: a paid LLM call behind a web endpoint needs user identity, usage metering and
+  rate limits first.
+- **Nothing is stored.** Uploads are written to a temporary folder for parsing and deleted before
+  the response is sent; API responses carry `Cache-Control: no-store`.
+- **Document text is shown, never run.** The page sets every value with `textContent`, and a
+  strict Content-Security-Policy allows only the app's own script and stylesheet.
+- **Limits:** 5 MB per file. The server binds to `127.0.0.1` by default; pass `--host` and
+  `--port` to change that. There is no authentication, so don't expose it publicly as it is.
+
+`POST /api/analyze` takes `multipart/form-data` with `resume` (file), either `jd` (file) or
+`jd_text`, and `perspective` (`candidate` or `hiring_manager`), and returns `facts`,
+`blind_spots` (plain text) and `report_markdown`. Bad input gets a 4xx with a readable `detail`.
 
 ## Tech stack
 

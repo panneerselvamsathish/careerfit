@@ -15,11 +15,16 @@ PKG = pathlib.Path(__file__).parent.parent / "src" / "careerfit"
 # Raw HTTP clients, including httpx2 (what the Anthropic SDK itself is built on).
 RAW_HTTP = {"requests", "httpx", "httpx2", "aiohttp", "urllib3", "urllib.request", "http.client"}
 
+# The web framework belongs to the composition root (api.py); the pipeline never sees a request.
+WEB = {"fastapi", "starlette", "uvicorn", "multipart", "python_multipart", "careerfit.api", "careerfit.cli"}
+
 FORBIDDEN = {
-    "analyze": {"careerfit.judge", "anthropic", "openai"} | RAW_HTTP,
-    "ingest": {"careerfit.judge", "careerfit.analyze", "anthropic", "openai"} | RAW_HTTP,
-    "report": {"careerfit.judge", "careerfit.analyze", "anthropic", "openai"} | RAW_HTTP,
-    "judge": {"careerfit.ingest", "careerfit.report", "careerfit.cli", "careerfit.api"} | RAW_HTTP,
+    "analyze": {"careerfit.judge", "anthropic", "openai"} | RAW_HTTP | WEB,
+    "ingest": {"careerfit.judge", "careerfit.analyze", "anthropic", "openai"} | RAW_HTTP | WEB,
+    "report": {"careerfit.judge", "careerfit.analyze", "anthropic", "openai"} | RAW_HTTP | WEB,
+    "judge": {"careerfit.ingest", "careerfit.report", "careerfit.cli", "careerfit.api"} | RAW_HTTP | WEB,
+    "facts": {"careerfit.ingest", "careerfit.analyze", "careerfit.judge", "careerfit.report", "careerfit.ontology"}
+             | RAW_HTTP | WEB,
 }
 
 def imports_of(path: pathlib.Path) -> set[str]:

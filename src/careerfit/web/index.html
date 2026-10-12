@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>careerfit — resume vs job description</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>careerfit</h1>
+    <p class="lede">Compare a resume with a job description. Every result quotes the line it relies on.</p>
+  </header>
+
+  <main>
+    <form id="form" novalidate>
+      <fieldset>
+        <legend>Resume</legend>
+        <label>File (.pdf or .txt, up to 5 MB)
+          <input type="file" name="resume" id="resume" accept=".pdf,.txt" required>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Job description</legend>
+        <label>File (.pdf or .txt)
+          <input type="file" name="jd" id="jd" accept=".pdf,.txt">
+        </label>
+        <p class="or">or paste it</p>
+        <label class="sr-only" for="jd_text">Job description text</label>
+        <textarea name="jd_text" id="jd_text" rows="8" placeholder="Paste the job description here"></textarea>
+      </fieldset>
+
+      <fieldset>
+        <legend>Report for</legend>
+        <label><input type="radio" name="perspective" value="candidate" checked> Candidate — what to work on</label>
+        <label><input type="radio" name="perspective" value="hiring_manager"> Hiring manager — how the candidate meets the JD</label>
+      </fieldset>
+
+      <button type="submit" id="submit">Analyse</button>
+      <p class="note">Keyword pass only, no LLM: nothing leaves this server. Files are read and discarded, never stored.</p>
+      <p id="error" class="error" role="alert" hidden></p>
+    </form>
+
+    <section id="result" hidden aria-live="polite">
+      <h2 id="title"></h2>
+      <p id="summary" class="summary"></p>
+      <div class="downloads">
+        <a id="download-report" download="careerfit-report.md">Download report (.md)</a>
+        <a id="download-facts" download="facts.json">Download facts (.json)</a>
+      </div>
+
+      <h3>Must have</h3>
+      <div id="must"></div>
+      <h3>Nice to have</h3>
+      <div id="nice"></div>
+
+      <h3>What this analysis could not see</h3>
+      <ul id="blind-spots"></ul>
+    </section>
+  </main>
+</body>
+</html>
