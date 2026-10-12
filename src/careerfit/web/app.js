@@ -93,6 +93,7 @@ function showError(message) {
 async function submit(event) {
   event.preventDefault();
   $("error").hidden = true;
+  $("result").hidden = true; // a failed run must never leave the previous files' results on screen
   const resume = $("resume").files[0];
   const jdFile = $("jd").files[0];
   const jdText = $("jd_text").value.trim();
