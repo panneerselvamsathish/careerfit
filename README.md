@@ -223,7 +223,7 @@ log retention and an optional $5/month budget alarm.
 # needs the AWS CLI signed in to your account, Docker, and the SAM CLI (brew install aws-sam-cli)
 sam build
 sam deploy --guided --resolve-image-repos   # first time: pick a stack name and region; prints the URL
-sam deploy                                  # later deploys reuse samconfig.toml
+sam build && sam deploy                     # later deploys: rebuild, then reuse samconfig.toml
 sam delete                                  # removes everything the stack created
 ```
 
