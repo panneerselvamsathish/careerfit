@@ -15,6 +15,7 @@ const DECIDED = ["matched", "partial", "gap"];
 const $ = (id) => document.getElementById(id);
 let downloadUrls = [];
 let maxFileMb = 5; // replaced by the server's own limit on load
+let limitsReady = Promise.resolve();
 
 async function loadLimits() {
   try {
@@ -113,6 +114,7 @@ async function submit(event) {
   const jdFile = $("jd").files[0];
   const jdText = $("jd_text").value.trim();
   if (!resume) return showError("Choose a resume file.");
+  await limitsReady; // on a cold start the limit lookup may still be in flight
   if (Boolean(jdFile) === Boolean(jdText)) return showError("Give the job description either as a file or as pasted text, not both.");
   // Checked here as well as on the server: some hosts refuse a large body before careerfit sees it.
   for (const file of [resume, jdFile]) {
@@ -147,6 +149,6 @@ async function submit(event) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  limitsReady = loadLimits();
   $("form").addEventListener("submit", submit);
-  loadLimits();
 });
