@@ -247,3 +247,11 @@ def test_rate_limiter_forgets_the_client_seen_least_recently():
     assert limiter.retry_after("c") is None  # evicts b, not a
     assert limiter.retry_after("a") == 60
     assert limiter.retry_after("b") is None  # b was forgotten, so it starts afresh
+
+
+def test_retry_after_rounds_up_so_a_client_never_retries_too_early():
+    now = [0.0]
+    limiter = RateLimiter(1, 10.0, clock=lambda: now[0])
+    assert limiter.retry_after("a") is None
+    now[0] = 8.9995  # 1.0005 s of the window left
+    assert limiter.retry_after("a") == 2

@@ -5,6 +5,7 @@ endpoint needs identity, metering and rate limits first, and those belong here, 
 """
 
 import argparse
+import math
 import os
 import re
 import tempfile
@@ -176,7 +177,7 @@ class RateLimiter:
             while hits and hits[0] <= now - self.window:
                 hits.popleft()
             if len(hits) >= self.limit:
-                return max(1, int(hits[0] + self.window - now + 0.999))
+                return max(1, math.ceil(hits[0] + self.window - now))
             hits.append(now)
             return None
 
