@@ -239,6 +239,36 @@ non-root user and checks `GET /healthz`. Behind a hosting platform's proxy, set
 `FORWARDED_ALLOW_IPS` to the proxy's address (or `*` when the container is reachable only
 through it), so the rate limit sees each visitor's address instead of the proxy's.
 
+### Deploying to AWS Lambda
+
+The same image runs on AWS Lambda. The [Lambda Web Adapter](https://github.com/awslabs/aws-lambda-web-adapter)
+in the image turns each invocation into an ordinary HTTP request, and a **Function URL** gives a
+public HTTPS address for free. `template.yaml` (AWS SAM) describes the function, its URL, 14-day
+log retention and an optional $5/month budget alarm.
+
+```bash
+# needs the AWS CLI signed in to your account, Docker, and the SAM CLI (brew install aws-sam-cli)
+sam build
+sam deploy --guided --resolve-image-repos   # first time: pick a stack name and region; prints the URL
+sam build && sam deploy                     # later deploys: rebuild, then reuse samconfig.toml
+sam delete                                  # removes everything the stack created
+```
+
+- **Architecture: arm64.** The image must be built for the function's architecture; on Apple
+  silicon and arm64 CI runners that's the native build.
+- **Cost (an estimate, not a cap):** at low traffic, Lambda's always-free allowance (1M requests
+  and 400,000 GB-seconds a month) covers the function, leaving a few cents for storing the image
+  in ECR. Traffic above the allowance is billed.
+- **Upload limit on Lambda: 2 MB per file.** Lambda accepts at most 6 MB per request, counted
+  after base64 encoding. The page checks sizes before uploading and reads the limit from
+  `GET /api/limits`.
+- **Rate limit:** each Lambda instance counts on its own, so the real ceiling is the per-address
+  limit times the number of instances running; the account's concurrency limit bounds that
+  (`ReservedConcurrency` caps it further once the quota allows).
+- **What limits the bill:** the URL is public, so a flood of requests still counts against the
+  free allowance and then costs $0.20 per million requests plus compute. The concurrency limit
+  bounds how fast that can happen; the budget alarm only sends an email, it doesn't stop charges.
+
 `POST /api/analyze` takes `multipart/form-data` with `resume` (file), either `jd` (file) or
 `jd_text`, and `perspective` (`candidate` or `hiring_manager`), and returns `facts`,
 `blind_spots` (plain text) and `report_markdown`. Bad input gets a 4xx with a readable `detail`.
