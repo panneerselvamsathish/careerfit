@@ -90,6 +90,10 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     ("snowflake", "Pipelines into the Snowflake Data Cloud", "found"),
     ("control tower", "Ran the operations control tower", "unclear"),
     ("control tower", "Landing zones with AWS Control Tower", "found"),
+    ("ecs", "Built an ECS game engine in Rust", "unclear"),
+    ("ecs", "Containers on Amazon ECS with Fargate", "found"),
+    ("adr", "Settled ADR and equity trades", "unclear"),
+    ("adr", "Wrote architecture decision records for each change", "found"),
 ])
 def test_new_skills_detect_as_intended(skill, text, expected):
     from careerfit.analyze.matcher import detect

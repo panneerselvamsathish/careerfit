@@ -228,8 +228,8 @@ lambda:
   ambiguous: true  # also Python lambdas, the Greek letter
 
 ecs:
-  aliases: ["amazon ecs", "elastic container service"]
-  ambiguous: false
+  aliases: ["amazon ecs", "aws ecs", "elastic container service"]
+  ambiguous: true  # also "entity-component system" in game development
 
 eks:
   aliases: ["amazon eks", "elastic kubernetes service"]
@@ -427,8 +427,8 @@ threat modeling:
 
 # Architecture practice and data
 adr:
-  aliases: ["adrs", "architecture decision record", "architecture decision records"]
-  ambiguous: false
+  aliases: ["architecture decision record", "architecture decision records"]
+  ambiguous: true  # also "American Depositary Receipt" in finance
 
 c4 model:
   aliases: ["c4 diagram", "c4 diagrams"]
