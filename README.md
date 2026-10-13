@@ -189,8 +189,8 @@ files give the same verdicts.
 - **Keyword pass only.** The web app never calls an LLM, so nothing leaves the server. `--deep`
   stays in the CLI: a paid LLM call behind a web endpoint needs user identity, usage metering and
   rate limits first.
-- **Nothing is stored.** Uploads are written to a temporary folder for parsing and deleted before
-  the response is sent; API responses carry `Cache-Control: no-store`.
+- **Nothing is kept.** Uploads are buffered and written to temporary files for parsing, and deleted
+  before the response is sent; API responses carry `Cache-Control: no-store`.
 - **Document text is shown, never run.** The page sets every value with `textContent`, and a
   strict Content-Security-Policy allows only the app's own script and stylesheet.
 - **Limits:** 5 MB per file. The server binds to `127.0.0.1` by default; pass `--host` and

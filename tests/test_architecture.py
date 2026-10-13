@@ -84,8 +84,11 @@ def test_facts_imports_no_other_careerfit_module() -> None:
     """facts/ is the shared contract, so it depends on nothing else in careerfit, including modules added later."""
     offenders = {}
     for file in (PKG / "facts").glob("**/*.py"):
-        own = {imp for imp in imports_of(file)
-               if (imp == "careerfit" or imp.startswith("careerfit.")) and not imp.startswith("careerfit.facts")}
+        own = {
+            imp for imp in imports_of(file)
+            if (imp == "careerfit" or imp.startswith("careerfit."))
+            and not (imp == "careerfit.facts" or imp.startswith("careerfit.facts."))  # not careerfit.facts_extra
+        }
         if own:
             offenders[str(file.relative_to(PKG))] = own
     assert not offenders, f"facts/ may only import from careerfit.facts: {offenders}"
