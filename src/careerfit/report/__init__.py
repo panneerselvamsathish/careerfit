@@ -2,6 +2,9 @@
 
 from careerfit.facts.schema import GapAnalysisFacts
 from careerfit.report import candidate, hiring_manager
+from careerfit.report.shared import blind_spot_notes
+
+__all__ = ["blind_spot_notes", "render_markdown"]
 
 
 def render_markdown(facts: GapAnalysisFacts) -> str:

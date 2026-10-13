@@ -1,7 +1,7 @@
 """Formatting shared by both perspectives. Presentation only: no verdict is decided here."""
 
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from careerfit.facts.schema import Coverage, GapAnalysisFacts, Provenance, SkillObservation, SkillStatus
 
@@ -73,6 +73,15 @@ def header(facts: GapAnalysisFacts, title: str) -> list[str]:
 
 def blind_spots(facts: GapAnalysisFacts) -> list[str]:
     """What the run could not see. Shown in every report, because a gap list without it overclaims."""
+    return ["## What this analysis could not see", "", *(f"- {n}" for n in blind_spot_notes(facts, cell)), ""]
+
+
+def blind_spot_notes(facts: GapAnalysisFacts, quote: Callable[[str], str] = str) -> list[str]:
+    """The notes themselves. Every value taken from the facts goes through quote: cell() for Markdown,
+    plain str for a caller that displays text literally (the web page sets textContent)."""
+    def names(items: Iterable[str]) -> str:
+        return ", ".join(quote(i) for i in items)
+
     notes = ["Only skills in careerfit's skill list were checked. Anything else the job asks for is not shown here."]
     resume, jd = facts.resume_coverage, facts.jd_coverage
     if "scanned_pages" in resume.known_blind_spots:
@@ -96,13 +105,13 @@ def blind_spots(facts: GapAnalysisFacts) -> list[str]:
         notes.append(f"Claude could not settle {len(unresolved)} skill(s) either: {names(unresolved)}.")
     if facts.judge is not None:
         for skill in facts.judge.dismissed_skills:
-            notes.append(f"Not counted: {cell(skill)}. The job description uses the word in its everyday sense, "
+            notes.append(f"Not counted: {quote(skill)}. The job description uses the word in its everyday sense, "
                          "not as a skill.")
         for failure in facts.judge.failures:
             # Says only what is true for every step: a failed skill match leaves its skills Ambiguous
             # (noted above), and a failed learning plan leaves the plan out. Neither is filled in by keywords.
-            notes.append(f"Part of the deep analysis failed, and its results are not in this report: {cell(failure)}")
-    return ["## What this analysis could not see", "", *(f"- {n}" for n in notes), ""]
+            notes.append(f"Part of the deep analysis failed, and its results are not in this report: {quote(failure)}")
+    return notes
 
 
 def provenance_section(facts: GapAnalysisFacts) -> list[str]:

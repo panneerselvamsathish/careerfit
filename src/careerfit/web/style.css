@@ -1,0 +1,39 @@
+:root {
+  --ink: #1d2433;
+  --muted: #5d6677;
+  --line: #d9dde5;
+  --paper: #f7f8fa;
+  --accent: #2f5bd3;
+  --ok: #1f7a4d;
+  --warn: #9a5b00;
+  --bad: #b3261e;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+body { margin: 0; line-height: 1.5; }
+header, main { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+header { padding-top: 28px; }
+h1 { margin: 0; font-size: 1.8rem; }
+.lede, .note, .muted { color: var(--muted); }
+form, #result { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 20px; margin: 20px 0; }
+fieldset { border: 0; padding: 0; margin: 0 0 18px; }
+legend { font-weight: 600; margin-bottom: 6px; }
+label { display: block; margin: 4px 0; }
+textarea { width: 100%; box-sizing: border-box; font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
+.or { margin: 8px 0 4px; color: var(--muted); font-size: 0.9rem; }
+button { font: inherit; font-weight: 600; background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 10px 22px; cursor: pointer; }
+button:disabled { opacity: 0.6; cursor: progress; }
+.error { color: var(--bad); font-weight: 600; }
+.summary { font-size: 1.05rem; }
+.downloads a { margin-right: 18px; color: var(--accent); }
+table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 0.95rem; }
+th, td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid var(--line); }
+th { background: var(--paper); }
+td.quote { color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.85rem; font-weight: 600; border: 1px solid currentColor; }
+.chip.matched { color: var(--ok); }
+.chip.partial, .chip.unresolvable { color: var(--warn); }
+.chip.gap { color: var(--bad); }
+.chip.not_assessed { color: var(--muted); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

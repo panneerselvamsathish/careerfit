@@ -15,11 +15,15 @@ PKG = pathlib.Path(__file__).parent.parent / "src" / "careerfit"
 # Raw HTTP clients, including httpx2 (what the Anthropic SDK itself is built on).
 RAW_HTTP = {"requests", "httpx", "httpx2", "aiohttp", "urllib3", "urllib.request", "http.client"}
 
+# The web framework belongs to the composition root (api.py); the pipeline never sees a request.
+WEB = {"fastapi", "starlette", "uvicorn", "multipart", "python_multipart", "careerfit.api", "careerfit.cli"}
+
 FORBIDDEN = {
-    "analyze": {"careerfit.judge", "anthropic", "openai"} | RAW_HTTP,
-    "ingest": {"careerfit.judge", "careerfit.analyze", "anthropic", "openai"} | RAW_HTTP,
-    "report": {"careerfit.judge", "careerfit.analyze", "anthropic", "openai"} | RAW_HTTP,
-    "judge": {"careerfit.ingest", "careerfit.report", "careerfit.cli", "careerfit.api"} | RAW_HTTP,
+    "analyze": {"careerfit.judge", "anthropic", "openai"} | RAW_HTTP | WEB,
+    "ingest": {"careerfit.judge", "careerfit.analyze", "anthropic", "openai"} | RAW_HTTP | WEB,
+    "report": {"careerfit.judge", "careerfit.analyze", "anthropic", "openai"} | RAW_HTTP | WEB,
+    "judge": {"careerfit.ingest", "careerfit.report", "careerfit.cli", "careerfit.api"} | RAW_HTTP | WEB,
+    "facts": RAW_HTTP | WEB,  # plus every other careerfit module: see test_facts_imports_no_other_careerfit_module
 }
 
 def imports_of(path: pathlib.Path) -> set[str]:
@@ -74,3 +78,17 @@ def test_only_judge_imports_an_llm_sdk() -> None:
         if sdk_imports:
             offenders[str(file.relative_to(PKG))] = sdk_imports
     assert not offenders, f"only judge/ may import an LLM SDK: {offenders}"
+
+
+def test_facts_imports_no_other_careerfit_module() -> None:
+    """facts/ is the shared contract, so it depends on nothing else in careerfit, including modules added later."""
+    offenders = {}
+    for file in (PKG / "facts").glob("**/*.py"):
+        own = {
+            imp for imp in imports_of(file)
+            if (imp == "careerfit" or imp.startswith("careerfit."))
+            and not (imp == "careerfit.facts" or imp.startswith("careerfit.facts."))  # not careerfit.facts_extra
+        }
+        if own:
+            offenders[str(file.relative_to(PKG))] = own
+    assert not offenders, f"facts/ may only import from careerfit.facts: {offenders}"
