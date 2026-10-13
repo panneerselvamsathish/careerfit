@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  careerfit web app (keyword pass only, no LLM) on AWS Lambda behind a public Function URL.
+  The container image is the repo's Dockerfile; the Lambda Web Adapter inside it forwards
+  each request to careerfit-server.
+
+Parameters:
+  MemorySize:
+    Type: Number
+    Default: 1024
+    AllowedValues: [512, 1024, 2048]
+    Description: MB. CPU scales with memory; PDF parsing is CPU-bound (measure it, LAMBDA_LEARNING L4).
+  ReservedConcurrency:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    Description: >
+      Cap on instances running at once (0 = no reservation). New accounts often have an account
+      limit of 10, and Lambda must keep 100 unreserved, so leave 0 until the quota is raised.
+  BudgetEmail:
+    Type: String
+    Default: ""
+    Description: Email for a $5/month account-wide budget alarm. Empty = no budget created.
+
+Conditions:
+  HasReservation: !Not [!Equals [!Ref ReservedConcurrency, 0]]
+  HasBudget: !Not [!Equals [!Ref BudgetEmail, ""]]
+
+Resources:
+  WebLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-web
+      RetentionInDays: 14  # access logs only; careerfit never logs document text
+
+  WebFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: .
+      DockerTag: latest
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-web
+      PackageType: Image
+      Architectures: [x86_64]
+      MemorySize: !Ref MemorySize
+      Timeout: 30
+      ReservedConcurrentExecutions: !If [HasReservation, !Ref ReservedConcurrency, !Ref AWS::NoValue]
+      LoggingConfig:
+        LogGroup: !Ref WebLogs
+      Environment:
+        Variables:
+          AWS_LWA_READINESS_CHECK_PATH: /healthz
+          # 6 MB Lambda payload limit, counted after base64: 2 MB per file keeps a request under it.
+          CAREERFIT_MAX_FILE_MB: "2"
+      # Public HTTPS endpoint. SAM adds both permissions a NONE-auth URL needs since Oct 2025
+      # (lambda:InvokeFunctionUrl and lambda:InvokeFunction).
+      FunctionUrlConfig:
+        AuthType: NONE
+
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Condition: HasBudget
+    Properties:
+      Budget:
+        BudgetName: !Sub ${AWS::StackName}-monthly
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: 5
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetEmail
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetEmail
+
+Outputs:
+  Url:
+    Description: careerfit's public URL
+    Value: !GetAtt WebFunctionUrl.FunctionUrl
+  FunctionName:
+    Description: For logs and metrics (CloudWatch)
+    Value: !Ref WebFunction

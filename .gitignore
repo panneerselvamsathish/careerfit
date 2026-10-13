@@ -16,3 +16,6 @@ scratch/
 
 # Shared Claude Code project settings must be committed (settings.local.json stays ignored)
 !.claude/settings.json
+
+# SAM build output (sam build)
+.aws-sam/
