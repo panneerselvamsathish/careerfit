@@ -61,6 +61,9 @@ def test_scan_reports_every_skill():
     ("Requirements\nNice to have Kubernetes experience\nPython experience", {"kubernetes": "nice", "python": "must"}),
     ("Nice-to-have\nKubernetes in production", {"kubernetes": "nice"}),
     ("Nice to have:\n- Kubernetes\nResponsibilities\nBuild services in Python", {"kubernetes": "nice", "python": "must"}),
+    ("Desired qualifications\n- Kubernetes", {"kubernetes": "nice"}),
+    ("Nice to have:\n- Kubernetes\nSkills\n- Python", {"kubernetes": "nice", "python": "must"}),
+    ("Bonus points\n- Kubernetes\nWhat You'd Need\n- AWS", {"kubernetes": "nice", "aws": "must"}),
 ])
 def test_requirement_levels(jd_text, expected):
    
@@ -115,3 +118,17 @@ def test_requirement_occurrences_lists_every_mention_in_order():
     go = SkillEntry(aliases=("golang",), ambiguous=True)
     jd = "Requirements:\n- You must go onsite\nNice to have:\n- Golang experience"
     assert requirement_occurrences(jd, {"go": go}) == {"go": [("must", 2, "unclear"), ("nice", 4, "found")]}
+
+
+@pytest.mark.parametrize("line, expected", [
+    ("Qualifications", "must"), ("Qualifications:", "must"), ("Minimum Qualifications", "must"),
+    ("Required qualifications:", "must"), ("Responsibilities", "must"), ("What You Will Bring", "must"),
+    ("What You'd Need", "must"), ("Skills", "must"), ("What we're looking for", "must"),
+    ("Preferred qualifications", "nice"), ("Desired qualifications", "nice"), ("Nice-to-have", "nice"),
+    ("Nice to haves:", "nice"), ("Bonus points", "nice"), ("What You Will Set You Apart", "nice"),
+    ("Nice to have Kubernetes experience", None), ("About the Role:", None), ("Cloud:", None),
+    ("Python experience", None),
+])
+def test_requirement_section_classifies_every_recognised_heading(line, expected):
+    from careerfit.analyze.matcher import requirement_section
+    assert requirement_section(line) == expected

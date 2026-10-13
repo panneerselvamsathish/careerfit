@@ -43,3 +43,13 @@ def test_coverage_cli_reports_each_jd(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "jd.txt: 2 of 4 requirement lines mention a known skill (50%)" in out
     assert "- line 8: Strong communication" in out
+
+
+def test_generic_colon_headings_neither_start_nor_reopen_counting():
+    jd = ("About the Role:\nYou will build payments infrastructure in Python for merchants\n"
+          "Qualifications:\nFive years running production workloads on AWS\n"
+          "Benefits:\nGenerous paid time off and a strong pension plan\n"
+          "Our Culture:\nWe write Python and ship small changes every day here")
+    result = coverage(jd, ONTOLOGY)
+    assert [n for n, _, _ in result.covered] == [4]
+    assert result.uncovered == ()

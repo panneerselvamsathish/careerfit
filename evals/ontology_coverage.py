@@ -16,7 +16,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from careerfit.analyze.matcher import is_heading, scan
+from careerfit.analyze.matcher import requirement_section, scan
 from careerfit.analyze.ontology import SkillEntry, load_ontology
 from careerfit.ingest.document import read_document
 
@@ -41,10 +41,6 @@ class Coverage:
         return len(self.covered) / total if total else 0.0
 
 
-def _requirements_heading(line: str) -> bool:
-    return is_heading(line) and not STOP_HEADING.fullmatch(line.rstrip(":").strip())
-
-
 def _stop_heading(line: str) -> bool:
     return STOP_HEADING.fullmatch(line.rstrip(":").strip()) is not None
 
@@ -53,7 +49,7 @@ def coverage(jd_text: str, ontology: dict[str, SkillEntry]) -> Coverage:
     """Requirement lines are the lines inside requirement sections. The preamble before the first
     such heading is skipped; a JD with no such heading at all is counted line by line."""
     lines = [(n, raw.strip()) for n, raw in enumerate(jd_text.splitlines(), start=1) if raw.strip()]
-    sections_found = any(_requirements_heading(text) for _, text in lines)
+    sections_found = any(requirement_section(text) for _, text in lines)
     inside = not sections_found
     covered, uncovered = [], []
     for number, text in lines:
@@ -62,9 +58,11 @@ def coverage(jd_text: str, ontology: dict[str, SkillEntry]) -> Coverage:
             if _stop_heading(text):
                 inside = False
                 continue
-            if is_heading(text):
+            if requirement_section(text):
                 inside = True
                 continue
+            if text.endswith(":"):
+                continue  # any other heading ("About the Role:", "Cloud:") is skipped and changes nothing
         if not inside:
             continue
         line = text[bullet.end():] if bullet else text
