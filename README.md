@@ -237,6 +237,9 @@ sam delete                                  # removes everything the stack creat
 - **Rate limit:** each Lambda instance counts on its own, so the real ceiling is the per-address
   limit times the number of instances running; the account's concurrency limit bounds that
   (`ReservedConcurrency` caps it further once the quota allows).
+- **What limits the bill:** the URL is public, so a flood of requests still counts against the
+  free allowance and then costs $0.20 per million requests plus compute. The concurrency limit
+  bounds how fast that can happen; the budget alarm only sends an email, it doesn't stop charges.
 
 `POST /api/analyze` takes `multipart/form-data` with `resume` (file), either `jd` (file) or
 `jd_text`, and `perspective` (`candidate` or `hiring_manager`), and returns `facts`,
