@@ -28,8 +28,11 @@ uv run careerfit --resume fixtures/resume.txt --jd fixtures/jd.txt --deep -o fac
 # Live judge smoke test against the real API (skipped unless opted in; costs a few cents)
 CAREERFIT_LIVE_LLM=1 uv run pytest tests/test_live_judge.py
 
-# Start the web server
+# Start the web server (127.0.0.1:8000; CAREERFIT_HOST / PORT override)
 uv run careerfit-server
+
+# Build and run the container image
+docker build -t careerfit . && docker run --rm -p 8000:8000 careerfit
 
 # Run every golden case through the pipeline: expectations + honesty invariants (exit 1 on any failure)
 uv run python -m evals.harness
@@ -124,6 +127,8 @@ The CLI/API passes the current timestamp in. Same input → byte-identical outpu
 | 6 | Judge | Anthropic tool_use structured output, prompt versioning |
 | 7 | Report + CLI | Rendering separation, composition root pattern |
 | 8 | Web API + UI | FastAPI file upload, serving static files, client-side render |
+| 9 | Deploy | Public-safe limits, container image, CI/CD with GitHub Actions |
+| 10 | Paid tier | Identity, metering and billing only in the composition root |
 
 ## Zero-token architecture
 

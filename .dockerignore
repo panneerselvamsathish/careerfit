@@ -1,0 +1,10 @@
+# Allow-list: the build context holds only what the Dockerfile copies, so nothing else
+# (local notes, .env files, credentials added later) ever reaches the builder.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+!src/**
+**/__pycache__
+**/*.pyc

@@ -40,6 +40,8 @@ not conventions, not comments. A build constraint.
 - [x] Milestone 6: Judge — Anthropic API with structured output, versioned prompt YAML files
 - [x] Milestone 7: Report + CLI — Markdown reports for two perspectives, every claim quoted, blind spots disclosed
 - [x] Milestone 8: Web API + UI — FastAPI file upload, vanilla JS client, strict CSP
+- [ ] Milestone 9: Deploy — public-safe server limits, container image, CI deploy, live URL (free keyword tier)
+- [ ] Milestone 10: Paid tier — accounts, usage metering and rate limits, Stripe, `--deep` on the web
 
 ## Getting started
 
@@ -193,8 +195,22 @@ files give the same verdicts.
   before the response is sent; API responses carry `Cache-Control: no-store`.
 - **Document text is shown, never run.** The page sets every value with `textContent`, and a
   strict Content-Security-Policy allows only the app's own script and stylesheet.
-- **Limits:** 5 MB per file. The server binds to `127.0.0.1` by default; pass `--host` and
-  `--port` to change that. There is no authentication, so don't expose it publicly as it is.
+- **Limits:** 5 MB per file and about 10 MB per request, enforced while the upload streams in;
+  20 pages per PDF; 10 analyses per minute per client address (HTTP 429 with `Retry-After`).
+  The server binds to `127.0.0.1` by default; `--host`/`--port` (or `CAREERFIT_HOST`/`PORT`)
+  change that. There is no authentication yet: accounts come with Milestone 10.
+
+### Running it in a container
+
+```bash
+docker build -t careerfit .
+docker run --rm -p 8000:8000 careerfit      # then open http://127.0.0.1:8000/
+```
+
+The image holds only the installed package (no tests, fixtures or credentials), runs as a
+non-root user and checks `GET /healthz`. Behind a hosting platform's proxy, set
+`FORWARDED_ALLOW_IPS` to the proxy's address (or `*` when the container is reachable only
+through it), so the rate limit sees each visitor's address instead of the proxy's.
 
 `POST /api/analyze` takes `multipart/form-data` with `resume` (file), either `jd` (file) or
 `jd_text`, and `perspective` (`candidate` or `hiring_manager`), and returns `facts`,
