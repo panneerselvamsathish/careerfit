@@ -195,8 +195,10 @@ files give the same verdicts.
   before the response is sent; API responses carry `Cache-Control: no-store`.
 - **Document text is shown, never run.** The page sets every value with `textContent`, and a
   strict Content-Security-Policy allows only the app's own script and stylesheet.
-- **Limits:** 5 MB per file. The server binds to `127.0.0.1` by default; pass `--host` and
-  `--port` to change that. There is no authentication, so don't expose it publicly as it is.
+- **Limits:** 5 MB per file and about 10 MB per request, enforced while the upload streams in;
+  20 pages per PDF; 10 analyses per minute per client address (HTTP 429 with `Retry-After`).
+  The server binds to `127.0.0.1` by default; `--host`/`--port` (or `CAREERFIT_HOST`/`PORT`)
+  change that. There is no authentication yet: accounts come with Milestone 10.
 
 `POST /api/analyze` takes `multipart/form-data` with `resume` (file), either `jd` (file) or
 `jd_text`, and `perspective` (`candidate` or `hiring_manager`), and returns `facts`,

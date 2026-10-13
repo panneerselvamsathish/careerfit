@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from fpdf import FPDF
 
-from careerfit.api import MAX_FILE_BYTES, create_app, safe_filename
+from careerfit.api import MAX_FILE_BYTES, MAX_PDF_PAGES, RateLimiter, create_app, run, safe_filename
 from careerfit.facts.schema import GapAnalysisFacts, SkillStatus
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
@@ -26,7 +26,7 @@ EXPECTED = {
 
 @pytest.fixture(scope="module")
 def client() -> TestClient:
-    return TestClient(create_app())
+    return TestClient(create_app(rate_limit=(1000, 60.0)))  # the rate limit has its own tests
 
 
 def analyze(client: TestClient, resume=("resume.txt", RESUME), jd=("jd.txt", JD), **form):
@@ -168,3 +168,65 @@ def test_page_never_inserts_document_text_as_html():
 def test_no_api_docs_are_exposed(client):
     assert client.get("/docs").status_code == 404
     assert client.get("/openapi.json").status_code == 404
+
+
+def test_chunked_upload_without_content_length_is_cut_off_at_the_limit(client):
+    def body():
+        for _ in range(12):  # 12 MiB, more than the whole request may carry
+            yield b"a" * (1024 * 1024)
+
+    response = client.post("/api/analyze", content=body(),
+                           headers={"content-type": "multipart/form-data; boundary=x"})
+    assert "content-length" not in response.request.headers
+    assert response.status_code == 413
+    assert response.json() == {"detail": "Upload too large."}
+    assert response.headers["x-content-type-options"] == "nosniff"
+
+
+def test_pdf_over_the_page_limit_is_refused(client, tmp_path):
+    pdf = FPDF()
+    pdf.set_font("Helvetica", size=12)
+    for _ in range(MAX_PDF_PAGES + 1):
+        pdf.add_page()
+        pdf.cell(text="Python")
+    path = tmp_path / "long.pdf"
+    pdf.output(str(path))
+    response = analyze(client, resume=("long.pdf", path.read_bytes()))
+    assert response.status_code == 422
+    assert response.json() == {"detail": "long.pdf has 21 pages; the limit is 20. Upload a shorter version."}
+
+
+def test_analyses_are_rate_limited_per_client_and_the_window_slides():
+    now = [1000.0]
+    limited = TestClient(create_app(rate_limit=(2, 60.0), clock=lambda: now[0]))
+    assert analyze(limited).status_code == 200
+    assert analyze(limited).status_code == 200
+    third = analyze(limited)
+    assert third.status_code == 429
+    assert third.headers["retry-after"] == "60"
+    assert third.json() == {"detail": "Too many analyses from this address. Try again in 60 s."}
+    assert limited.get("/").status_code == 200  # only analyses count
+    now[0] += 60.0
+    assert analyze(limited).status_code == 200
+
+
+def test_rate_limiter_counts_each_client_separately():
+    limiter = RateLimiter(1, 10.0, clock=lambda: 0.0)
+    assert limiter.retry_after("10.0.0.1") is None
+    assert limiter.retry_after("10.0.0.2") is None
+    assert limiter.retry_after("10.0.0.1") == 10
+
+
+def test_healthz(client):
+    response = client.get("/healthz")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_server_binds_locally_by_default_and_takes_port_from_the_environment(monkeypatch):
+    calls = []
+    monkeypatch.setattr("careerfit.api.uvicorn.run", lambda app, **kw: calls.append(kw))
+    run([], env={})
+    run([], env={"PORT": "9000", "CAREERFIT_HOST": "0.0.0.0"})
+    assert [(c["host"], c["port"]) for c in calls] == [("127.0.0.1", 8000), ("0.0.0.0", 9000)]
+    assert all(c["proxy_headers"] is True and c["server_header"] is False for c in calls)

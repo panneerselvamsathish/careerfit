@@ -5,8 +5,13 @@ endpoint needs identity, metering and rate limits first, and those belong here, 
 """
 
 import argparse
+import os
 import re
 import tempfile
+import threading
+import time
+from collections import deque
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -27,6 +32,8 @@ WEB_DIR = Path(__file__).parent / "web"
 MAX_FILE_BYTES = 5 * 1024 * 1024
 # Two files plus multipart framing and the small form fields.
 MAX_REQUEST_BYTES = 2 * MAX_FILE_BYTES + 256 * 1024
+MAX_PDF_PAGES = 20  # a resume or JD is a few pages; parsing hundreds is a way to burn the server's CPU
+RATE_LIMIT = (10, 60.0)  # analyses per client IP per window (seconds)
 
 SECURITY_HEADERS = {
     # No inline script or style anywhere, so the page cannot run markup injected from a document.
@@ -73,7 +80,7 @@ def _save(upload: UploadFile, folder: Path, fallback: str) -> Path:
 
 def _read(path: Path) -> tuple[str, Coverage]:
     try:
-        return read_document(path)
+        return read_document(path, max_pdf_pages=MAX_PDF_PAGES)
     except UnicodeDecodeError as e:
         raise UploadError(422, f"{path.name} is not UTF-8 text. Save it as UTF-8 or upload a PDF.") from e
     except (OSError, ValueError) as e:
@@ -85,15 +92,104 @@ def _given(upload: UploadFile | None) -> bool:
     return upload is not None and bool(upload.filename)
 
 
-def create_app(ontology_path: Path = DEFAULT_ONTOLOGY) -> FastAPI:
+class BodyLimit:
+    """Refuses a request body over `limit` bytes, whether or not it declares a Content-Length.
+
+    Pure ASGI so it sees the bytes as they arrive: Starlette would otherwise spool an unbounded
+    chunked upload to disk before the route runs, and FastAPI turns a failed read into a 400.
+    """
+
+    def __init__(self, app, limit: int):
+        self.app = app
+        self.limit = limit
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        length = dict(scope["headers"]).get(b"content-length")
+        if length is not None and (not length.isdigit() or int(length) > self.limit):
+            return await _too_large(send)
+        received = 0
+        exceeded = False
+        started = False
+
+        async def counting_receive():
+            nonlocal received, exceeded
+            if exceeded:
+                return {"type": "http.disconnect"}
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.limit:
+                    exceeded = True
+                    return {"type": "http.disconnect"}
+            return message
+
+        async def guarded_send(message):
+            nonlocal started
+            if exceeded:
+                return  # whatever the app answers to a cut-off body, the client gets the 413 below
+            started = True
+            await send(message)
+
+        try:
+            await self.app(scope, counting_receive, guarded_send)
+        except Exception:
+            if not exceeded:
+                raise
+        if exceeded and not started:
+            await _too_large(send)
+
+
+async def _too_large(send) -> None:
+    body = b'{"detail":"Upload too large."}'
+    await send({"type": "http.response.start", "status": 413,
+                "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(body)).encode()),
+                            *((k.lower().encode(), v.encode()) for k, v in SECURITY_HEADERS.items())]})
+    await send({"type": "http.response.body", "body": body})
+
+
+class RateLimiter:
+    """Sliding window per key, in memory. One process only: behind several instances each counts alone."""
+
+    def __init__(self, limit: int, window: float, clock: Callable[[], float]):
+        self.limit, self.window, self.clock = limit, window, clock
+        self._hits: dict[str, deque[float]] = {}
+        self._lock = threading.Lock()
+
+    def retry_after(self, key: str) -> int | None:
+        """None if this request may go ahead (and counts it); otherwise seconds until it may."""
+        now = self.clock()
+        with self._lock:
+            if len(self._hits) > 10_000:  # forget clients whose window has passed, so memory stays bounded
+                self._hits = {k: q for k, q in self._hits.items() if q and q[-1] > now - self.window}
+            hits = self._hits.setdefault(key, deque())
+            while hits and hits[0] <= now - self.window:
+                hits.popleft()
+            if len(hits) >= self.limit:
+                return max(1, int(hits[0] + self.window - now + 0.999))
+            hits.append(now)
+            return None
+
+
+def create_app(
+    ontology_path: Path = DEFAULT_ONTOLOGY,
+    rate_limit: tuple[int, float] = RATE_LIMIT,
+    clock: Callable[[], float] = time.monotonic,
+) -> FastAPI:
     ontology = load_ontology(ontology_path)
+    limiter = RateLimiter(*rate_limit, clock=clock)
     app = FastAPI(title="careerfit", docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.middleware("http")
     async def limits_and_headers(request: Request, call_next):
-        length = request.headers.get("content-length")
-        if length is not None and (not length.isdigit() or int(length) > MAX_REQUEST_BYTES):
-            response = JSONResponse({"detail": "Upload too large."}, status_code=413)
+        wait = None
+        if request.url.path == "/api/analyze" and request.method == "POST":
+            # request.client is the real client only when uvicorn trusts the proxy (see run()).
+            wait = limiter.retry_after(request.client.host if request.client else "unknown")
+        if wait is not None:
+            response = JSONResponse({"detail": f"Too many analyses from this address. Try again in {wait} s."},
+                                    status_code=429, headers={"Retry-After": str(wait)})
         else:
             response = await call_next(request)
         response.headers.update(SECURITY_HEADERS)
@@ -108,6 +204,10 @@ def create_app(ontology_path: Path = DEFAULT_ONTOLOGY) -> FastAPI:
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:
         return FileResponse(WEB_DIR / "index.html")
+
+    @app.get("/healthz", include_in_schema=False)
+    def healthz() -> dict[str, str]:
+        return {"status": "ok"}
 
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon() -> Response:
@@ -155,13 +255,19 @@ def create_app(ontology_path: Path = DEFAULT_ONTOLOGY) -> FastAPI:
         })
 
     app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
+    app.add_middleware(BodyLimit, limit=MAX_REQUEST_BYTES)
     return app
 
 
-def run(argv: list[str] | None = None) -> None:
+def run(argv: list[str] | None = None, env: dict[str, str] | None = None) -> None:
+    env = os.environ if env is None else env
     parser = argparse.ArgumentParser(prog="careerfit-server", description="Serve the careerfit web app.")
-    parser.add_argument("--host", default="127.0.0.1", help="interface to bind (default: this machine only)")
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--host", default=env.get("CAREERFIT_HOST", "127.0.0.1"),
+                        help="interface to bind (default: this machine only; a container sets 0.0.0.0)")
+    parser.add_argument("--port", type=int, default=int(env.get("PORT", "8000")),
+                        help="port (default: $PORT, which most hosting platforms set, else 8000)")
     args = parser.parse_args(argv)
-    print(f"careerfit: open http://{args.host}:{args.port}/ (keyword pass only; --deep stays in the CLI)")
-    uvicorn.run(create_app(), host=args.host, port=args.port)
+    print(f"careerfit: serving on http://{args.host}:{args.port}/ (keyword pass only; --deep stays in the CLI)")
+    # proxy_headers: behind the platform's proxy, the client IP for rate limiting comes from
+    # X-Forwarded-For, trusted only from FORWARDED_ALLOW_IPS (uvicorn's default: 127.0.0.1).
+    uvicorn.run(create_app(), host=args.host, port=args.port, proxy_headers=True, server_header=False)
