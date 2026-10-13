@@ -16,23 +16,24 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from careerfit.analyze.matcher import scan
+from careerfit.analyze.matcher import is_heading, scan
 from careerfit.analyze.ontology import SkillEntry, load_ontology
 from careerfit.ingest.document import read_document
 
 DEFAULT_ONTOLOGY = Path(__file__).parent.parent / "src" / "careerfit" / "ontology" / "skills.yaml"
 # Sections that never hold requirements: everything after one of these headings is skipped
-# until a heading that starts requirements again.
-STOP_HEADING = re.compile(r"\b(benefits?|perks|what we offer|equal opportunity|about us|disclaimer|salary)\b", re.I)
-START_HEADING = re.compile(r"\b(responsibilit\w*|qualifications?|requirements?|what you will|you bring|"
-                           r"set you apart|preferred|must have|nice to have)\b", re.I)
-MIN_WORDS = 5  # shorter lines are headings or fragments
+# until a requirements heading starts again.
+STOP_HEADING = re.compile(r"(about (us|the company)|benefits?(/perks)?|perks|what we offer( you)?|equal opportunity.*|"
+                          r"disclaimer|salary.*|compensation)", re.I)
+BULLET = re.compile(r"^\s*([-•*▪●]|\d+[.)])\s+")
+MIN_WORDS = 3  # a shorter line that isn't a bullet is a title or a fragment
 
 
 @dataclass(frozen=True)
 class Coverage:
     covered: tuple[tuple[int, str, tuple[str, ...]], ...]  # (line number, text, skills found)
     uncovered: tuple[tuple[int, str], ...]
+    sections_found: bool  # False: no requirements heading, so every line was counted
 
     @property
     def share(self) -> float:
@@ -40,33 +41,41 @@ class Coverage:
         return len(self.covered) / total if total else 0.0
 
 
-def is_heading(line: str) -> bool:
-    words = len(line.split())
-    named = (START_HEADING.search(line) or STOP_HEADING.search(line)) and words <= 6 and not line.endswith(".")
-    return line.endswith(":") or words < MIN_WORDS or bool(named)
+def _requirements_heading(line: str) -> bool:
+    return is_heading(line) and not STOP_HEADING.fullmatch(line.rstrip(":").strip())
+
+
+def _stop_heading(line: str) -> bool:
+    return STOP_HEADING.fullmatch(line.rstrip(":").strip()) is not None
 
 
 def coverage(jd_text: str, ontology: dict[str, SkillEntry]) -> Coverage:
+    """Requirement lines are the lines inside requirement sections. The preamble before the first
+    such heading is skipped; a JD with no such heading at all is counted line by line."""
+    lines = [(n, raw.strip()) for n, raw in enumerate(jd_text.splitlines(), start=1) if raw.strip()]
+    sections_found = any(_requirements_heading(text) for _, text in lines)
+    inside = not sections_found
     covered, uncovered = [], []
-    skipping = False
-    for number, raw in enumerate(jd_text.splitlines(), start=1):
-        line = raw.strip(" \t-•*")
-        if not line:
+    for number, text in lines:
+        bullet = BULLET.match(text)
+        if not bullet:
+            if _stop_heading(text):
+                inside = False
+                continue
+            if is_heading(text):
+                inside = True
+                continue
+        if not inside:
             continue
-        if is_heading(line):
-            if STOP_HEADING.search(line):
-                skipping = True
-            elif START_HEADING.search(line):
-                skipping = False
-            continue
-        if skipping:
+        line = text[bullet.end():] if bullet else text
+        if not bullet and len(line.split()) < MIN_WORDS:
             continue
         found = tuple(sorted(name for name, result in scan(line, ontology).items() if result != "absent"))
         if found:
             covered.append((number, line, found))
         else:
             uncovered.append((number, line))
-    return Coverage(covered=tuple(covered), uncovered=tuple(uncovered))
+    return Coverage(covered=tuple(covered), uncovered=tuple(uncovered), sections_found=sections_found)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -83,6 +92,8 @@ def main(argv: list[str] | None = None) -> int:
         total = len(result.covered) + len(result.uncovered)
         print(f"\n== {path.name}: {len(result.covered)} of {total} requirement lines mention a known skill "
               f"({result.share:.0%})")
+        if not result.sections_found:
+            print("  (no requirements heading found, so every line was counted)")
         if args.covered:
             for number, line, skills in result.covered:
                 print(f"  + line {number} [{', '.join(skills)}]: {line[:110]}")
