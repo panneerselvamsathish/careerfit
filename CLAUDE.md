@@ -34,6 +34,9 @@ uv run careerfit-server
 # Build and run the container image
 docker build -t careerfit . && docker run --rm -p 8000:8000 careerfit
 
+# How much of a JD the skill list can see (lists requirement lines no skill covers)
+uv run python -m evals.ontology_coverage scratch/jds/*.txt
+
 # Run every golden case through the pipeline: expectations + honesty invariants (exit 1 on any failure)
 uv run python -m evals.harness
 ```
