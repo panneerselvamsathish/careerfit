@@ -108,29 +108,31 @@ function showError(message) {
 
 async function submit(event) {
   event.preventDefault();
+  if ($("submit").disabled) return; // one analysis at a time, including while the limits load
   $("error").hidden = true;
   $("result").hidden = true; // a failed run must never leave the previous files' results on screen
-  const resume = $("resume").files[0];
-  const jdFile = $("jd").files[0];
-  const jdText = $("jd_text").value.trim();
-  if (!resume) return showError("Choose a resume file.");
-  await limitsReady; // on a cold start the limit lookup may still be in flight
-  if (Boolean(jdFile) === Boolean(jdText)) return showError("Give the job description either as a file or as pasted text, not both.");
-  // Checked here as well as on the server: some hosts refuse a large body before careerfit sees it.
-  for (const file of [resume, jdFile]) {
-    if (tooLarge(file)) return showError(`${file.name} is larger than ${maxFileMb} MB.`);
-  }
-
-  // Only fields that were filled in are sent, so the server never sees an empty file part.
-  const form = new FormData();
-  form.append("resume", resume);
-  if (jdFile) form.append("jd", jdFile);
-  else form.append("jd_text", jdText);
-  form.append("perspective", document.querySelector('input[name="perspective"]:checked').value);
-
   $("submit").disabled = true;
   $("submit").textContent = "Analysing…";
   try {
+    await limitsReady; // on a cold start the limit lookup may still be in flight
+    // Fields are read after the wait, so edits made while it ran are the ones sent.
+    const resume = $("resume").files[0];
+    const jdFile = $("jd").files[0];
+    const jdText = $("jd_text").value.trim();
+    if (!resume) return showError("Choose a resume file.");
+    if (Boolean(jdFile) === Boolean(jdText)) return showError("Give the job description either as a file or as pasted text, not both.");
+    // Checked here as well as on the server: some hosts refuse a large body before careerfit sees it.
+    for (const file of [resume, jdFile]) {
+      if (tooLarge(file)) return showError(`${file.name} is larger than ${maxFileMb} MB.`);
+    }
+
+    // Only fields that were filled in are sent, so the server never sees an empty file part.
+    const form = new FormData();
+    form.append("resume", resume);
+    if (jdFile) form.append("jd", jdFile);
+    else form.append("jd_text", jdText);
+    form.append("perspective", document.querySelector('input[name="perspective"]:checked').value);
+
     const response = await fetch("/api/analyze", { method: "POST", body: form });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
