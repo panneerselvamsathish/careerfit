@@ -1,0 +1,17 @@
+# Only pyproject.toml, uv.lock, README.md and src/ are copied; keep everything else out of the build context.
+.git
+.github
+.venv
+.cache
+.claude
+.pytest_cache
+**/__pycache__
+scratch
+docs
+evals
+fixtures
+tests
+*.json
+report*.md
+.env
+.env.*

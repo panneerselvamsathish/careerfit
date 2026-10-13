@@ -200,6 +200,18 @@ files give the same verdicts.
   The server binds to `127.0.0.1` by default; `--host`/`--port` (or `CAREERFIT_HOST`/`PORT`)
   change that. There is no authentication yet: accounts come with Milestone 10.
 
+### Running it in a container
+
+```bash
+docker build -t careerfit .
+docker run --rm -p 8000:8000 careerfit      # then open http://127.0.0.1:8000/
+```
+
+The image holds only the installed package (no tests, fixtures or credentials), runs as a
+non-root user and checks `GET /healthz`. Behind a hosting platform's proxy, set
+`FORWARDED_ALLOW_IPS` to the proxy's address (or `*` when the container is reachable only
+through it), so the rate limit sees each visitor's address instead of the proxy's.
+
 `POST /api/analyze` takes `multipart/form-data` with `resume` (file), either `jd` (file) or
 `jd_text`, and `perspective` (`candidate` or `hiring_manager`), and returns `facts`,
 `blind_spots` (plain text) and `report_markdown`. Bad input gets a 4xx with a readable `detail`.
