@@ -34,6 +34,8 @@ uv run careerfit-server
 # Build and run the container image
 docker build -t careerfit . && docker run --rm -p 8000:8000 careerfit
 
+# How much of a JD the skill list can see (lists requirement lines no skill covers)
+uv run python -m evals.ontology_coverage scratch/jds/*.txt
 # Deploy to AWS Lambda (template.yaml; needs Docker + SAM CLI + a signed-in personal AWS account)
 sam build && sam deploy --guided --resolve-image-repos   # first time: creates the ECR repo, writes samconfig.toml
 sam build && sam deploy                                  # later deploys reuse samconfig.toml

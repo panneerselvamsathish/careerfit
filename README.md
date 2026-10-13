@@ -118,6 +118,33 @@ resume mentions the skill also cite that resume line.
 The keyword pass only knows the skills listed in `src/careerfit/ontology/skills.yaml`.
 Skills outside that list are not checked at all.
 
+### Growing the skill list
+
+The keyword pass is only as good as `skills.yaml`, so grow it from real job descriptions and
+measure each change:
+
+```bash
+uv run python -m evals.ontology_coverage path/to/jd1.txt path/to/jd2.txt
+```
+
+It prints how many of each JD's requirement lines mention a known skill, and lists the lines that
+mention none. For each of those lines:
+
+1. **Does it name a concrete skill?** ("Kafka", "LangGraph", "SOC 2") Add it, with the other
+   spellings as `aliases`.
+2. **Does the name have an everyday meaning?** ("at the helm", "harness the power", "in flux")
+   Set `ambiguous: true`, so a bare mention is left to `--deep` instead of being guessed.
+   Aliases must never be ambiguous.
+3. **Is it a paraphrase or a soft skill?** ("how systems fail in production", "mentor engineers")
+   Don't add it. Keyword rules can't decide those; the LLM judge can.
+4. **Check the resume side too.** If a resume says it differently ("versioned prompts" for prompt
+   engineering), add that wording as an alias.
+
+`tests/test_ontology.py` fails if any name or alias is claimed by two skills, and checks the
+everyday-meaning words stay ambiguous. Keep real JDs out of the repo (`scratch/` is gitignored)
+unless they are labelled held-out cases in `evals/golden/`. A JD used to grow the list can't also
+measure it.
+
 ### Checking quality: the evals
 
 ```bash

@@ -27,10 +27,51 @@ def scan(text: str, ontology: dict[str, SkillEntry]) -> dict[str, DetectResult]:
         results[name] = detect(name, entry, text)
     return results
 
-NICE_TO_HAVE_MARKERS = ("nice to have", "optional", "bonus", "preferred","a plus", "preferable")
+NICE_TO_HAVE_MARKERS = ("nice to have", "nice-to-have", "optional", "bonus", "preferred","a plus", "preferable", "set you apart", "sets you apart")
 
 MUST_HAVE_MARKERS = ("required", "must", "mandatory")
 MUST_HAVE_HEADINGS = ("requirements", "qualifications", "minimum", "essential")
+# Requirement-section headings, recognised with or without a trailing colon (job boards such as
+# LinkedIn drop it). Only a line that is exactly one of these forms counts, so a short requirement
+# like "Nice to have Kubernetes experience" never changes the section for the lines after it.
+SECTION_HEADING = re.compile(
+    r"(key |minimum |basic |required |preferred |desired )?"
+    r"(qualifications|requirements|responsibilities|skills|skills and experience)"
+    r"|what (you will|you'll|you'd) (do|bring|need)"
+    r"|what (you will |will )?set you apart|what sets you apart"
+    r"|what we('re| are) looking for"
+    r"|nice[- ]to[- ]haves?|bonus points",
+    re.IGNORECASE,
+)
+NICE_SECTION = re.compile(r"preferred|desired|bonus|nice[- ]to[- ]have|sets? you apart", re.IGNORECASE)
+Level = Literal["must", "nice"]
+
+
+def requirement_section(line: str) -> Level | None:
+    """The level a requirements-section heading opens, or None if the line isn't one.
+
+    The one place a recognised heading is classified, so the matcher and the coverage tool agree.
+    """
+    form = " ".join(line.rstrip(":").split())
+    if SECTION_HEADING.fullmatch(form) is None:
+        return None
+    return "nice" if NICE_SECTION.search(form) else "must"
+
+
+def heading_level(line: str) -> Level | None:
+    """The level a heading line switches to: a known section heading, or a colon heading that
+    carries a marker ("Kubernetes is a plus:"). A colon heading without one ("Cloud:") is a
+    sub-heading and returns None, keeping the current section."""
+    section = requirement_section(line)
+    if section is not None:
+        return section
+    if line.endswith(":"):
+        if has_nice_marker(line):
+            return "nice"
+        if has_must_marker(line) or any(mentions(word, line) for word in MUST_HAVE_HEADINGS):
+            return "must"
+    return None
+
 
 def has_nice_marker(text: str) -> bool:
     return any(mentions(marker, text) for marker in NICE_TO_HAVE_MARKERS)
@@ -56,12 +97,9 @@ def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> di
         line = raw_line.strip()
         if not line:
             continue
-        if line.endswith(":"):
-            # A heading with neither kind of marker ("Cloud:") is a sub-heading and keeps the current section.
-            if has_nice_marker(line):
-                current = "nice"
-            elif has_must_marker(line) or any(mentions(word, line) for word in MUST_HAVE_HEADINGS):
-                current = "must"
+        level_here = heading_level(line)
+        if level_here is not None:
+            current = level_here
         for sentence in re.split(r"(?<=[.!?])\s+", line):
             for clause in clauses(sentence):
                 level: Literal["must", "nice"]

@@ -70,3 +70,406 @@ rest:
 git:
   aliases: []
   ambiguous: false
+
+# ---- Added 2026-10-13 from three real AI-architect JDs (Empower, Experian, Oracle Health) ----
+# Grown with evals/ontology_coverage.py: add what a JD line names concretely; leave paraphrased
+# concepts to the judge. ambiguous: true where the word has a common everyday meaning.
+
+# Generative AI and agents
+generative ai:
+  aliases: ["genai", "gen ai"]
+  ambiguous: false
+
+llm:
+  aliases: ["llms", "large language model", "large language models"]
+  ambiguous: false
+
+ai agents:
+  aliases: ["ai agent", "agentic ai", "agentic", "llm agents", "agent-based systems", "agent framework", "agent frameworks"]
+  ambiguous: false
+
+multi-agent systems:
+  aliases: ["multi-agent", "multi agent"]
+  ambiguous: false
+
+agent orchestration:
+  aliases: ["llm orchestration", "ai orchestration", "tool orchestration", "orchestration layer", "orchestration layers"]
+  ambiguous: false
+
+tool calling:
+  aliases: ["function calling", "tool and function calling", "tool/function calling"]
+  ambiguous: false
+
+# "retrieval" alone is often just "data retrieval", and a bare "RAG" is usually a red/amber/green
+# status, so only phrases that mean retrieval-augmented generation are aliases.
+retrieval:
+  aliases: ["retrieval-augmented generation", "retrieval augmented generation", "rag pipeline", "rag pipelines", "rag architecture", "rag system", "rag systems"]
+  ambiguous: true
+
+embeddings:
+  aliases: ["vector embeddings", "text embeddings", "embedding model", "embedding models"]
+  ambiguous: false
+
+vector database:
+  aliases: ["vector databases", "vector db", "vector store", "vector stores", "vector search"]
+  ambiguous: false
+
+pgvector:
+  aliases: []
+  ambiguous: false
+
+pinecone:
+  aliases: []
+  ambiguous: false
+
+knowledge graph:
+  aliases: ["knowledge graphs"]
+  ambiguous: false
+
+information retrieval:
+  aliases: []
+  ambiguous: false
+
+semantic search:
+  aliases: []
+  ambiguous: false
+
+prompt engineering:
+  aliases: ["prompt design", "prompt composition", "prompt architecture", "prompt and tool architecture", "prompt versioning", "versioned prompt", "versioned prompts"]
+  ambiguous: false
+
+prompt injection:
+  aliases: ["prompt-injection"]
+  ambiguous: false
+
+guardrails:
+  aliases: ["llm guardrails", "ai guardrails"]
+  ambiguous: true
+
+grounding:
+  aliases: ["grounded outputs", "grounded generation", "retrieval-grounded"]
+  ambiguous: true
+
+agent memory:
+  aliases: ["llm memory"]
+  ambiguous: false
+
+llm evaluation:
+  aliases: ["llm evals", "ai evaluation", "ai evals"]
+  ambiguous: false
+
+llm routing:
+  aliases: ["model routing"]
+  ambiguous: false
+
+llm observability:
+  aliases: ["ai observability"]
+  ambiguous: false
+
+fine-tuning:
+  aliases: ["fine tuning", "finetuning"]
+  ambiguous: false
+
+mcp:
+  aliases: ["model context protocol"]
+  ambiguous: true  # also "Microsoft Certified Professional" on older resumes
+
+langchain:
+  aliases: []
+  ambiguous: false
+
+langgraph:
+  aliases: []
+  ambiguous: false
+
+autogen:
+  aliases: []
+  ambiguous: false
+
+semantic kernel:
+  aliases: []
+  ambiguous: false
+
+crewai:
+  aliases: ["crew ai"]
+  ambiguous: false
+
+llamaindex:
+  aliases: ["llama index", "llama-index"]
+  ambiguous: false
+
+openai:
+  aliases: ["openai api", "azure openai"]
+  ambiguous: false
+
+claude:
+  aliases: ["anthropic claude", "claude api", "claude code"]
+  ambiguous: true  # also a first name
+
+bedrock:
+  aliases: ["amazon bedrock", "aws bedrock"]
+  ambiguous: true  # "the bedrock of"
+
+sagemaker:
+  aliases: ["amazon sagemaker", "aws sagemaker"]
+  ambiguous: false
+
+machine learning:
+  aliases: ["ml engineering"]
+  ambiguous: false
+
+mlops:
+  aliases: []
+  ambiguous: false
+
+# AWS and cloud
+lambda:
+  aliases: ["aws lambda", "amazon lambda"]
+  ambiguous: true  # also Python lambdas, the Greek letter
+
+ecs:
+  aliases: ["amazon ecs", "aws ecs", "elastic container service"]
+  ambiguous: true  # also "entity-component system" in game development
+
+eks:
+  aliases: ["amazon eks", "elastic kubernetes service"]
+  ambiguous: false
+
+dynamodb:
+  aliases: ["amazon dynamodb", "dynamo db"]
+  ambiguous: false
+
+aurora:
+  aliases: ["amazon aurora", "aurora rds", "aurora postgresql", "aurora mysql"]
+  ambiguous: true
+
+rds:
+  aliases: ["amazon rds"]
+  ambiguous: false
+
+s3:
+  aliases: ["amazon s3"]
+  ambiguous: false
+
+opensearch:
+  aliases: ["amazon opensearch"]
+  ambiguous: false
+
+elasticsearch:
+  aliases: []
+  ambiguous: false
+
+redis:
+  aliases: []
+  ambiguous: false
+
+elasticache:
+  aliases: ["amazon elasticache"]
+  ambiguous: false
+
+kinesis:
+  aliases: ["amazon kinesis"]
+  ambiguous: false
+
+vpc:
+  aliases: ["virtual private cloud"]
+  ambiguous: false
+
+iam:
+  aliases: ["identity and access management"]
+  ambiguous: false
+
+cloudformation:
+  aliases: ["aws cloudformation"]
+  ambiguous: false
+
+cdk:
+  aliases: ["aws cdk", "cloud development kit"]
+  ambiguous: false
+
+control tower:
+  aliases: ["aws control tower"]
+  ambiguous: true  # also a generic "operations control tower"
+
+api gateway:
+  aliases: ["amazon api gateway", "aws api gateway"]
+  ambiguous: false
+
+snowflake:
+  aliases: ["snowflake data cloud", "snowflake data platform", "snowflake data platforms"]
+  ambiguous: true  # also "snowflake schema"
+
+# Platform, delivery and reliability
+ci/cd:
+  aliases: ["cicd", "ci-cd", "continuous integration", "continuous delivery", "continuous deployment"]
+  ambiguous: false
+
+github actions:
+  aliases: []
+  ambiguous: false
+
+jenkins:
+  aliases: []
+  ambiguous: false
+
+harness:
+  aliases: []
+  ambiguous: true  # "harness the power of"
+
+gitops:
+  aliases: []
+  ambiguous: false
+
+argocd:
+  aliases: ["argo cd"]
+  ambiguous: false
+
+flux:
+  aliases: ["fluxcd", "flux cd"]
+  ambiguous: true  # "in flux"
+
+helm:
+  aliases: ["helm chart", "helm charts"]
+  ambiguous: true  # "at the helm"
+
+service mesh:
+  aliases: []
+  ambiguous: false
+
+istio:
+  aliases: []
+  ambiguous: false
+
+grpc:
+  aliases: []
+  ambiguous: false
+
+microservices:
+  aliases: ["microservice", "micro-services"]
+  ambiguous: false
+
+distributed systems:
+  aliases: ["distributed system"]
+  ambiguous: false
+
+event-driven architecture:
+  aliases: ["event-driven", "event driven architecture"]
+  ambiguous: false
+
+observability:
+  aliases: []
+  ambiguous: false
+
+opentelemetry:
+  aliases: ["open telemetry", "otel"]
+  ambiguous: false
+
+distributed tracing:
+  aliases: []
+  ambiguous: false
+
+sre:
+  aliases: ["site reliability engineering", "site reliability"]
+  ambiguous: false
+
+slo:
+  aliases: ["slos", "service level objective", "service level objectives"]
+  ambiguous: false
+
+chaos engineering:
+  aliases: []
+  ambiguous: false
+
+# Security and governance
+rbac:
+  aliases: ["role-based access control", "role based access control"]
+  ambiguous: false
+
+zero trust:
+  aliases: ["zero-trust"]
+  ambiguous: false
+
+least privilege:
+  aliases: ["least-privilege"]
+  ambiguous: false
+
+secrets management:
+  aliases: ["secrets manager", "aws secrets manager", "secrets handling"]
+  ambiguous: false
+
+vault:
+  aliases: ["hashicorp vault"]
+  ambiguous: true
+
+siem:
+  aliases: []
+  ambiguous: false
+
+soc 2:
+  aliases: ["soc2"]
+  ambiguous: false
+
+iso 27001:
+  aliases: ["iso/iec 27001"]
+  ambiguous: false
+
+dlp:
+  aliases: ["data loss prevention"]
+  ambiguous: false
+
+data governance:
+  aliases: []
+  ambiguous: false
+
+threat modeling:
+  aliases: ["threat model", "threat models", "threat modelling"]
+  ambiguous: false
+
+# Architecture practice and data
+adr:
+  aliases: ["architecture decision record", "architecture decision records"]
+  ambiguous: true  # also "American Depositary Receipt" in finance
+
+c4 model:
+  aliases: ["c4 diagram", "c4 diagrams"]
+  ambiguous: false
+
+reference architecture:
+  aliases: ["reference architectures"]
+  ambiguous: false
+
+data architecture:
+  aliases: []
+  ambiguous: false
+
+data modeling:
+  aliases: ["data model", "data models", "data modelling"]
+  ambiguous: false
+
+data lake:
+  aliases: ["data lakes", "lakehouse"]
+  ambiguous: false
+
+data pipelines:
+  aliases: ["data pipeline", "streaming pipelines"]
+  ambiguous: false
+
+etl:
+  aliases: ["elt"]
+  ambiguous: false
+
+olap:
+  aliases: []
+  ambiguous: false
+
+oltp:
+  aliases: []
+  ambiguous: false
+
+access control:
+  aliases: ["access controls"]
+  ambiguous: false
+
+metadata management:
+  aliases: ["metadata systems", "metadata catalog"]
+  ambiguous: false
