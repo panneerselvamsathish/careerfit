@@ -23,7 +23,7 @@ from careerfit.ingest.document import read_document
 DEFAULT_ONTOLOGY = Path(__file__).parent.parent / "src" / "careerfit" / "ontology" / "skills.yaml"
 # Sections that never hold requirements: everything after one of these headings is skipped
 # until a requirements heading starts again.
-STOP_HEADING = re.compile(r"(about (us|the company)|benefits?(/perks)?|perks|what we offer( you)?|equal opportunity.*|"
+STOP_HEADING = re.compile(r"(about (us|the company)|benefits?(( and | ?& ?|/)perks)?|perks|what we offer( you)?|equal opportunity.*|"
                           r"disclaimer|salary.*|compensation)", re.I)
 BULLET = re.compile(r"^\s*([-•*▪●]|\d+[.)])\s+")
 MIN_WORDS = 3  # a shorter line that isn't a bullet is a title or a fragment

@@ -64,6 +64,8 @@ def test_scan_reports_every_skill():
     ("Desired qualifications\n- Kubernetes", {"kubernetes": "nice"}),
     ("Nice to have:\n- Kubernetes\nSkills\n- Python", {"kubernetes": "nice", "python": "must"}),
     ("Bonus points\n- Kubernetes\nWhat You'd Need\n- AWS", {"kubernetes": "nice", "aws": "must"}),
+    ("Requirements\n- AWS\nPython experience sets you apart.", {"aws": "must", "python": "nice"}),
+    ("What sets you apart\n- Kubernetes", {"kubernetes": "nice"}),
 ])
 def test_requirement_levels(jd_text, expected):
    

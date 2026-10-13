@@ -27,7 +27,7 @@ def scan(text: str, ontology: dict[str, SkillEntry]) -> dict[str, DetectResult]:
         results[name] = detect(name, entry, text)
     return results
 
-NICE_TO_HAVE_MARKERS = ("nice to have", "nice-to-have", "optional", "bonus", "preferred","a plus", "preferable", "set you apart")
+NICE_TO_HAVE_MARKERS = ("nice to have", "nice-to-have", "optional", "bonus", "preferred","a plus", "preferable", "set you apart", "sets you apart")
 
 MUST_HAVE_MARKERS = ("required", "must", "mandatory")
 MUST_HAVE_HEADINGS = ("requirements", "qualifications", "minimum", "essential")
@@ -38,12 +38,12 @@ SECTION_HEADING = re.compile(
     r"(key |minimum |basic |required |preferred |desired )?"
     r"(qualifications|requirements|responsibilities|skills|skills and experience)"
     r"|what (you will|you'll|you'd) (do|bring|need)"
-    r"|what (you will |will )?set you apart"
+    r"|what (you will |will )?set you apart|what sets you apart"
     r"|what we('re| are) looking for"
     r"|nice[- ]to[- ]haves?|bonus points",
     re.IGNORECASE,
 )
-NICE_SECTION = re.compile(r"preferred|desired|bonus|nice[- ]to[- ]have|set you apart", re.IGNORECASE)
+NICE_SECTION = re.compile(r"preferred|desired|bonus|nice[- ]to[- ]have|sets? you apart", re.IGNORECASE)
 Level = Literal["must", "nice"]
 
 

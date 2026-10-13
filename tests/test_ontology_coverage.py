@@ -53,3 +53,9 @@ def test_generic_colon_headings_neither_start_nor_reopen_counting():
     result = coverage(jd, ONTOLOGY)
     assert [n for n, _, _ in result.covered] == [4]
     assert result.uncovered == ()
+
+
+def test_benefits_and_perks_headings_end_counting():
+    for heading in ("Benefits and Perks", "Benefits & Perks", "Benefits/Perks:"):
+        jd = f"Qualifications\nFive years running production workloads on AWS\n{heading}\nFree Python lunches for the whole team"
+        assert [n for n, _, _ in coverage(jd, ONTOLOGY).covered] == [2], heading
