@@ -40,6 +40,8 @@ not conventions, not comments. A build constraint.
 - [x] Milestone 6: Judge — Anthropic API with structured output, versioned prompt YAML files
 - [x] Milestone 7: Report + CLI — Markdown reports for two perspectives, every claim quoted, blind spots disclosed
 - [x] Milestone 8: Web API + UI — FastAPI file upload, vanilla JS client, strict CSP
+- [ ] Milestone 9: Deploy — public-safe server limits, container image, CI deploy, live URL (free keyword tier)
+- [ ] Milestone 10: Paid tier — accounts, usage metering and rate limits, Stripe, `--deep` on the web
 
 ## Getting started
 

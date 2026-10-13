@@ -124,6 +124,8 @@ The CLI/API passes the current timestamp in. Same input → byte-identical outpu
 | 6 | Judge | Anthropic tool_use structured output, prompt versioning |
 | 7 | Report + CLI | Rendering separation, composition root pattern |
 | 8 | Web API + UI | FastAPI file upload, serving static files, client-side render |
+| 9 | Deploy | Public-safe limits, container image, CI/CD with GitHub Actions |
+| 10 | Paid tier | Identity, metering and billing only in the composition root |
 
 ## Zero-token architecture
 
