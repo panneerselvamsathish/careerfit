@@ -14,6 +14,21 @@ const DECIDED = ["matched", "partial", "gap"];
 
 const $ = (id) => document.getElementById(id);
 let downloadUrls = [];
+let maxFileMb = 5; // replaced by the server's own limit on load
+
+async function loadLimits() {
+  try {
+    const limits = await (await fetch("/api/limits")).json();
+    if (Number.isInteger(limits.max_file_mb)) maxFileMb = limits.max_file_mb;
+  } catch {
+    // keep the default; the server still enforces its real limit
+  }
+  document.querySelectorAll(".max-mb").forEach((node) => (node.textContent = String(maxFileMb)));
+}
+
+function tooLarge(file) {
+  return file && file.size > maxFileMb * 1024 * 1024;
+}
 
 function el(tag, text, className) {
   const node = document.createElement(tag);
@@ -99,6 +114,10 @@ async function submit(event) {
   const jdText = $("jd_text").value.trim();
   if (!resume) return showError("Choose a resume file.");
   if (Boolean(jdFile) === Boolean(jdText)) return showError("Give the job description either as a file or as pasted text, not both.");
+  // Checked here as well as on the server: some hosts refuse a large body before careerfit sees it.
+  for (const file of [resume, jdFile]) {
+    if (tooLarge(file)) return showError(`${file.name} is larger than ${maxFileMb} MB.`);
+  }
 
   // Only fields that were filled in are sent, so the server never sees an empty file part.
   const form = new FormData();
@@ -113,7 +132,9 @@ async function submit(event) {
     const response = await fetch("/api/analyze", { method: "POST", body: form });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const detail = typeof payload.detail === "string" ? payload.detail : "The server could not read that request.";
+      const detail = typeof payload.detail === "string" ? payload.detail
+        : response.status === 413 ? `The upload is too large for this server (limit ${maxFileMb} MB per file).`
+        : "The server could not read that request.";
       return showError(detail);
     }
     render(payload);
@@ -125,4 +146,7 @@ async function submit(event) {
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => $("form").addEventListener("submit", submit));
+document.addEventListener("DOMContentLoaded", () => {
+  $("form").addEventListener("submit", submit);
+  loadLimits();
+});

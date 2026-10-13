@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from fpdf import FPDF
 
-from careerfit.api import MAX_FILE_BYTES, MAX_PDF_PAGES, RateLimiter, create_app, run, safe_filename
+from careerfit.api import MAX_FILE_BYTES, MAX_PDF_PAGES, RateLimiter, create_app, max_request_bytes, run, safe_filename
 from careerfit.facts.schema import GapAnalysisFacts, SkillStatus
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
@@ -247,3 +247,24 @@ def test_rate_limiter_forgets_the_client_seen_least_recently():
     assert limiter.retry_after("c") is None  # evicts b, not a
     assert limiter.retry_after("a") == 60
     assert limiter.retry_after("b") is None  # b was forgotten, so it starts afresh
+
+
+def test_upload_limit_is_configurable_for_hosts_with_smaller_payloads():
+    small = TestClient(create_app(rate_limit=(1000, 60.0), max_file_mb=2))
+    assert small.get("/api/limits").json() == {"max_file_mb": 2, "max_pdf_pages": 20}
+    response = analyze(small, resume=("resume.txt", b"a" * (2 * 1024 * 1024 + 1)))
+    assert response.status_code == 413
+    assert response.json() == {"detail": "resume.txt is larger than 2 MB."}
+    assert analyze(small).status_code == 200
+
+
+def test_lambda_sized_requests_fit_the_6_mb_payload_once_base64_encoded():
+    # Lambda's 6 MB limit counts the base64'd body plus the event's headers; keep 256 KB spare.
+    assert max_request_bytes(2) * 4 / 3 < 6 * 1024 * 1024 - 256 * 1024
+
+
+def test_server_reads_the_upload_limit_from_the_environment(monkeypatch):
+    apps = []
+    monkeypatch.setattr("careerfit.api.uvicorn.run", lambda app, **kw: apps.append(app))
+    run([], env={"CAREERFIT_MAX_FILE_MB": "2"})
+    assert TestClient(apps[0]).get("/api/limits").json()["max_file_mb"] == 2

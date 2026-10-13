@@ -29,9 +29,8 @@ from careerfit.report import blind_spot_notes, render_markdown
 
 DEFAULT_ONTOLOGY = Path(__file__).parent / "ontology" / "skills.yaml"
 WEB_DIR = Path(__file__).parent / "web"
-MAX_FILE_BYTES = 5 * 1024 * 1024
-# Two files plus multipart framing and the small form fields.
-MAX_REQUEST_BYTES = 2 * MAX_FILE_BYTES + 256 * 1024
+MAX_FILE_MB = 5  # AWS Lambda sets 2 (CAREERFIT_MAX_FILE_MB): its 6 MB payload limit counts base64'd bytes
+MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024
 MAX_PDF_PAGES = 20  # a resume or JD is a few pages; parsing hundreds is a way to burn the server's CPU
 RATE_LIMIT = (10, 60.0)  # analyses per client IP per window (seconds)
 
@@ -66,11 +65,17 @@ def safe_filename(filename: str | None, fallback: str) -> str:
     return f"{stem}.{suffix[:10]}" if suffix else stem
 
 
-def _save(upload: UploadFile, folder: Path, fallback: str) -> Path:
-    data = upload.file.read(MAX_FILE_BYTES + 1)
+def max_request_bytes(max_file_mb: int) -> int:
+    """Two files plus multipart framing and the small form fields."""
+    return 2 * max_file_mb * 1024 * 1024 + 256 * 1024
+
+
+def _save(upload: UploadFile, folder: Path, fallback: str, max_file_mb: int) -> Path:
+    limit = max_file_mb * 1024 * 1024
+    data = upload.file.read(limit + 1)
     name = safe_filename(upload.filename, fallback)
-    if len(data) > MAX_FILE_BYTES:
-        raise UploadError(413, f"{name} is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB.")
+    if len(data) > limit:
+        raise UploadError(413, f"{name} is larger than {max_file_mb} MB.")
     if not data:
         raise UploadError(422, f"{name} is empty.")
     path = folder / name
@@ -188,6 +193,7 @@ def create_app(
     ontology_path: Path = DEFAULT_ONTOLOGY,
     rate_limit: tuple[int, float] = RATE_LIMIT,
     clock: Callable[[], float] = time.monotonic,
+    max_file_mb: int = MAX_FILE_MB,
 ) -> FastAPI:
     ontology = load_ontology(ontology_path)
     limiter = RateLimiter(*rate_limit, clock=clock)
@@ -221,6 +227,12 @@ def create_app(
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.get("/api/limits")
+    def limits() -> dict[str, int]:
+        # The page checks sizes before uploading: on Lambda an oversized body is refused by the
+        # Function URL before careerfit runs, with an error the page couldn't explain.
+        return {"max_file_mb": max_file_mb, "max_pdf_pages": MAX_PDF_PAGES}
+
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon() -> Response:
         return Response(status_code=204)  # no icon; saves a 404 in every browser console
@@ -240,12 +252,12 @@ def create_app(
             folder = Path(tmp)
             (folder / "resume").mkdir()
             (folder / "jd").mkdir()
-            resume_path = _save(resume, folder / "resume", "resume")
+            resume_path = _save(resume, folder / "resume", "resume", max_file_mb)
             if has_text:
                 jd_path = folder / "jd" / "pasted-job-description.txt"
                 jd_path.write_text(jd_text, encoding="utf-8")
             else:
-                jd_path = _save(jd, folder / "jd", "job-description")
+                jd_path = _save(jd, folder / "jd", "job-description", max_file_mb)
             resume_text, resume_coverage = _read(resume_path)
             jd_text_read, jd_coverage = _read(jd_path)
 
@@ -267,7 +279,7 @@ def create_app(
         })
 
     app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
-    app.add_middleware(BodyLimit, limit=MAX_REQUEST_BYTES)
+    app.add_middleware(BodyLimit, limit=max_request_bytes(max_file_mb))
     return app
 
 
@@ -280,6 +292,9 @@ def run(argv: list[str] | None = None, env: dict[str, str] | None = None) -> Non
                         help="port (default: $PORT, which most hosting platforms set, else 8000)")
     args = parser.parse_args(argv)
     print(f"careerfit: serving on http://{args.host}:{args.port}/ (keyword pass only; --deep stays in the CLI)")
+    max_file_mb = int(env.get("CAREERFIT_MAX_FILE_MB", MAX_FILE_MB))
     # proxy_headers: behind the platform's proxy, the client IP for rate limiting comes from
     # X-Forwarded-For, trusted only from FORWARDED_ALLOW_IPS (uvicorn's default: 127.0.0.1).
-    uvicorn.run(create_app(), host=args.host, port=args.port, proxy_headers=True, server_header=False)
+    # On Lambda the Web Adapter is that proxy and connects from 127.0.0.1, so the default is right.
+    uvicorn.run(create_app(max_file_mb=max_file_mb), host=args.host, port=args.port, proxy_headers=True,
+                server_header=False)
