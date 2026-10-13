@@ -1,17 +1,9 @@
-# Only pyproject.toml, uv.lock, README.md and src/ are copied; keep everything else out of the build context.
-.git
-.github
-.venv
-.cache
-.claude
-.pytest_cache
+# Allow-list: the build context holds only what the Dockerfile copies, so nothing else
+# (local notes, .env files, credentials added later) ever reaches the builder.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
 **/__pycache__
-scratch
-docs
-evals
-fixtures
-tests
-*.json
-report*.md
-.env
-.env.*
+**/*.pyc
