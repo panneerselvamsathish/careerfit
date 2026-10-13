@@ -6,7 +6,8 @@ from pypdf.errors import FileNotDecryptedError, PdfReadError
 from careerfit.facts.schema import Coverage 
 
 
-def read_pdf(path: Path) -> tuple[str, Coverage]:
+def read_pdf(path: Path, max_pages: int | None = None) -> tuple[str, Coverage]:
+    """max_pages refuses long files before any page is parsed (the web server sets it; the CLI doesn't)."""
     
     pages_with_text = 0
     pages_without_text = 0
@@ -15,6 +16,8 @@ def read_pdf(path: Path) -> tuple[str, Coverage]:
     try:
         reader = PdfReader(path)
         total_pages = len(reader.pages)
+        if max_pages is not None and total_pages > max_pages:
+            raise ValueError(f"{path.name} has {total_pages} pages; the limit is {max_pages}. Upload a shorter version.")
         for page in reader.pages:
             text = page.extract_text().strip()
             if text:

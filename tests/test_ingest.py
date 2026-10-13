@@ -169,3 +169,17 @@ def test_read_pdf_page_that_fails_during_extraction_raises_clear_error(tmp_path,
     monkeypatch.setattr(PageObject, "extract_text", broken_extract)
     with pytest.raises(ValueError, match="not a readable PDF"):
         read_pdf(pdf_path)
+
+
+def test_read_pdf_refuses_more_pages_than_max_pages(tmp_path):
+    pdf = FPDF()
+    pdf.set_font("Helvetica", size=12)
+    for _ in range(3):
+        pdf.add_page()
+        pdf.cell(text="Python")
+    path = tmp_path / "three.pdf"
+    pdf.output(str(path))
+    with pytest.raises(ValueError, match="three.pdf has 3 pages; the limit is 2. Upload a shorter version."):
+        read_pdf(path, max_pages=2)
+    text, coverage = read_pdf(path)  # no limit unless the caller sets one
+    assert coverage.pages_total == 3
