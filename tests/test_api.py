@@ -230,3 +230,20 @@ def test_server_binds_locally_by_default_and_takes_port_from_the_environment(mon
     run([], env={"PORT": "9000", "CAREERFIT_HOST": "0.0.0.0"})
     assert [(c["host"], c["port"]) for c in calls] == [("127.0.0.1", 8000), ("0.0.0.0", 9000)]
     assert all(c["proxy_headers"] is True and c["server_header"] is False for c in calls)
+
+
+def test_rate_limiter_memory_is_bounded_under_a_flood_of_addresses():
+    limiter = RateLimiter(1, 60.0, clock=lambda: 0.0, max_clients=100)
+    for n in range(5000):  # every address still inside its window
+        limiter.retry_after(f"10.0.{n // 256}.{n % 256}")
+    assert len(limiter) == 100
+
+
+def test_rate_limiter_forgets_the_client_seen_least_recently():
+    limiter = RateLimiter(1, 60.0, clock=lambda: 0.0, max_clients=2)
+    assert limiter.retry_after("a") is None
+    assert limiter.retry_after("b") is None
+    assert limiter.retry_after("a") == 60  # a is now the most recent
+    assert limiter.retry_after("c") is None  # evicts b, not a
+    assert limiter.retry_after("a") == 60
+    assert limiter.retry_after("b") is None  # b was forgotten, so it starts afresh

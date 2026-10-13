@@ -10,7 +10,7 @@ import re
 import tempfile
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
@@ -150,26 +150,38 @@ async def _too_large(send) -> None:
 
 
 class RateLimiter:
-    """Sliding window per key, in memory. One process only: behind several instances each counts alone."""
+    """Sliding window per key, in memory. One process only: behind several instances each counts alone.
 
-    def __init__(self, limit: int, window: float, clock: Callable[[], float]):
-        self.limit, self.window, self.clock = limit, window, clock
-        self._hits: dict[str, deque[float]] = {}
+    Memory and work per request stay bounded however many clients arrive: at most max_clients
+    buckets of at most `limit` timestamps each. Past that, the client seen least recently is
+    forgotten (and starts afresh if it returns), so a flood of addresses costs O(1) per request.
+    """
+
+    def __init__(self, limit: int, window: float, clock: Callable[[], float], max_clients: int = 10_000):
+        self.limit, self.window, self.clock, self.max_clients = limit, window, clock, max_clients
+        self._hits: OrderedDict[str, deque[float]] = OrderedDict()
         self._lock = threading.Lock()
 
     def retry_after(self, key: str) -> int | None:
         """None if this request may go ahead (and counts it); otherwise seconds until it may."""
         now = self.clock()
         with self._lock:
-            if len(self._hits) > 10_000:  # forget clients whose window has passed, so memory stays bounded
-                self._hits = {k: q for k, q in self._hits.items() if q and q[-1] > now - self.window}
-            hits = self._hits.setdefault(key, deque())
+            hits = self._hits.get(key)
+            if hits is None:
+                hits = self._hits[key] = deque()
+                if len(self._hits) > self.max_clients:
+                    self._hits.popitem(last=False)
+            else:
+                self._hits.move_to_end(key)
             while hits and hits[0] <= now - self.window:
                 hits.popleft()
             if len(hits) >= self.limit:
                 return max(1, int(hits[0] + self.window - now + 0.999))
             hits.append(now)
             return None
+
+    def __len__(self) -> int:
+        return len(self._hits)
 
 
 def create_app(
