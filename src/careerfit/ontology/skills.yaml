@@ -100,9 +100,10 @@ tool calling:
   aliases: ["function calling", "tool and function calling", "tool/function calling"]
   ambiguous: false
 
-# "retrieval" alone is often just "data retrieval", so a bare mention is left to the judge.
+# "retrieval" alone is often just "data retrieval", and a bare "RAG" is usually a red/amber/green
+# status, so only phrases that mean retrieval-augmented generation are aliases.
 retrieval:
-  aliases: ["rag", "retrieval-augmented generation", "retrieval augmented generation", "retrieval systems", "retrieval strategies"]
+  aliases: ["retrieval-augmented generation", "retrieval augmented generation", "rag pipeline", "rag pipelines", "rag architecture", "rag system", "rag systems"]
   ambiguous: true
 
 embeddings:

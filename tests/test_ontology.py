@@ -68,6 +68,8 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     ("bedrock", "Built agents on Amazon Bedrock", "found"),
     ("retrieval", "Fast data retrieval from the warehouse", "unclear"),
     ("retrieval", "Designed RAG pipelines over policy documents", "found"),
+    ("retrieval", "Reported weekly RAG status to leadership", "absent"),
+    ("retrieval", "Tuned the retrieval systems behind the order database", "unclear"),
     ("lambda", "Sorted with a lambda", "unclear"),
     ("lambda", "Serverless APIs on AWS Lambda", "found"),
     ("flux", "Requirements are in flux", "unclear"),
