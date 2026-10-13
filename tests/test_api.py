@@ -274,3 +274,16 @@ def test_retry_after_rounds_up_so_a_client_never_retries_too_early():
     assert limiter.retry_after("a") is None
     now[0] = 8.9995  # 1.0005 s of the window left
     assert limiter.retry_after("a") == 2
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "two", ""])
+def test_server_refuses_to_start_with_an_unusable_upload_limit(monkeypatch, capsys, value):
+    monkeypatch.setattr("careerfit.api.uvicorn.run", lambda app, **kw: pytest.fail("must not start"))
+    with pytest.raises(SystemExit):
+        run([], env={"CAREERFIT_MAX_FILE_MB": value})
+    assert "CAREERFIT_MAX_FILE_MB must be a whole number of MB, at least 1" in capsys.readouterr().err
+
+
+def test_create_app_rejects_a_non_positive_upload_limit():
+    with pytest.raises(ValueError, match="max_file_mb must be at least 1, got 0"):
+        create_app(max_file_mb=0)

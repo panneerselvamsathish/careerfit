@@ -196,6 +196,8 @@ def create_app(
     clock: Callable[[], float] = time.monotonic,
     max_file_mb: int = MAX_FILE_MB,
 ) -> FastAPI:
+    if max_file_mb < 1:
+        raise ValueError(f"max_file_mb must be at least 1, got {max_file_mb}")
     ontology = load_ontology(ontology_path)
     limiter = RateLimiter(*rate_limit, clock=clock)
     app = FastAPI(title="careerfit", docs_url=None, redoc_url=None, openapi_url=None)
@@ -293,7 +295,10 @@ def run(argv: list[str] | None = None, env: dict[str, str] | None = None) -> Non
                         help="port (default: $PORT, which most hosting platforms set, else 8000)")
     args = parser.parse_args(argv)
     print(f"careerfit: serving on http://{args.host}:{args.port}/ (keyword pass only; --deep stays in the CLI)")
-    max_file_mb = int(env.get("CAREERFIT_MAX_FILE_MB", MAX_FILE_MB))
+    raw = env.get("CAREERFIT_MAX_FILE_MB", str(MAX_FILE_MB))
+    if not raw.isdigit() or int(raw) < 1:  # fail at startup, not on every upload
+        parser.error(f"CAREERFIT_MAX_FILE_MB must be a whole number of MB, at least 1 (got {raw!r})")
+    max_file_mb = int(raw)
     # proxy_headers: behind the platform's proxy, the client IP for rate limiting comes from
     # X-Forwarded-For, trusted only from FORWARDED_ALLOW_IPS (uvicorn's default: 127.0.0.1).
     # On Lambda the Web Adapter is that proxy and connects from 127.0.0.1, so the default is right.
