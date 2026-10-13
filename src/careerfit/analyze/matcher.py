@@ -27,22 +27,29 @@ def scan(text: str, ontology: dict[str, SkillEntry]) -> dict[str, DetectResult]:
         results[name] = detect(name, entry, text)
     return results
 
-NICE_TO_HAVE_MARKERS = ("nice to have", "optional", "bonus", "preferred","a plus", "preferable", "set you apart")
+NICE_TO_HAVE_MARKERS = ("nice to have", "nice-to-have", "optional", "bonus", "preferred","a plus", "preferable", "set you apart")
 
 MUST_HAVE_MARKERS = ("required", "must", "mandatory")
-MUST_HAVE_HEADINGS = ("requirements", "qualifications", "minimum", "essential")
-# Section names that job boards (LinkedIn among them) show without a trailing colon.
-SECTION_NAMES = ("requirements", "qualifications", "responsibilities", "what you will do", "what you'll do",
-                 "what you will bring", "what you'll bring", "what we're looking for", "what we are looking for",
-                 "set you apart", "nice to have", "bonus points")
+MUST_HAVE_HEADINGS = ("requirements", "qualifications", "minimum", "essential", "responsibilities", "what you will do",
+                      "what you'll do", "what you will bring", "what you'll bring", "looking for")
+# Section headings that job boards (LinkedIn among them) show without a trailing colon. Only a line
+# that is exactly one of these forms starts a section, so a short requirement such as "Nice to have
+# Kubernetes experience" never changes the section for the lines after it.
+SECTION_HEADING = re.compile(
+    r"(key |minimum |basic |required |preferred |desired |additional )?"
+    r"(qualifications|requirements|responsibilities|skills|skills and experience)"
+    r"|what (you will|you'll|you'd) (do|bring|need)"
+    r"|what (you will |will )?set you apart"
+    r"|what we('re| are) looking for"
+    r"|nice[- ]to[- ]haves?|bonus points",
+    re.IGNORECASE,
+)
 
 
 def is_heading(line: str) -> bool:
-    """A line that starts a section: ends with ':', or is a short colon-less section name."""
-    if line.endswith(":"):
-        return True
-    return (len(line.split()) <= 6 and line[-1] not in ".,;!?" and not line.startswith(("-", "•", "*"))
-            and any(mentions(name, line) for name in SECTION_NAMES))
+    """A line that starts a section: ends with ':', or is exactly a known section heading."""
+    return line.endswith(":") or SECTION_HEADING.fullmatch(" ".join(line.split())) is not None
+
 
 def has_nice_marker(text: str) -> bool:
     return any(mentions(marker, text) for marker in NICE_TO_HAVE_MARKERS)

@@ -57,6 +57,10 @@ def test_scan_reports_every_skill():
     ("Nice to have:\n- Kubernetes\n- AWS required\n- Python", {"kubernetes": "nice", "aws": "must", "python": "nice"}),
     ("Experience with AWS will set you apart.", {"aws": "nice"}),
     ("Python developer\nAWS experience", {"python": "must", "aws": "must"}),
+    # Only an exact heading form starts a section; a short requirement never does
+    ("Requirements\nNice to have Kubernetes experience\nPython experience", {"kubernetes": "nice", "python": "must"}),
+    ("Nice-to-have\nKubernetes in production", {"kubernetes": "nice"}),
+    ("Nice to have:\n- Kubernetes\nResponsibilities\nBuild services in Python", {"kubernetes": "nice", "python": "must"}),
 ])
 def test_requirement_levels(jd_text, expected):
    
