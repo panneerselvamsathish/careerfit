@@ -268,3 +268,9 @@ def test_server_reads_the_upload_limit_from_the_environment(monkeypatch):
     monkeypatch.setattr("careerfit.api.uvicorn.run", lambda app, **kw: apps.append(app))
     run([], env={"CAREERFIT_MAX_FILE_MB": "2"})
     assert TestClient(apps[0]).get("/api/limits").json()["max_file_mb"] == 2
+def test_retry_after_rounds_up_so_a_client_never_retries_too_early():
+    now = [0.0]
+    limiter = RateLimiter(1, 10.0, clock=lambda: now[0])
+    assert limiter.retry_after("a") is None
+    now[0] = 8.9995  # 1.0005 s of the window left
+    assert limiter.retry_after("a") == 2
