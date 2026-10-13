@@ -50,6 +50,13 @@ def test_scan_reports_every_skill():
     ("Requirements:\n- Python\nNice to have:\nCloud:\n- AWS\nContainers:\n- Kubernetes", {"python": "must", "aws": "nice", "kubernetes": "nice"}),
     ("Nice to have:\n- Kubernetes\nMinimum qualifications:\n- AWS", {"kubernetes": "nice", "aws": "must"}),
     ("Preferred qualifications:\n- Kubernetes", {"kubernetes": "nice"}),
+    # Job boards drop the colon from section names
+    ("What You Will Bring\nExperience with Python\nWhat You Will Set You Apart\nExperience with AWS",
+     {"python": "must", "aws": "nice"}),
+    ("Responsibilities\nBuild services in Python\nNice to have\nKubernetes in production", {"python": "must", "kubernetes": "nice"}),
+    ("Nice to have:\n- Kubernetes\n- AWS required\n- Python", {"kubernetes": "nice", "aws": "must", "python": "nice"}),
+    ("Experience with AWS will set you apart.", {"aws": "nice"}),
+    ("Python developer\nAWS experience", {"python": "must", "aws": "must"}),
 ])
 def test_requirement_levels(jd_text, expected):
    

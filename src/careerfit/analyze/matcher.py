@@ -27,10 +27,22 @@ def scan(text: str, ontology: dict[str, SkillEntry]) -> dict[str, DetectResult]:
         results[name] = detect(name, entry, text)
     return results
 
-NICE_TO_HAVE_MARKERS = ("nice to have", "optional", "bonus", "preferred","a plus", "preferable")
+NICE_TO_HAVE_MARKERS = ("nice to have", "optional", "bonus", "preferred","a plus", "preferable", "set you apart")
 
 MUST_HAVE_MARKERS = ("required", "must", "mandatory")
 MUST_HAVE_HEADINGS = ("requirements", "qualifications", "minimum", "essential")
+# Section names that job boards (LinkedIn among them) show without a trailing colon.
+SECTION_NAMES = ("requirements", "qualifications", "responsibilities", "what you will do", "what you'll do",
+                 "what you will bring", "what you'll bring", "what we're looking for", "what we are looking for",
+                 "set you apart", "nice to have", "bonus points")
+
+
+def is_heading(line: str) -> bool:
+    """A line that starts a section: ends with ':', or is a short colon-less section name."""
+    if line.endswith(":"):
+        return True
+    return (len(line.split()) <= 6 and line[-1] not in ".,;!?" and not line.startswith(("-", "•", "*"))
+            and any(mentions(name, line) for name in SECTION_NAMES))
 
 def has_nice_marker(text: str) -> bool:
     return any(mentions(marker, text) for marker in NICE_TO_HAVE_MARKERS)
@@ -56,7 +68,7 @@ def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> di
         line = raw_line.strip()
         if not line:
             continue
-        if line.endswith(":"):
+        if is_heading(line):
             # A heading with neither kind of marker ("Cloud:") is a sub-heading and keeps the current section.
             if has_nice_marker(line):
                 current = "nice"
