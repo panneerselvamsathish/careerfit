@@ -227,6 +227,8 @@ sam build && sam deploy                     # later deploys: rebuild, then reuse
 sam delete                                  # removes everything the stack created
 ```
 
+- **Architecture: arm64.** The image must be built for the function's architecture; on Apple
+  silicon and arm64 CI runners that's the native build.
 - **Cost:** Lambda's always-free allowance (1M requests and 400,000 GB-seconds a month) covers
   this traffic, so the bill is a few cents for storing the image in ECR.
 - **Upload limit on Lambda: 2 MB per file.** Lambda accepts at most 6 MB per request, counted

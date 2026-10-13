@@ -43,7 +43,8 @@ Resources:
     Properties:
       FunctionName: !Sub ${AWS::StackName}-web
       PackageType: Image
-      Architectures: [x86_64]
+      # arm64 (Graviton): matches images built on Apple silicon and GitHub's arm64 runners, ~20% cheaper.
+      Architectures: [arm64]
       MemorySize: !Ref MemorySize
       Timeout: 30
       ReservedConcurrentExecutions: !If [HasReservation, !Ref ReservedConcurrency, !Ref AWS::NoValue]
