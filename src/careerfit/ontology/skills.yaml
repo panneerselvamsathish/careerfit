@@ -97,7 +97,7 @@ agent orchestration:
   ambiguous: false
 
 tool calling:
-  aliases: ["function calling", "tool use", "tool usage", "tool and function calling", "tool/function calling"]
+  aliases: ["function calling", "tool and function calling", "tool/function calling"]
   ambiguous: false
 
 # "retrieval" alone is often just "data retrieval", so a bare mention is left to the judge.
@@ -150,11 +150,11 @@ grounding:
   ambiguous: true
 
 agent memory:
-  aliases: ["llm memory", "memory systems"]
+  aliases: ["llm memory"]
   ambiguous: false
 
 llm evaluation:
-  aliases: ["llm evals", "evals", "evaluation pipelines", "evaluation frameworks", "ai evaluation", "model evaluation"]
+  aliases: ["llm evals", "ai evaluation", "ai evals"]
   ambiguous: false
 
 llm routing:
@@ -288,15 +288,15 @@ cdk:
 
 control tower:
   aliases: ["aws control tower"]
-  ambiguous: false
+  ambiguous: true  # also a generic "operations control tower"
 
 api gateway:
   aliases: ["amazon api gateway", "aws api gateway"]
   ambiguous: false
 
 snowflake:
-  aliases: []
-  ambiguous: false
+  aliases: ["snowflake data cloud", "snowflake data platform", "snowflake data platforms"]
+  ambiguous: true  # also "snowflake schema"
 
 # Platform, delivery and reliability
 ci/cd:

@@ -80,6 +80,14 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     ("soc 2", "Compliance frameworks (SOC 2, ISO 27001)", "found"),
     ("event-driven architecture", "async event-driven integration", "found"),
     ("prompt injection", "prompt-injection defences", "found"),
+    # aliases are conclusive, so none may match an everyday phrase
+    ("tool calling", "Monitor developer tool usage across teams", "absent"),
+    ("llm evaluation", "Completed annual performance evals", "absent"),
+    ("agent memory", "Designed cache-coherent memory systems", "absent"),
+    ("snowflake", "Star and snowflake schema design", "unclear"),
+    ("snowflake", "Pipelines into the Snowflake Data Cloud", "found"),
+    ("control tower", "Ran the operations control tower", "unclear"),
+    ("control tower", "Landing zones with AWS Control Tower", "found"),
 ])
 def test_new_skills_detect_as_intended(skill, text, expected):
     from careerfit.analyze.matcher import detect
