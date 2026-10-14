@@ -145,3 +145,13 @@ def test_the_implying_skill_named_most_often_is_the_one_cited():
     resume = "Python (FastAPI), PL/SQL\nWrote PL/SQL packages\nTuned PL/SQL for the finance export"
     evidence = by_skill(build_observations(resume, TEXT_COVERAGE, jd, ontology, AT))["backend development"].resume_evidence
     assert (evidence.via, evidence.locator) == ("pl/sql", "line 1")
+
+
+def test_sql_named_only_inside_pl_sql_is_shown_through_it():
+    jd = "Requirements:\n- SQL"
+    inside = by_skill(build_observations("Wrote PL/SQL packages", TEXT_COVERAGE, jd, IMPLIED, AT))["sql"]
+    assert inside.status == SkillStatus.MATCHED
+    assert (inside.resume_evidence.source, inside.resume_evidence.via) == ("derived", "pl/sql")
+    resume = "Wrote PL/SQL packages\nStrong SQL tuning"
+    standalone = by_skill(build_observations(resume, TEXT_COVERAGE, jd, IMPLIED, AT))["sql"]
+    assert (standalone.resume_evidence.source, standalone.resume_evidence.locator) == ("resume", "line 2")

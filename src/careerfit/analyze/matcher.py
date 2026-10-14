@@ -6,8 +6,13 @@ from careerfit.facts.schema import SkillStatus
 
 DetectResult = Literal["found", "unclear", "absent"]
 
+def mention_pattern(term: str) -> re.Pattern[str]:
+    """A whole-word, case-insensitive match for a skill name or alias ("js" never inside "Node.js")."""
+    return re.compile(rf'(?<!\w)(?<!\w\.){re.escape(term)}(?!\w)(?!\.\w)', re.IGNORECASE)
+
+
 def mentions(term: str, text: str) -> bool:
-    return re.search(rf'(?<!\w)(?<!\w\.){re.escape(term)}(?!\w)(?!\.\w)', text, re.IGNORECASE) is not None
+    return mention_pattern(term).search(text) is not None
 
 def detect(name: str, entry: SkillEntry, text: str) -> DetectResult:
     
@@ -57,7 +62,9 @@ NICE_SECTION = re.compile(r"preferred|desired|bonus|nice[- ]to[- ]have|sets? you
 STOP_HEADING = re.compile(
     r"(our )?benefits?(( and | ?& ?|/)perks)?|perks|what we offer( you)?"
     r"|equal (employment )?opportunity( employer)?|disclaimer|salary|compensation|pay"
-    r"|((base |annual )?(pay|salary|compensation)( range)?|salary range)\b.*[$€£]\s?\d.*",
+    # a pay heading on its own ("Base Pay Range") or followed by an amount ("Salary Range: $93,000 ...");
+    # anything else after it ("Compensation analysis experience") keeps the line a requirement
+    r"|((base |annual )?(pay|salary|compensation)( range)?|salary range)(\b.*[$€£]\s?\d.*)?",
     re.IGNORECASE,
 )
 OPEN_STOP_HEADING = re.compile(r"(your journey|life) (at|with) .+|why (join|work (at|with)) .+", re.IGNORECASE)

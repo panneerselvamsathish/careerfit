@@ -149,6 +149,8 @@ def test_requirement_section_classifies_every_recognised_heading(line, expected)
     ("- Compensation analysis experience", False), ("- Salary benchmarking experience", False),
     ("Salary benchmarking experience", False), ("- Your journey at A&M", False),
     ("* Base Pay Range: $ 160,000 - $ 200,000", True), ("Compensation", True),
+    # a pay heading with no amount on the line (Copilot review on #15)
+    ("Salary Range", True), ("Base Pay Range:", True), ("Compensation Range", True), ("- Pay range analysis", False),
 ])
 def test_stop_section_marks_headings_with_no_requirements(line, expected):
     from careerfit.analyze.matcher import stop_section

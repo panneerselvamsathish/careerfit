@@ -42,7 +42,8 @@ class Coverage:
 
 
 def _stop_heading(line: str) -> bool:
-    return stop_section(line) or ABOUT_COMPANY.fullmatch(line.rstrip(":").strip()) is not None
+    # Normalised like the matcher's headings, so "* About Us" behind a bullet still counts.
+    return stop_section(line) or ABOUT_COMPANY.fullmatch(BULLET.sub("", line).strip().rstrip(":").strip()) is not None
 
 
 def coverage(jd_text: str, ontology: dict[str, SkillEntry]) -> Coverage:

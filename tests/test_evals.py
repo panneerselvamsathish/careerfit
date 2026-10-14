@@ -144,3 +144,17 @@ def test_derived_evidence_must_name_an_implying_skill_on_the_cited_line():
         "backend development: resume evidence via 'python', which does not imply it"]
     assert invariants.check_evidence(facts("pl/sql", 1, "Billing engineer"), resume, jd, ontology) == [
         "backend development: resume evidence 'line 1' points at a line that does not mention the skill"]
+
+
+def test_derived_evidence_needs_a_clear_mention_of_the_via_skill():
+    ontology = {
+        "backend development": SkillEntry(aliases=(), ambiguous=False),
+        "go": SkillEntry(aliases=("golang",), ambiguous=True, implies=("backend development",)),
+    }
+    resume = "Led the go-live of the billing system"
+    evidence = Provenance(source="derived", via="go", locator="line 1", excerpt=resume, retrieved_at=AT)
+    facts = facts_with(SkillObservation(skill="backend development", status=SkillStatus.MATCHED, requirement="must",
+                                        jd_evidence=jd_line(2, excerpt="- Backend development"),
+                                        resume_evidence=evidence))
+    assert invariants.check_evidence(facts, resume, "Requirements:\n- Backend development", ontology) == [
+        "backend development: resume evidence 'line 1' names 'go' only ambiguously, so it can't show this skill"]

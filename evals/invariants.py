@@ -70,6 +70,10 @@ def check_evidence(
                     bad.append(f"{o.skill}: {label} evidence via {evidence.via!r}, which does not imply it")
                     continue
                 problem = _evidence_problem(evidence.via or "", via, evidence, text)
+                if problem is None and detect(evidence.via or "", via, evidence.excerpt) != "found":
+                    # The matcher only lets a clear mention stand in for another skill ("go-live"
+                    # never shows back-end development), so the invariant demands the same.
+                    problem = f"names {evidence.via!r} only ambiguously, so it can't show this skill"
             else:
                 problem = _evidence_problem(o.skill, entry, evidence, text)
             if problem:
