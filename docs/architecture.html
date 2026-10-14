@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>careerfit — architecture and flow</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 24px 32px; color: #1f2933; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  h2 { font-size: 17px; margin-top: 32px; }
+  p.note { color: #52606d; margin-top: 0; max-width: 900px; }
+  .diagram { border: 1px solid #e4e7eb; border-radius: 8px; padding: 16px; overflow-x: auto; }
+  #error { color: #b42318; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>careerfit — architecture and flow</h1>
+<p class="note">A fixed sequential pipeline (prompt chaining), not hub-and-spoke: no coordinator model, no subagents,
+no Task tool, no tool use. The only orchestrator is plain Python (the composition roots).</p>
+<div id="error"></div>
+
+<h2>Architecture</h2>
+<div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  subgraph Roots["Composition roots: plain Python, the only orchestrator"]
+    CLI["cli.py<br/>careerfit --resume --jd [--deep]"]
+    API["api.py: FastAPI web app<br/>keyword pass only<br/>Docker image for AWS Lambda"]
+  end
+
+  subgraph Ingest["ingest/: I/O, untrusted input"]
+    RD["read_document()<br/>pdf.py · text.py"]
+  end
+
+  ONT[("ontology/skills.yaml<br/>115 skills · aliases · ambiguous flag")]
+
+  subgraph Analyze["analyze/: pure functions, no LLM, network or clock"]
+    MATCH["matcher<br/>whole-word detection · must/nice level"]
+    BUILD["build_facts()"]
+  end
+
+  FACTS[["facts/: GapAnalysisFacts<br/>Pydantic contract · 5 statuses<br/>every claim carries Provenance + excerpt"]]
+
+  subgraph Judge["judge/: the only package that calls an LLM, CLI --deep only"]
+    RS["resolve_skills()<br/>only UNRESOLVABLE skills"]
+    PL["plan_learning()<br/>only GAP skills"]
+    ASK["_ask()<br/>1 structured-output request + 1 retry<br/>quotes verified in code"]
+    FIT["compute_fit_score()<br/>plain arithmetic"]
+  end
+
+  CACHE[("cache.py<br/>SHA-256 disk cache")]
+  CLAUDE["Claude<br/>Amazon Bedrock or Anthropic API"]
+  JUDGED[["judged GapAnalysisFacts<br/>+ JudgeRun audit record"]]
+
+  subgraph Report["report/: renderers, zero logic"]
+    REP["candidate.py · hiring_manager.py<br/>What this analysis could not see"]
+  end
+
+  EVALS["evals/<br/>honesty invariants + golden cases<br/>CI gate"]
+
+  CLI --> RD
+  API --> RD
+  RD -->|"text + Coverage"| MATCH
+  ONT --> MATCH
+  MATCH --> BUILD --> FACTS
+  FACTS -->|"--deep"| RS
+  RS --> PL --> FIT --> JUDGED
+  RS --> ASK
+  PL --> ASK
+  ASK --> CACHE --> CLAUDE
+  FACTS --> REP
+  JUDGED --> REP
+  FACTS -.-> EVALS
+  JUDGED -.-> EVALS
+
+  classDef llm fill:#fff4e5,stroke:#f79009,color:#1f2933;
+  classDef pure fill:#ecfdf3,stroke:#12b76a,color:#1f2933;
+  classDef contract fill:#eff8ff,stroke:#2e90fa,color:#1f2933;
+  class RS,PL,ASK,CLAUDE llm;
+  class MATCH,BUILD,FIT,REP pure;
+  class FACTS,JUDGED contract;
+</pre>
+</div>
+
+<h2>A --deep run, step by step</h2>
+<p class="note">At most four model requests per run: two prompts, each with one possible retry. None if nothing needs judging.</p>
+<div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  participant CLI as cli.py (code)
+  participant AN as analyze/ (rules)
+  participant J as judge/
+  participant C as cache.py
+  participant M as Claude
+
+  CLI->>AN: build_facts(resume, JD, ontology, at)
+  AN-->>CLI: facts with statuses, levels, cited lines
+  CLI->>J: judge_facts(facts)
+  alt some skills UNRESOLVABLE
+    J->>C: skill_match prompt with JSON schema
+    C->>M: only on a cache miss
+    M-->>J: verdicts
+    J->>J: validate in code (quote on one line, 3+ words, JD line listed)
+    opt problems found
+      J->>M: one retry with the problems appended
+    end
+  end
+  alt some skills GAP
+    J->>M: learning_path prompt (same validation, one retry)
+  end
+  J->>J: compute_fit_score() is arithmetic, no LLM
+  J-->>CLI: judged facts + JudgeRun (model, prompts, dismissed, failures)
+  CLI->>CLI: render report, write files
+</pre>
+</div>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: false, theme: "default", securityLevel: "strict" });
+  try {
+    await mermaid.run({ querySelector: ".mermaid" });
+    document.title = "careerfit — rendered";
+  } catch (e) {
+    document.getElementById("error").textContent = "Mermaid error: " + (e.message || e);
+    document.title = "careerfit — ERROR";
+  }
+</script>
+</body>
+</html>
