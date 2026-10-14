@@ -66,7 +66,7 @@ uv run careerfit --resume fixtures/resume.txt --jd fixtures/jd.txt -o facts.json
 Step 4 prints a one-line summary and writes the full result to `facts.json`:
 
 ```text
-Wrote facts.json: 9 JD skills (3 gap, 4 matched, 2 unresolvable)
+Wrote facts.json: 10 JD skills (3 gap, 5 matched, 2 unresolvable)
 ```
 
 To try your own files, pass any `.pdf` or `.txt` resume and job description. Leave out `-o`
@@ -139,8 +139,14 @@ mention none. For each of those lines:
    Don't add it. Keyword rules can't decide those; the LLM judge can.
 4. **Check the resume side too.** If a resume says it differently ("versioned prompts" for prompt
    engineering), add that wording as an alias.
+5. **Does a more specific skill show it by definition?** ("PL/SQL" is back-end development and
+   SQL.) Add `implies: [backend development, sql]` to the specific skill. A resume that names it
+   clearly then matches a JD asking for the broader skill, and the report cites that line as
+   "shown through pl/sql". Only strict "X is a kind of Y" facts belong here, never "people who
+   know X usually know Y", and implication never runs from the broad skill to the specific one.
 
-`tests/test_ontology.py` fails if any name or alias is claimed by two skills, and checks the
+`tests/test_ontology.py` fails if any name or alias is claimed by two skills, if an `implies`
+names a skill that doesn't exist, and checks the
 everyday-meaning words stay ambiguous. Keep real JDs out of the repo (`scratch/` is gitignored)
 unless they are labelled held-out cases in `evals/golden/`. A JD used to grow the list can't also
 measure it.

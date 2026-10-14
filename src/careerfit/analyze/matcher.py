@@ -6,8 +6,13 @@ from careerfit.facts.schema import SkillStatus
 
 DetectResult = Literal["found", "unclear", "absent"]
 
+def mention_pattern(term: str) -> re.Pattern[str]:
+    """A whole-word, case-insensitive match for a skill name or alias ("js" never inside "Node.js")."""
+    return re.compile(rf'(?<!\w)(?<!\w\.){re.escape(term)}(?!\w)(?!\.\w)', re.IGNORECASE)
+
+
 def mentions(term: str, text: str) -> bool:
-    return re.search(rf'(?<!\w)(?<!\w\.){re.escape(term)}(?!\w)(?!\.\w)', text, re.IGNORECASE) is not None
+    return mention_pattern(term).search(text) is not None
 
 def detect(name: str, entry: SkillEntry, text: str) -> DetectResult:
     
@@ -35,16 +40,42 @@ MUST_HAVE_HEADINGS = ("requirements", "qualifications", "minimum", "essential")
 # LinkedIn drop it). Only a line that is exactly one of these forms counts, so a short requirement
 # like "Nice to have Kubernetes experience" never changes the section for the lines after it.
 SECTION_HEADING = re.compile(
-    r"(key |minimum |basic |required |preferred |desired )?"
+    r"(key |minimum |basic |required |preferred |desired |primary |secondary )?"
     r"(qualifications|requirements|responsibilities|skills|skills and experience)"
     r"|what (you will|you'll|you'd) (do|bring|need)"
+    r"|what will you (do|bring|need)"
+    r"|what (will make|makes) you successful"
+    r"|how you('ll| will) contribute"
+    r"|you will|you'll|you have|you bring|you'll bring"
     r"|what (you will |will )?set you apart|what sets you apart"
     r"|what we('re| are) looking for"
     r"|nice[- ]to[- ]haves?|bonus points",
     re.IGNORECASE,
 )
 NICE_SECTION = re.compile(r"preferred|desired|bonus|nice[- ]to[- ]have|sets? you apart", re.IGNORECASE)
+# Headings of sections that come after the requirements and never hold any (benefits, equal
+# opportunity, pay). A skill named there ("Cybersecurity Protection" as a benefit) is not a
+# requirement, so counting stops until the next requirements heading. These must never swallow a
+# requirement such as "- Compensation analysis experience", so:
+#  - exact headings, and pay lines that carry an amount, may sit behind a bullet ("* Our Benefits");
+#  - open-ended forms ("Your journey at A&M") count only as a short line that isn't a bullet.
+STOP_HEADING = re.compile(
+    r"(our )?benefits?(( and | ?& ?|/)perks)?|perks|what we offer( you)?"
+    r"|equal (employment )?opportunity( employer)?|disclaimer|salary|compensation|pay"
+    # a pay heading on its own ("Base Pay Range") or followed by an amount ("Salary Range: $93,000 ...");
+    # anything else after it ("Compensation analysis experience") keeps the line a requirement
+    r"|((base |annual )?(pay|salary|compensation)( range)?|salary range)(\b.*[$€£]\s?\d.*)?",
+    re.IGNORECASE,
+)
+OPEN_STOP_HEADING = re.compile(r"(your journey|life) (at|with) .+|why (join|work (at|with)) .+", re.IGNORECASE)
+OPEN_STOP_MAX_WORDS = 6
+_LEADING_BULLET = re.compile(r"^\s*([-•*▪●]|\d+[.)])\s+")
 Level = Literal["must", "nice"]
+
+
+def _heading_form(line: str) -> str:
+    """A line as a heading would read: no leading bullet ("* You Have:"), no trailing colon."""
+    return " ".join(_LEADING_BULLET.sub("", line).strip().rstrip(":").split())
 
 
 def requirement_section(line: str) -> Level | None:
@@ -52,10 +83,20 @@ def requirement_section(line: str) -> Level | None:
 
     The one place a recognised heading is classified, so the matcher and the coverage tool agree.
     """
-    form = " ".join(line.rstrip(":").split())
+    form = _heading_form(line)
     if SECTION_HEADING.fullmatch(form) is None:
         return None
     return "nice" if NICE_SECTION.search(form) else "must"
+
+
+def stop_section(line: str) -> bool:
+    """True for a heading that opens a section with no requirements in it (benefits, EEO, pay)."""
+    form = _heading_form(line)
+    if STOP_HEADING.fullmatch(form):
+        return True
+    bulleted = _LEADING_BULLET.match(line) is not None
+    return (not bulleted and len(form.split()) <= OPEN_STOP_MAX_WORDS
+            and OPEN_STOP_HEADING.fullmatch(form) is not None)
 
 
 def heading_level(line: str) -> Level | None:
@@ -93,13 +134,20 @@ def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> di
     """Every place the JD mentions each skill, as (level, line, detection result), in document order."""
     found: dict[str, list[Occurrence]] = {}
     current: Literal["must", "nice"] = "must"
+    counting = True  # off inside a benefits / equal-opportunity / pay section
     for line_no, raw_line in enumerate(jd_text.splitlines(), start=1):
         line = raw_line.strip()
         if not line:
             continue
+        if stop_section(line):
+            counting = False
+            continue
         level_here = heading_level(line)
         if level_here is not None:
             current = level_here
+            counting = True
+        if not counting:
+            continue
         for sentence in re.split(r"(?<=[.!?])\s+", line):
             for clause in clauses(sentence):
                 level: Literal["must", "nice"]

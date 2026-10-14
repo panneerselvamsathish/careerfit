@@ -43,7 +43,7 @@ def test_keyword_report_cites_both_documents_and_suggests_deep():
     assert '| kubernetes | Gap | line 9: "- Running Kubernetes in production" | — |' in report
     assert "Run with --deep to have Claude settle them." in report
     assert "## Learning plan" not in report
-    assert "7 of 7 decided skills were settled by keyword matching" in report
+    assert "8 of 8 decided skills were settled by keyword matching" in report
 
 
 def test_every_report_says_unlisted_skills_were_not_checked():
@@ -192,3 +192,11 @@ def test_cli_writes_the_report(tmp_path, capsys):
     assert main(["--resume", str(FIXTURES / "resume.txt"), "--jd", str(FIXTURES / "jd.txt"), "--report", str(out)]) == 0
     assert out.read_text(encoding="utf-8").startswith("# Your fit for this job")
     assert f"Wrote {out}:" in capsys.readouterr().err
+
+
+def test_derived_evidence_says_which_skill_shows_it():
+    from careerfit.facts.schema import Provenance
+    from careerfit.report.shared import cite
+    evidence = Provenance(source="derived", via="pl/sql", locator="line 13", excerpt="Wrote PL/SQL packages",
+                          retrieved_at=AT)
+    assert cite(evidence) == 'line 13 (shown through pl/sql): "Wrote PL/SQL packages"'

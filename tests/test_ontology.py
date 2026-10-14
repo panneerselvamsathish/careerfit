@@ -94,7 +94,67 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     ("ecs", "Containers on Amazon ECS with Fargate", "found"),
     ("adr", "Settled ADR and equity trades", "unclear"),
     ("adr", "Wrote architecture decision records for each change", "found"),
+    # added 2026-10-14 from four more real JDs
+    ("azure", "Deep experience designing and deploying enterprise solutions within Microsoft Azure", "found"),
+    ("banking", "We are banking on a fast launch", "unclear"),
+    ("banking", "Banking industry experience, including regulation and risk", "found"),
+    ("agile", "Thrives in an agile, fast-moving team", "unclear"),
+    ("agile", "Delivered with agile methodology across three teams", "found"),
+    ("waterfall", "Modelled the fund's distribution waterfall", "unclear"),
+    ("waterfall", "Ability to apply architecture principles to Agile and Waterfall delivery", "found"),
+    ("proof of concept", "Point of contact (POC) for vendor escalations", "absent"),
+    ("proof of concept", "Took the assistant from proof of concept to production", "found"),
+    ("sso", "Single sign-on through Okta", "found"),
+    ("oauth", "SSO, SAML, OAuth/OIDC, role-based access controls", "found"),
+    ("openid connect", "SSO, SAML, OAuth/OIDC, role-based access controls", "found"),
+    ("data center", "Prior experience in Data Center operations", "found"),
+    ("frontend development", "across front-end, back-end, and cloud environments", "found"),
+    ("frontend development", "at the front end of the sales funnel", "absent"),
+    ("solution architecture", "5+ years of experience working as Solution Architect", "found"),
+    ("aiops", "Familiarity with cybersecurity practices and AI-driven operations", "found"),
+    ("ai-assisted development", "get them up and running on our AI-assisted development platform", "found"),
+    # a case for every other entry added 2026-10-14, aliases included (Copilot review on #15)
+    ("devops", "Strong grasp of DevOps practices", "found"),
+    ("saml", "Federation over SAML 2.0", "found"),
+    ("cybersecurity", "Information security policies and controls", "found"),
+    ("cybersecurity", "Cyber security awareness training", "found"),
+    ("enterprise architecture", "Worked as an Enterprise Architect for the bank", "found"),
+    ("togaf", "Experience with TOGAF or equivalent architecture frameworks", "found"),
+    ("archimate", "Knowledge of ArchiMate Enterprise Architecture Modeling Language", "found"),
+    ("service-oriented architecture", "Experience working with SOA, microservices", "found"),
+    ("sdlc", "Understanding of the software development life cycle", "found"),
+    ("scrum", "Ran Scrum ceremonies for two teams", "found"),
+    ("kanban", "Moved support work onto a Kanban board", "found"),
+    ("backend development", "Built the backend for the checkout service", "found"),
+    ("backend development", "Back-end development in Python", "found"),
+    # the Oracle stack from the resume side (2026-10-14); bare "Oracle" is the company
+    ("pl/sql", "Wrote PL/SQL packages for the billing flow", "found"),
+    ("pl/sql", "Tuned plsql procedures", "found"),
+    ("oracle database", "Oracle 19c, AWS RDS, Informix", "found"),
+    ("oracle database", "Oracle Health is seeking a Principal AI Agent Architect", "absent"),
+    ("informix", "Oracle 19c, AWS RDS, Informix", "found"),
+    ("fastapi", "A FastAPI backend and a browser front end", "found"),
+    ("jaspersoft", "Own the enterprise Jaspersoft reporting platform", "found"),
+    ("jaspersoft", "Built JasperReports templates", "found"),
+    ("oracle forms", "Oracle Forms/Reports, WebLogic", "found"),
+    ("weblogic", "Oracle Forms/Reports, WebLogic", "found"),
 ])
 def test_new_skills_detect_as_intended(skill, text, expected):
     from careerfit.analyze.matcher import detect
     assert detect(skill, SKILLS[skill], text) == expected
+
+
+def test_load_ontology_rejects_bad_implications(tmp_path):
+    bad = tmp_path / "skills.yaml"
+    bad.write_text("pl/sql:\n  aliases: []\n  ambiguous: false\n  implies: [cobol]\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="implies unknown skill"):
+        load_ontology(bad)
+    bad.write_text("sql:\n  aliases: []\n  ambiguous: false\n  implies: [sql]\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="cannot imply itself"):
+        load_ontology(bad)
+
+
+def test_implications_run_from_the_specific_skill_to_the_broad_one():
+    assert set(SKILLS["pl/sql"].implies) == {"sql", "backend development"}
+    assert set(SKILLS["fastapi"].implies) == {"python", "backend development"}
+    assert SKILLS["sql"].implies == ()  # SQL alone does not show back-end development

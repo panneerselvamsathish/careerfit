@@ -16,15 +16,15 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from careerfit.analyze.matcher import requirement_section, scan
+from careerfit.analyze.matcher import requirement_section, scan, stop_section
 from careerfit.analyze.ontology import SkillEntry, load_ontology
 from careerfit.ingest.document import read_document
 
 DEFAULT_ONTOLOGY = Path(__file__).parent.parent / "src" / "careerfit" / "ontology" / "skills.yaml"
-# Sections that never hold requirements: everything after one of these headings is skipped
-# until a requirements heading starts again.
-STOP_HEADING = re.compile(r"(about (us|the company)|benefits?(( and | ?& ?|/)perks)?|perks|what we offer( you)?|equal opportunity.*|"
-                          r"disclaimer|salary.*|compensation)", re.I)
+# Benefits, equal-opportunity and pay sections use the matcher's own stop_section(), so the tool
+# measures what the product actually reads. The company blurb is skipped here too: it is never a
+# requirement line, but the matcher keeps reading after it because "About the Role" often is one.
+ABOUT_COMPANY = re.compile(r"about (us|the company)", re.I)
 BULLET = re.compile(r"^\s*([-•*▪●]|\d+[.)])\s+")
 MIN_WORDS = 3  # a shorter line that isn't a bullet is a title or a fragment
 
@@ -42,7 +42,8 @@ class Coverage:
 
 
 def _stop_heading(line: str) -> bool:
-    return STOP_HEADING.fullmatch(line.rstrip(":").strip()) is not None
+    # Normalised like the matcher's headings, so "* About Us" behind a bullet still counts.
+    return stop_section(line) or ABOUT_COMPANY.fullmatch(BULLET.sub("", line).strip().rstrip(":").strip()) is not None
 
 
 def coverage(jd_text: str, ontology: dict[str, SkillEntry]) -> Coverage:
@@ -53,16 +54,16 @@ def coverage(jd_text: str, ontology: dict[str, SkillEntry]) -> Coverage:
     inside = not sections_found
     covered, uncovered = [], []
     for number, text in lines:
+        # Headings count even behind a bullet: some postings bullet them ("* You Have:", "* Our Benefits").
+        if _stop_heading(text):
+            inside = False
+            continue
+        if requirement_section(text):
+            inside = True
+            continue
         bullet = BULLET.match(text)
-        if not bullet:
-            if _stop_heading(text):
-                inside = False
-                continue
-            if requirement_section(text):
-                inside = True
-                continue
-            if text.endswith(":"):
-                continue  # any other heading ("About the Role:", "Cloud:") is skipped and changes nothing
+        if not bullet and text.endswith(":"):
+            continue  # any other heading ("About the Role:", "Cloud:") is skipped and changes nothing
         if not inside:
             continue
         line = text[bullet.end():] if bullet else text

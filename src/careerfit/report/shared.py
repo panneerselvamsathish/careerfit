@@ -41,7 +41,12 @@ def names(items: Iterable[str]) -> str:
 def cite(evidence: Provenance | None) -> str:
     if evidence is None:
         return "—"
-    source = " (Claude)" if evidence.source == "llm_judge" else ""
+    if evidence.source == "llm_judge":
+        source = " (Claude)"
+    elif evidence.source == "derived":
+        source = f" (shown through {evidence.via})"
+    else:
+        source = ""
     return cell(f'{evidence.locator}{source}: "{evidence.excerpt}"')
 
 

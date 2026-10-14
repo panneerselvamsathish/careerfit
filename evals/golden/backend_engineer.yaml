@@ -6,9 +6,12 @@ held_out: false
 resume: fixtures/resume.txt
 jd: fixtures/jd.txt
 labelled_by: sathish
-labelled_at: 2026-10-10
+labelled_at: 2026-10-14
+# First labelled 2026-10-10. backend development was added 2026-10-14 when the skill joined
+# skills.yaml (PR #15), and sathish confirmed it the same day: matched, must-have.
 
 expected:
+  backend development: {status: matched, requirement: must}   # "Backend Engineer" title in both documents
   python:     {status: matched,      requirement: must}
   aws:        {status: matched,      requirement: must}
   kubernetes: {status: gap,          requirement: must}

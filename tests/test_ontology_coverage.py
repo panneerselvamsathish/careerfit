@@ -59,3 +59,8 @@ def test_benefits_and_perks_headings_end_counting():
     for heading in ("Benefits and Perks", "Benefits & Perks", "Benefits/Perks:"):
         jd = f"Qualifications\nFive years running production workloads on AWS\n{heading}\nFree Python lunches for the whole team"
         assert [n for n, _, _ in coverage(jd, ONTOLOGY).covered] == [2], heading
+
+
+def test_bulleted_about_us_heading_ends_counting():
+    jd = "Qualifications\n- Five years running production workloads on AWS\n* About Us\n- We are a Python shop with free lunches"
+    assert [n for n, _, _ in coverage(jd, ONTOLOGY).covered] == [2]

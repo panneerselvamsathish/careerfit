@@ -7,6 +7,9 @@ class SkillEntry(BaseModel):
 
     aliases: tuple[str, ...]
     ambiguous: bool
+    # Broader skills this one demonstrates by definition ("pl/sql" is back-end development and SQL).
+    # Only strict "X is a kind of Y" facts belong here, never "people who know X often know Y".
+    implies: tuple[str, ...] = ()
 
     @model_validator(mode="after")
     def check_aliases_not_empty(self) -> "SkillEntry":
@@ -28,4 +31,10 @@ def load_ontology(path: Path) -> dict[str, SkillEntry]:
         if not isinstance(skill_data, dict):
             raise ValueError(f"{path.name}: entry for '{skill_name}' must have aliases and ambiguous fields")
         ontology[skill_name] = SkillEntry(**skill_data)
+    for skill_name, entry in ontology.items():
+        if skill_name in entry.implies:
+            raise ValueError(f"{path.name}: '{skill_name}' cannot imply itself")
+        unknown = [name for name in entry.implies if name not in ontology]
+        if unknown:
+            raise ValueError(f"{path.name}: '{skill_name}' implies unknown skill(s) {unknown}")
     return ontology

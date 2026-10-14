@@ -115,3 +115,11 @@ def test_dismissed_skill_cannot_also_be_observed():
     judge = schema.JudgeRun(model="m", prompt_versions=("skill_match@1",), dismissed_skills=("go",))
     with pytest.raises(ValidationError, match="a dismissed skill cannot also be observed"):
         _facts(llm_used=True, judge=judge, skill_observations=(obs,))
+
+
+def test_derived_provenance_must_name_its_via_skill():
+    with pytest.raises(ValidationError, match="derived evidence must name the skill"):
+        schema.Provenance(source="derived", locator="line 1", excerpt="x", retrieved_at=datetime(2026, 10, 14))
+    with pytest.raises(ValidationError, match="only derived evidence has a via skill"):
+        schema.Provenance(source="resume", locator="line 1", excerpt="x", retrieved_at=datetime(2026, 10, 14),
+                          via="pl/sql")

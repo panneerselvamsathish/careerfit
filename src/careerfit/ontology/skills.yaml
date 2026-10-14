@@ -2,6 +2,9 @@
 # ambiguous: true when the word's non-skill meaning is common in resumes/JDs
 # (e.g. "go live", "a swift turnaround"), so a keyword match alone can't be trusted.
 # aliases must never be ambiguous; an ambiguous spelling doesn't belong in aliases.
+# implies: broader skills this one shows by definition ("pl/sql" is SQL and back-end development).
+# A resume that names it clearly then matches a JD asking for the broader skill, cited to that line.
+# Only strict "X is a kind of Y" facts; never "people who know X usually know Y".
 
 python:
   aliases: ["python3"]
@@ -26,6 +29,7 @@ javascript:
 django:
   aliases: []
   ambiguous: false
+  implies: [python, backend development]
 
 go:
   aliases: ["golang"]
@@ -50,6 +54,7 @@ terraform:
 postgresql:
   aliases: ["postgres"]
   ambiguous: false
+  implies: [sql]
 
 sql:
   aliases: []
@@ -472,4 +477,147 @@ access control:
 
 metadata management:
   aliases: ["metadata systems", "metadata catalog"]
+  ambiguous: false
+
+# ---- Added 2026-10-14 from four more real JDs (Alvarez & Marsal, Huntington National Bank,
+# Schneider Electric, Dow Jones Forward Deployed Engineer). Those JDs are development data now:
+# held-out eval cases must come from other JDs. ----
+
+# Cloud, platform and operations
+azure:
+  aliases: ["microsoft azure", "azure cloud"]
+  ambiguous: false
+
+devops:
+  aliases: ["dev ops"]
+  ambiguous: false
+
+data center:
+  aliases: ["data centre", "datacenter", "data centers", "data centres", "datacenters"]
+  ambiguous: false
+
+aiops:
+  aliases: ["ai-driven operations", "ai for it operations"]
+  ambiguous: false
+
+# Identity and security
+sso:
+  aliases: ["single sign-on", "single sign on"]
+  ambiguous: false
+
+saml:
+  aliases: ["saml 2.0", "saml2"]
+  ambiguous: false
+
+oauth:
+  aliases: ["oauth2", "oauth 2.0"]
+  ambiguous: false
+
+openid connect:
+  aliases: ["oidc"]
+  ambiguous: false
+
+cybersecurity:
+  aliases: ["cyber security", "cyber-security", "information security", "infosec"]
+  ambiguous: false
+
+# Architecture practice and delivery
+solution architecture:
+  aliases: ["solutions architecture", "solution architect", "solutions architect"]
+  ambiguous: false
+
+enterprise architecture:
+  aliases: ["enterprise architect"]
+  ambiguous: false
+
+togaf:
+  aliases: []
+  ambiguous: false
+
+archimate:
+  aliases: []
+  ambiguous: false
+
+service-oriented architecture:
+  aliases: ["soa", "service oriented architecture"]
+  ambiguous: false
+
+# "POC" is not an alias: in JDs it usually means "point of contact".
+proof of concept:
+  aliases: ["proofs of concept", "proof-of-concept", "proofs-of-concept"]
+  ambiguous: false
+
+sdlc:
+  aliases: ["software development life cycle", "software development lifecycle", "systems development life cycle"]
+  ambiguous: false
+
+# "agile" is also an everyday adjective ("an agile, fast-moving team"), so only phrases that
+# name the methodology are aliases.
+agile:
+  aliases: ["agile methodology", "agile methodologies", "agile delivery", "agile software development"]
+  ambiguous: true
+
+scrum:
+  aliases: []
+  ambiguous: false
+
+kanban:
+  aliases: []
+  ambiguous: false
+
+# "waterfall" is also a finance term (a distribution or cash-flow waterfall).
+waterfall:
+  aliases: ["waterfall methodology", "waterfall delivery", "waterfall model"]
+  ambiguous: true
+
+# Engineering scope. "front end" with a space is left out: "the front end of the process".
+frontend development:
+  aliases: ["front-end", "frontend", "front-end development", "browser front end"]
+  ambiguous: false
+
+backend development:
+  aliases: ["back-end", "backend", "back-end development"]
+  ambiguous: false
+
+ai-assisted development:
+  aliases: ["ai-assisted software development", "ai-assisted coding", "ai pair programming"]
+  ambiguous: false
+
+# Domains. "banking" is also an idiom ("we're banking on a fast launch").
+banking:
+  aliases: ["banking industry", "retail banking", "commercial banking", "investment banking", "banking domain"]
+  ambiguous: true
+
+# ---- Added 2026-10-14 from the resume side (README rule 4): the Oracle stack a JD may name,
+# which the skill list could not see. Bare "oracle" is not an alias: it is also the company. ----
+pl/sql:
+  aliases: ["plsql"]
+  ambiguous: false
+  implies: [sql, backend development]
+
+oracle database:
+  aliases: ["oracle db", "oracle rdbms", "oracle 11g", "oracle 12c", "oracle 19c", "oracle 21c", "oracle 23ai"]
+  ambiguous: false
+  implies: [sql]
+
+informix:
+  aliases: ["ibm informix"]
+  ambiguous: false
+  implies: [sql]
+
+fastapi:
+  aliases: ["fast api"]
+  ambiguous: false
+  implies: [python, backend development]
+
+jaspersoft:
+  aliases: ["jasperreports", "jasper reports"]
+  ambiguous: false
+
+oracle forms:
+  aliases: ["oracle forms and reports"]
+  ambiguous: false
+
+weblogic:
+  aliases: ["oracle weblogic", "weblogic server"]
   ambiguous: false

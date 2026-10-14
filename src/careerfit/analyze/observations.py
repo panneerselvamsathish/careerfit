@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from careerfit.analyze.matcher import decide_status, detect, first_mention_line, requirement_evidence
+from careerfit.analyze.matcher import decide_status, detect, first_mention_line, mention_pattern, requirement_evidence
 from careerfit.analyze.ontology import SkillEntry
 from careerfit.facts.schema import Coverage, GapAnalysisFacts, Provenance, SkillObservation
 
@@ -18,15 +18,23 @@ def build_observations(
     observations = []
     for name, (level, jd_line, jd_result) in requirement_evidence(jd_text, ontology).items():
         entry = ontology[name]
-        resume_result = detect(name, entry, resume_text)
+        # "SQL" inside "PL/SQL" is not a standalone SQL mention: the skill is shown through PL/SQL.
+        own_mentions = without_implying_mentions(name, ontology, resume_text)
+        resume_result = detect(name, entry, own_mentions)
+        implied = implied_evidence(name, ontology, resume_text) if resume_result != "found" else None
+        if implied is not None:
+            resume_result = "found"  # e.g. PL/SQL on the resume shows the back-end development the JD asks for
         status = decide_status(jd_result, resume_result, scanned)
 
         jd_evidence = Provenance(source="jd", locator=f"line {jd_line}", excerpt=jd_lines[jd_line - 1].strip(),
                                  retrieved_at=at)
 
-        resume_line = first_mention_line(name, entry, resume_text)
         resume_evidence = None
-        if resume_line is not None:
+        if implied is not None:
+            via, line_no = implied
+            resume_evidence = Provenance(source="derived", locator=f"line {line_no}", via=via,
+                                         excerpt=resume_lines[line_no - 1].strip(), retrieved_at=at)
+        elif (resume_line := first_mention_line(name, entry, own_mentions)) is not None:
             resume_evidence = Provenance(source="resume", locator=f"line {resume_line}",
                                          excerpt=resume_lines[resume_line - 1].strip(), retrieved_at=at)
 
@@ -38,6 +46,36 @@ def build_observations(
             resume_evidence=resume_evidence,
         ))
     return tuple(observations)
+
+
+def without_implying_mentions(name: str, ontology: dict[str, SkillEntry], text: str) -> str:
+    """The text with every mention of a skill that implies `name` blanked out, so a skill named only
+    inside another's name ("SQL" in "PL/SQL") isn't taken as its own mention. Blanks keep each
+    line's length and the line breaks, so line numbers still point at the original text."""
+    for other, entry in ontology.items():
+        if name in entry.implies:
+            for term in (*entry.aliases, other):
+                text = mention_pattern(term).sub(lambda m: " " * len(m.group()), text)
+    return text
+
+
+def implied_evidence(name: str, ontology: dict[str, SkillEntry], resume_text: str) -> tuple[str, int] | None:
+    """The resume's strongest evidence for `name` through a skill that implies it, as (that skill,
+    the first line naming it).
+
+    Only a clear mention counts: an ambiguous one ("Go" that may be the verb) can't stand in for
+    another skill. The implying skill the resume names on the most lines wins (15 years of PL/SQL
+    over one FastAPI project), then the earliest line, then the name, so the result is deterministic.
+    """
+    lines = resume_text.splitlines()
+    best: tuple[int, int, str] | None = None  # (-lines naming it, first line, skill) sorts best first
+    for other, entry in ontology.items():
+        if name not in entry.implies:
+            continue
+        found = [i for i, line in enumerate(lines, start=1) if detect(other, entry, line) == "found"]
+        if found and (best is None or (-len(found), found[0], other) < best):
+            best = (-len(found), found[0], other)
+    return None if best is None else (best[2], best[1])
 
 
 def build_facts(
