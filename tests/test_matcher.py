@@ -145,6 +145,10 @@ def test_requirement_section_classifies_every_recognised_heading(line, expected)
     ("Base Pay Range: $ 160,000 - $ 200,000", True), ("Your journey at A&M", True),
     ("Compensation Range: $93,000 - $189,000 Annual Salary", True),
     ("About the Role:", False), ("Cybersecurity experience", False), ("Requirements", False),
+    # requirement bullets about pay must never stop counting (Copilot review on #15)
+    ("- Compensation analysis experience", False), ("- Salary benchmarking experience", False),
+    ("Salary benchmarking experience", False), ("- Your journey at A&M", False),
+    ("* Base Pay Range: $ 160,000 - $ 200,000", True), ("Compensation", True),
 ])
 def test_stop_section_marks_headings_with_no_requirements(line, expected):
     from careerfit.analyze.matcher import stop_section
@@ -157,3 +161,9 @@ def test_benefits_section_is_not_read_as_requirements():
     jd = "Requirements:\n- Python\nOur Benefits\n- Cybersecurity Protection\nNice to have:\n- Kafka"
     levels = requirement_levels(jd, {"python": entry, "cybersecurity": entry, "kafka": entry})
     assert levels == {"python": "must", "kafka": "nice"}
+
+
+def test_a_requirement_about_pay_does_not_stop_counting():
+    entry = SkillEntry(aliases=(), ambiguous=False)
+    jd = "Requirements:\n- Compensation analysis experience\n- Salary benchmarking\n- Python"
+    assert requirement_levels(jd, {"python": entry}) == {"python": "must"}

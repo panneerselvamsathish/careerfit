@@ -40,7 +40,9 @@ function el(tag, text, className) {
 
 function cite(evidence) {
   if (!evidence) return "—";
-  return `${evidence.locator}: "${evidence.excerpt}"`;
+  // Same wording as the Markdown report: say when a skill is shown through another one.
+  const through = evidence.source === "derived" ? ` (shown through ${evidence.via})` : "";
+  return `${evidence.locator}${through}: "${evidence.excerpt}"`;
 }
 
 function table(observations, perspective) {

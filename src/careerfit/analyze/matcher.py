@@ -50,13 +50,18 @@ SECTION_HEADING = re.compile(
 NICE_SECTION = re.compile(r"preferred|desired|bonus|nice[- ]to[- ]have|sets? you apart", re.IGNORECASE)
 # Headings of sections that come after the requirements and never hold any (benefits, equal
 # opportunity, pay). A skill named there ("Cybersecurity Protection" as a benefit) is not a
-# requirement, so counting stops until the next requirements heading.
+# requirement, so counting stops until the next requirements heading. These must never swallow a
+# requirement such as "- Compensation analysis experience", so:
+#  - exact headings, and pay lines that carry an amount, may sit behind a bullet ("* Our Benefits");
+#  - open-ended forms ("Your journey at A&M") count only as a short line that isn't a bullet.
 STOP_HEADING = re.compile(
     r"(our )?benefits?(( and | ?& ?|/)perks)?|perks|what we offer( you)?"
-    r"|equal (employment )?opportunity.*|disclaimer|salary.*|compensation.*|base (pay|salary) range.*"
-    r"|your journey (at|with) .+|why (join|work (at|with)) .+",
+    r"|equal (employment )?opportunity( employer)?|disclaimer|salary|compensation|pay"
+    r"|((base |annual )?(pay|salary|compensation)( range)?|salary range)\b.*[$€£]\s?\d.*",
     re.IGNORECASE,
 )
+OPEN_STOP_HEADING = re.compile(r"(your journey|life) (at|with) .+|why (join|work (at|with)) .+", re.IGNORECASE)
+OPEN_STOP_MAX_WORDS = 6
 _LEADING_BULLET = re.compile(r"^\s*([-•*▪●]|\d+[.)])\s+")
 Level = Literal["must", "nice"]
 
@@ -79,7 +84,12 @@ def requirement_section(line: str) -> Level | None:
 
 def stop_section(line: str) -> bool:
     """True for a heading that opens a section with no requirements in it (benefits, EEO, pay)."""
-    return STOP_HEADING.fullmatch(_heading_form(line)) is not None
+    form = _heading_form(line)
+    if STOP_HEADING.fullmatch(form):
+        return True
+    bulleted = _LEADING_BULLET.match(line) is not None
+    return (not bulleted and len(form.split()) <= OPEN_STOP_MAX_WORDS
+            and OPEN_STOP_HEADING.fullmatch(form) is not None)
 
 
 def heading_level(line: str) -> Level | None:

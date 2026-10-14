@@ -2,6 +2,9 @@
 # ambiguous: true when the word's non-skill meaning is common in resumes/JDs
 # (e.g. "go live", "a swift turnaround"), so a keyword match alone can't be trusted.
 # aliases must never be ambiguous; an ambiguous spelling doesn't belong in aliases.
+# implies: broader skills this one shows by definition ("pl/sql" is SQL and back-end development).
+# A resume that names it clearly then matches a JD asking for the broader skill, cited to that line.
+# Only strict "X is a kind of Y" facts; never "people who know X usually know Y".
 
 python:
   aliases: ["python3"]
@@ -26,6 +29,7 @@ javascript:
 django:
   aliases: []
   ambiguous: false
+  implies: [python, backend development]
 
 go:
   aliases: ["golang"]
@@ -50,6 +54,7 @@ terraform:
 postgresql:
   aliases: ["postgres"]
   ambiguous: false
+  implies: [sql]
 
 sql:
   aliases: []
@@ -582,3 +587,37 @@ ai-assisted development:
 banking:
   aliases: ["banking industry", "retail banking", "commercial banking", "investment banking", "banking domain"]
   ambiguous: true
+
+# ---- Added 2026-10-14 from the resume side (README rule 4): the Oracle stack a JD may name,
+# which the skill list could not see. Bare "oracle" is not an alias: it is also the company. ----
+pl/sql:
+  aliases: ["plsql"]
+  ambiguous: false
+  implies: [sql, backend development]
+
+oracle database:
+  aliases: ["oracle db", "oracle rdbms", "oracle 11g", "oracle 12c", "oracle 19c", "oracle 21c", "oracle 23ai"]
+  ambiguous: false
+  implies: [sql]
+
+informix:
+  aliases: ["ibm informix"]
+  ambiguous: false
+  implies: [sql]
+
+fastapi:
+  aliases: ["fast api"]
+  ambiguous: false
+  implies: [python, backend development]
+
+jaspersoft:
+  aliases: ["jasperreports", "jasper reports"]
+  ambiguous: false
+
+oracle forms:
+  aliases: ["oracle forms and reports"]
+  ambiguous: false
+
+weblogic:
+  aliases: ["oracle weblogic", "weblogic server"]
+  ambiguous: false

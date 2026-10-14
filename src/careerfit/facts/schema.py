@@ -20,6 +20,15 @@ class Provenance(BaseModel):
     locator: str
     excerpt: str  # the cited text itself, so a reader can check the claim without the source file
     retrieved_at: datetime
+    via: str | None = None  # source="derived": the skill named on the cited line that implies this one
+
+    @model_validator(mode="after")
+    def check_via(self) -> "Provenance":
+        if self.source == "derived" and not self.via:
+            raise ValueError("derived evidence must name the skill it was derived from (via)")
+        if self.source != "derived" and self.via is not None:
+            raise ValueError("only derived evidence has a via skill")
+        return self
 
 class SkillObservation(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -98,7 +107,7 @@ class GapAnalysisFacts(BaseModel):
     jd_coverage: Coverage
     analyzed_at: datetime
     llm_used: bool
-    schema_version: str = "0.4.0"
+    schema_version: str = "0.5.0"  # 0.5.0: Provenance.via for skills shown through another skill
     fit_score: FitScore | None = None
     judge: JudgeRun | None = None
     skill_observations: tuple[SkillObservation, ...]

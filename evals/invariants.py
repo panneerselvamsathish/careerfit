@@ -62,7 +62,16 @@ def check_evidence(
         for label, evidence, text in sources:
             if evidence is None:
                 continue
-            problem = _evidence_problem(o.skill, entry, evidence, text)
+            if evidence.source == "derived":
+                # Shown through another skill: the cited line must name that skill, and the skill
+                # list must really say it implies this one.
+                via = ontology.get(evidence.via or "")
+                if via is None or o.skill not in via.implies:
+                    bad.append(f"{o.skill}: {label} evidence via {evidence.via!r}, which does not imply it")
+                    continue
+                problem = _evidence_problem(evidence.via or "", via, evidence, text)
+            else:
+                problem = _evidence_problem(o.skill, entry, evidence, text)
             if problem:
                 bad.append(f"{o.skill}: {label} evidence {evidence.locator!r} {problem}")
     return bad

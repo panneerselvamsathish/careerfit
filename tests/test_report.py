@@ -192,3 +192,11 @@ def test_cli_writes_the_report(tmp_path, capsys):
     assert main(["--resume", str(FIXTURES / "resume.txt"), "--jd", str(FIXTURES / "jd.txt"), "--report", str(out)]) == 0
     assert out.read_text(encoding="utf-8").startswith("# Your fit for this job")
     assert f"Wrote {out}:" in capsys.readouterr().err
+
+
+def test_derived_evidence_says_which_skill_shows_it():
+    from careerfit.facts.schema import Provenance
+    from careerfit.report.shared import cite
+    evidence = Provenance(source="derived", via="pl/sql", locator="line 13", excerpt="Wrote PL/SQL packages",
+                          retrieved_at=AT)
+    assert cite(evidence) == 'line 13 (shown through pl/sql): "Wrote PL/SQL packages"'
