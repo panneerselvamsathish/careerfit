@@ -94,6 +94,25 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     ("ecs", "Containers on Amazon ECS with Fargate", "found"),
     ("adr", "Settled ADR and equity trades", "unclear"),
     ("adr", "Wrote architecture decision records for each change", "found"),
+    # added 2026-10-14 from four more real JDs
+    ("azure", "Deep experience designing and deploying enterprise solutions within Microsoft Azure", "found"),
+    ("banking", "We are banking on a fast launch", "unclear"),
+    ("banking", "Banking industry experience, including regulation and risk", "found"),
+    ("agile", "Thrives in an agile, fast-moving team", "unclear"),
+    ("agile", "Delivered with agile methodology across three teams", "found"),
+    ("waterfall", "Modelled the fund's distribution waterfall", "unclear"),
+    ("waterfall", "Ability to apply architecture principles to Agile and Waterfall delivery", "found"),
+    ("proof of concept", "Point of contact (POC) for vendor escalations", "absent"),
+    ("proof of concept", "Took the assistant from proof of concept to production", "found"),
+    ("sso", "Single sign-on through Okta", "found"),
+    ("oauth", "SSO, SAML, OAuth/OIDC, role-based access controls", "found"),
+    ("openid connect", "SSO, SAML, OAuth/OIDC, role-based access controls", "found"),
+    ("data center", "Prior experience in Data Center operations", "found"),
+    ("frontend development", "across front-end, back-end, and cloud environments", "found"),
+    ("frontend development", "at the front end of the sales funnel", "absent"),
+    ("solution architecture", "5+ years of experience working as Solution Architect", "found"),
+    ("aiops", "Familiarity with cybersecurity practices and AI-driven operations", "found"),
+    ("ai-assisted development", "get them up and running on our AI-assisted development platform", "found"),
 ])
 def test_new_skills_detect_as_intended(skill, text, expected):
     from careerfit.analyze.matcher import detect

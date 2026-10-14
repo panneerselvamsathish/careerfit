@@ -9,6 +9,7 @@ labelled_by: sathish
 labelled_at: 2026-10-10
 
 expected:
+  backend development: {status: matched, requirement: must}   # job title in both documents; label added 2026-10-14 when the skill was added, for sathish to review
   python:     {status: matched,      requirement: must}
   aws:        {status: matched,      requirement: must}
   kubernetes: {status: gap,          requirement: must}

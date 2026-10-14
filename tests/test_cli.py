@@ -15,6 +15,7 @@ EXPECTED = {
     "go": (SkillStatus.UNRESOLVABLE, "nice"),
     "kafka": (SkillStatus.GAP, "nice"),
     "react": (SkillStatus.UNRESOLVABLE, "nice"),
+    "backend development": (SkillStatus.MATCHED, "must"),  # "Backend Engineer" title in both documents
 }
 
 

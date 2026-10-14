@@ -130,7 +130,30 @@ def test_requirement_occurrences_lists_every_mention_in_order():
     ("Nice to haves:", "nice"), ("Bonus points", "nice"), ("What You Will Set You Apart", "nice"),
     ("Nice to have Kubernetes experience", None), ("About the Role:", None), ("Cloud:", None),
     ("Python experience", None),
+    # forms seen in real postings (2026-10-14)
+    ("What will you do:", "must"), ("What will make you successful:", "must"), ("You Will:", "must"),
+    ("* You Have:", "must"), ("How You Will Contribute", "must"), ("Primary Responsibilities", "must"),
+    ("You will build services", None),
 ])
 def test_requirement_section_classifies_every_recognised_heading(line, expected):
     from careerfit.analyze.matcher import requirement_section
     assert requirement_section(line) == expected
+
+
+@pytest.mark.parametrize("line, expected", [
+    ("Our Benefits", True), ("Benefits and Perks", True), ("* Equal Opportunity Employer", True),
+    ("Base Pay Range: $ 160,000 - $ 200,000", True), ("Your journey at A&M", True),
+    ("Compensation Range: $93,000 - $189,000 Annual Salary", True),
+    ("About the Role:", False), ("Cybersecurity experience", False), ("Requirements", False),
+])
+def test_stop_section_marks_headings_with_no_requirements(line, expected):
+    from careerfit.analyze.matcher import stop_section
+    assert stop_section(line) is expected
+
+
+def test_benefits_section_is_not_read_as_requirements():
+    from careerfit.analyze.matcher import requirement_levels
+    entry = SkillEntry(aliases=(), ambiguous=False)
+    jd = "Requirements:\n- Python\nOur Benefits\n- Cybersecurity Protection\nNice to have:\n- Kafka"
+    levels = requirement_levels(jd, {"python": entry, "cybersecurity": entry, "kafka": entry})
+    assert levels == {"python": "must", "kafka": "nice"}

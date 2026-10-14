@@ -43,7 +43,7 @@ def test_keyword_report_cites_both_documents_and_suggests_deep():
     assert '| kubernetes | Gap | line 9: "- Running Kubernetes in production" | — |' in report
     assert "Run with --deep to have Claude settle them." in report
     assert "## Learning plan" not in report
-    assert "7 of 7 decided skills were settled by keyword matching" in report
+    assert "8 of 8 decided skills were settled by keyword matching" in report
 
 
 def test_every_report_says_unlisted_skills_were_not_checked():

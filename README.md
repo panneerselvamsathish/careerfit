@@ -66,7 +66,7 @@ uv run careerfit --resume fixtures/resume.txt --jd fixtures/jd.txt -o facts.json
 Step 4 prints a one-line summary and writes the full result to `facts.json`:
 
 ```text
-Wrote facts.json: 9 JD skills (3 gap, 4 matched, 2 unresolvable)
+Wrote facts.json: 10 JD skills (3 gap, 5 matched, 2 unresolvable)
 ```
 
 To try your own files, pass any `.pdf` or `.txt` resume and job description. Leave out `-o`
