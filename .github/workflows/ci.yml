@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# Read-only by default; only the deploy job asks for more, and only what it needs.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -17,3 +21,52 @@ jobs:
         run: uv run pytest
       - name: Evals (golden cases + honesty invariants)
         run: uv run python -m evals.harness
+
+  # Continuous deployment of the free keyword tier to AWS Lambda (Milestone 9).
+  # Runs only after the tests and evals pass, only for a push to main, and only once the
+  # repository variable AWS_DEPLOY_ROLE_ARN exists (see "Continuous deployment" in the README),
+  # so pull requests and an unconnected repo never try to deploy.
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ROLE_ARN != ''
+    # The function runs on arm64, so build the image natively on an arm64 runner.
+    runs-on: ubuntu-24.04-arm
+    # One deploy at a time; a newer push waits instead of racing an older one.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write  # lets the job ask GitHub for an OIDC token; AWS trades it for the role
+    env:
+      STACK: ${{ vars.CAREERFIT_STACK || 'careerfit' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install the SAM CLI
+        run: |
+          uv tool install aws-sam-cli
+          uv tool dir --bin >> "$GITHUB_PATH"
+      - name: Sign in to AWS with OIDC (no stored keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Build the image
+        run: sam build
+      - name: Deploy
+        env:
+          BUDGET_EMAIL: ${{ vars.BUDGET_EMAIL }}
+        run: |
+          # Pass the budget email on every deploy: a parameter left out falls back to the
+          # template default (empty), and CloudFormation would delete the budget alarm.
+          overrides=()
+          if [ -n "$BUDGET_EMAIL" ]; then overrides=(--parameter-overrides "BudgetEmail=$BUDGET_EMAIL"); fi
+          sam deploy --stack-name "$STACK" --resolve-image-repos --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset --no-fail-on-empty-changeset "${overrides[@]}"
+      - name: Smoke test the live URL
+        run: |
+          url=$(aws cloudformation describe-stacks --stack-name "$STACK" \
+            --query "Stacks[0].Outputs[?OutputKey=='Url'].OutputValue" --output text)
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --retry-all-errors "${url}healthz"
+          echo "Live: ${url}" >> "$GITHUB_STEP_SUMMARY"

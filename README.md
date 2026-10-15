@@ -40,7 +40,7 @@ not conventions, not comments. A build constraint.
 - [x] Milestone 6: Judge — Anthropic API with structured output, versioned prompt YAML files
 - [x] Milestone 7: Report + CLI — Markdown reports for two perspectives, every claim quoted, blind spots disclosed
 - [x] Milestone 8: Web API + UI — FastAPI file upload, vanilla JS client, strict CSP
-- [ ] Milestone 9: Deploy — public-safe server limits, container image, CI deploy, live URL (free keyword tier)
+- [ ] Milestone 9: Deploy — public-safe server limits, container image, CI deploy, live URL (free keyword tier) · *server limits, image and CI deploy done; the live URL follows the one-time AWS setup below*
 - [ ] Milestone 10: Paid tier — accounts, usage metering and rate limits, Stripe, `--deep` on the web
 
 ## Getting started
@@ -278,6 +278,35 @@ sam delete                                  # removes everything the stack creat
 `POST /api/analyze` takes `multipart/form-data` with `resume` (file), either `jd` (file) or
 `jd_text`, and `perspective` (`candidate` or `hiring_manager`), and returns `facts`,
 `blind_spots` (plain text) and `report_markdown`. Bad input gets a 4xx with a readable `detail`.
+
+### Continuous deployment (GitHub Actions + OIDC)
+
+Every push to `main` deploys, but only after the tests and evals pass: the `deploy` job in
+`.github/workflows/ci.yml` builds the arm64 image, runs `sam deploy`, then checks `/healthz` on the
+live URL and prints the URL in the run summary. GitHub signs in to AWS with **OpenID Connect**, so
+no AWS key is stored anywhere. Until it is connected, the job is skipped and CI stays green.
+
+One-time setup, in your **personal** AWS account:
+
+1. **First deploy by hand**, so the stack exists: `sam build && sam deploy --guided --resolve-image-repos`
+   with the stack name `careerfit`.
+2. **Create the deploy role** (`infra/github-deploy-role.yaml`):
+   ```bash
+   aws cloudformation deploy --template-file infra/github-deploy-role.yaml \
+     --stack-name careerfit-github-deploy --capabilities CAPABILITY_IAM --profile <personal>
+   ```
+   The role can be assumed only by workflows on `main` of this repository (an exact match on the
+   token's `sub` claim, no wildcard), and it can only manage resources named after the `careerfit`
+   stack. Add `--parameter-overrides CreateOidcProvider=false` if the account already has a
+   GitHub OIDC provider.
+3. **Add repository variables** (Settings → Secrets and variables → Actions → *Variables*):
+   `AWS_DEPLOY_ROLE_ARN` (the stack's `RoleArn` output), `AWS_REGION`, and `BUDGET_EMAIL` if you
+   set one in step 1. Leaving it out of a later deploy would delete the budget alarm.
+   `CAREERFIT_STACK` is only needed if the stack isn't called `careerfit`.
+
+`tests/test_deploy_config.py` keeps this safe: it fails the build if the deploy could run before
+the tests or outside `main`, if any AWS key appears in the workflow, if the trust policy gains a
+wildcard, or if a permission reaches beyond careerfit's own resources.
 
 ## Tech stack
 
