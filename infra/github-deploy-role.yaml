@@ -52,9 +52,17 @@ Resources:
       RepositoryName: !Sub ${AppStackName}-web
       ImageScanningConfiguration:
         ScanOnPush: true
+      # CI moves the "live" tag to each image Lambda runs, so tags must stay movable.
+      ImageTagMutability: MUTABLE
+      # Rule 1 never expires anything (only one image can carry "live"), but it claims the running
+      # image: ECR never lets a lower-priority rule expire an image a higher one matched. So failed
+      # deploys pushing newer images can't push the running one out of the 5 that rule 2 keeps.
       LifecyclePolicy:
         LifecyclePolicyText: >
-          {"rules": [{"rulePriority": 1, "description": "Keep the 5 newest images",
+          {"rules": [{"rulePriority": 1, "description": "Never expire the image Lambda runs",
+          "selection": {"tagStatus": "tagged", "tagPrefixList": ["live"],
+          "countType": "imageCountMoreThan", "countNumber": 1}, "action": {"type": "expire"}},
+          {"rulePriority": 2, "description": "Keep the 5 newest of the rest",
           "selection": {"tagStatus": "any", "countType": "imageCountMoreThan", "countNumber": 5},
           "action": {"type": "expire"}}]}
       RepositoryPolicyText:
@@ -184,6 +192,8 @@ Resources:
                   - lambda:ListTags
                 Resource: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppStackName}-web
               # Changes to the execution role are allowed only while it carries the boundary above.
+              # PutRolePermissionsBoundary can only attach that same boundary (AWS's delegation
+              # pattern), so a stack created before the boundary existed picks it up on its next deploy.
               - Sid: ExecutionRoleChangesOnlyWithTheBoundary
                 Effect: Allow
                 Action:
@@ -192,6 +202,7 @@ Resources:
                   - iam:DetachRolePolicy
                   - iam:PutRolePolicy
                   - iam:DeleteRolePolicy
+                  - iam:PutRolePermissionsBoundary
                 Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/${AppStackName}-WebFunctionRole-*
                 Condition:
                   StringEquals:
@@ -241,12 +252,21 @@ Resources:
                 Resource:
                   - !Sub arn:aws:iam::${AWS::AccountId}:role/github-actions-${AppStackName}-deploy
                   - !Ref ExecutionRoleBoundary
-              - Sid: NeverRemoveOrSwapABoundary
+              - Sid: NeverRemoveABoundary
+                Effect: Deny
+                Action: iam:DeleteRolePermissionsBoundary
+                Resource: "*"
+              # StringNotEquals also matches a request with no boundary at all, so this denies
+              # creating any role without the boundary and attaching any other boundary.
+              - Sid: NeverCreateARoleOrSetABoundaryExceptWithTheBoundary
                 Effect: Deny
                 Action:
-                  - iam:DeleteRolePermissionsBoundary
+                  - iam:CreateRole
                   - iam:PutRolePermissionsBoundary
                 Resource: "*"
+                Condition:
+                  StringNotEquals:
+                    iam:PermissionsBoundary: !Ref ExecutionRoleBoundary
 
 Outputs:
   RoleArn:

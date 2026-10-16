@@ -42,19 +42,39 @@ jobs:
       STACK: ${{ vars.CAREERFIT_STACK || 'careerfit' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      # Deploys queue one at a time, but not in commit order: an older run whose tests finished late,
+      # or a re-run of an old workflow, would roll production back. Only the head of main deploys;
+      # every later step checks this, so a superseded commit never even signs in to AWS.
+      - name: Check this commit is still the head of main
+        id: head
+        run: |
+          head=$(git ls-remote --exit-code origin refs/heads/main)
+          head=${head%%[[:space:]]*}
+          if [ "$head" = "$GITHUB_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "Skipped: main has moved on to ${head}, so ${GITHUB_SHA} must not deploy." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Install uv
+        if: steps.head.outputs.current == 'true'
+        uses: astral-sh/setup-uv@v6
       - name: Install the SAM CLI
+        if: steps.head.outputs.current == 'true'
         run: |
           uv tool install aws-sam-cli
           uv tool dir --bin >> "$GITHUB_PATH"
       - name: Sign in to AWS with OIDC (no stored keys)
+        if: steps.head.outputs.current == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
       - name: Build the image
+        if: steps.head.outputs.current == 'true'
         run: sam build
       - name: Deploy
+        if: steps.head.outputs.current == 'true'
         env:
           BUDGET_EMAIL: ${{ vars.BUDGET_EMAIL }}
         run: |
@@ -68,7 +88,31 @@ jobs:
           if [ -n "$BUDGET_EMAIL" ]; then overrides=(--parameter-overrides "BudgetEmail=$BUDGET_EMAIL"); fi
           sam deploy --stack-name "$STACK" --image-repository "$repository" --capabilities CAPABILITY_IAM \
             --no-confirm-changeset --no-fail-on-empty-changeset "${overrides[@]}"
+      # Image cleanup keeps the 5 newest images plus the one tagged "live" (infra/github-deploy-role.yaml).
+      # Tag the image Lambda now runs, so pushes from failed deploys can never expire it: Lambda pulls
+      # the image again when an idle function wakes up, and a deleted image would leave it broken.
+      - name: Tag the running image as live
+        if: steps.head.outputs.current == 'true'
+        run: |
+          repository="${STACK}-web"
+          running=$(aws lambda get-function --function-name "${STACK}-web" \
+            --query Code.ResolvedImageUri --output text)
+          digest=${running##*@}
+          manifest=$(aws ecr batch-get-image --repository-name "$repository" --image-ids imageDigest="$digest" \
+            --query 'images[0].imageManifest' --output text)
+          media_type=$(aws ecr batch-get-image --repository-name "$repository" --image-ids imageDigest="$digest" \
+            --query 'images[0].imageManifestMediaType' --output text)
+          # --image-digest makes ECR refuse a manifest that doesn't hash to the running image.
+          # ImageAlreadyExistsException means "live" is already on it (a deploy with no changes).
+          if ! out=$(aws ecr put-image --repository-name "$repository" --image-tag live --image-digest "$digest" \
+              --image-manifest "$manifest" --image-manifest-media-type "$media_type" 2>&1); then
+            case "$out" in
+              *ImageAlreadyExistsException*) ;;
+              *) echo "$out" >&2; exit 1 ;;
+            esac
+          fi
       - name: Smoke test the live URL
+        if: steps.head.outputs.current == 'true'
         run: |
           url=$(aws cloudformation describe-stacks --stack-name "$STACK" \
             --query "Stacks[0].Outputs[?OutputKey=='Url'].OutputValue" --output text)

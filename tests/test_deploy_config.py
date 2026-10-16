@@ -5,6 +5,7 @@ deploy that runs before the tests, or a permission wide enough for CI to grant i
 those is a failing build here.
 """
 
+import json
 from pathlib import Path
 
 import yaml
@@ -89,6 +90,26 @@ def test_deploy_pushes_to_the_bootstrap_repository_not_a_companion_stack():
     assert "--resolve-s3" not in text
 
 
+def test_only_the_head_of_main_deploys():
+    """Deploys queue in arrival order, not commit order: a late or re-run older commit must not roll back."""
+    steps = workflow()["jobs"]["deploy"]["steps"]
+    check = next(i for i, s in enumerate(steps) if s.get("id") == "head")
+    assert "git ls-remote --exit-code origin refs/heads/main" in steps[check]["run"]
+    assert '"$head" = "$GITHUB_SHA"' in steps[check]["run"]
+    assert steps[:check] == [{"uses": "actions/checkout@v4"}]  # nothing touches AWS before the check
+    for step in steps[check + 1:]:
+        assert step.get("if") == "steps.head.outputs.current == 'true'", step["name"]
+
+
+def test_the_running_image_is_tagged_live_after_each_deploy():
+    steps = workflow()["jobs"]["deploy"]["steps"]
+    names = [s["name"] for s in steps if "name" in s]
+    assert names.index("Tag the running image as live") == names.index("Deploy") + 1
+    tag = steps[[s.get("name") for s in steps].index("Tag the running image as live")]["run"]
+    assert "Code.ResolvedImageUri" in tag  # the digest Lambda runs, not whatever was pushed last
+    assert "--image-tag live --image-digest \"$digest\"" in tag
+
+
 # ---- the bootstrap's trust and identity ----
 
 def test_trust_policy_admits_one_repo_on_one_branch_with_no_wildcards():
@@ -130,20 +151,26 @@ def test_iam_changes_are_allowed_only_while_the_boundary_is_attached():
         changes = IAM_CHANGES & set(_as_list(statement["Action"]))
         if not changes:
             continue
+        # PutRolePermissionsBoundary is allowed only to attach this same boundary (AWS's delegation pattern)
         assert changes <= {"iam:CreateRole", "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:PutRolePolicy",
-                           "iam:DeleteRolePolicy"}, statement["Sid"]
+                           "iam:DeleteRolePolicy", "iam:PutRolePermissionsBoundary"}, statement["Sid"]
         assert statement["Condition"]["StringEquals"]["iam:PermissionsBoundary"] == "ExecutionRoleBoundary"
         assert statement["Resource"].endswith("role/${AppStackName}-WebFunctionRole-*")
 
 
 def test_explicit_denies_protect_the_deploy_role_and_the_boundary():
     denies = [s for s in deploy_statements() if s["Effect"] == "Deny"]
+    assert len(denies) == 3
     self_protection = next(s for s in denies if s["Action"] == "iam:*")
     assert set(self_protection["Resource"]) == {
         "arn:aws:iam::${AWS::AccountId}:role/github-actions-${AppStackName}-deploy", "ExecutionRoleBoundary"}
-    boundary_lock = next(s for s in denies if s["Action"] != "iam:*")
-    assert set(boundary_lock["Action"]) == {"iam:DeleteRolePermissionsBoundary", "iam:PutRolePermissionsBoundary"}
-    assert boundary_lock["Resource"] == "*"
+    never_remove = next(s for s in denies if s["Action"] == "iam:DeleteRolePermissionsBoundary")
+    assert never_remove["Resource"] == "*" and "Condition" not in never_remove
+    only_this_boundary = next(s for s in denies if isinstance(s["Action"], list))
+    assert set(only_this_boundary["Action"]) == {"iam:CreateRole", "iam:PutRolePermissionsBoundary"}
+    assert only_this_boundary["Resource"] == "*"
+    # StringNotEquals also matches a request with no boundary, so a boundary-less role is denied too
+    assert only_this_boundary["Condition"] == {"StringNotEquals": {"iam:PermissionsBoundary": "ExecutionRoleBoundary"}}
 
 
 # ---- the boundary, the image repository and the app template ----
@@ -153,6 +180,18 @@ def test_the_boundary_allows_only_writing_the_functions_own_logs():
     allowed = {a for s in statements for a in _as_list(s["Action"])}
     assert allowed == {"logs:CreateLogStream", "logs:PutLogEvents"}
     assert all("/aws/lambda/${AppStackName}-web" in s["Resource"] for s in statements)
+
+
+def test_cleanup_never_expires_the_running_image():
+    repository = bootstrap()["Resources"]["ImageRepository"]["Properties"]
+    assert repository["ImageTagMutability"] == "MUTABLE"  # CI moves "live" to each deployed image
+    rules = sorted(json.loads(repository["LifecyclePolicy"]["LifecyclePolicyText"])["rules"],
+                   key=lambda r: r["rulePriority"])
+    # the image tagged "live" is claimed first; ECR never lets a lower-priority rule expire it
+    assert rules[0]["selection"]["tagStatus"] == "tagged"
+    assert rules[0]["selection"]["tagPrefixList"] == ["live"]
+    assert rules[0]["selection"]["countNumber"] >= 1
+    assert all(r["selection"]["tagStatus"] != "any" for r in rules[:-1]), "a tagStatus any rule must come last"
 
 
 def test_only_careerfits_function_may_pull_the_image():

@@ -287,6 +287,14 @@ Every push to `main` deploys, but only after the tests and evals pass: the `depl
 live URL and prints the URL in the run summary. GitHub signs in to AWS with **OpenID Connect**, so
 no AWS key is stored anywhere. Until it is connected, the job is skipped and CI stays green.
 
+- **No rollbacks:** deploys run one at a time, and each one first checks that its commit is still
+  the head of `main`. An older run whose tests finished late, or a re-run of an old workflow, is
+  skipped instead of putting old code back.
+- **The running image is never cleaned up:** the image repository keeps the 5 newest images, plus
+  the one tagged `live`. After each deploy, CI moves `live` to the image Lambda now runs, so failed
+  deploys can't push it out. (Lambda pulls the image again when an idle function wakes up.) A
+  manual `sam deploy` doesn't move the tag; the next CI deploy does.
+
 One-time setup, in your **personal** AWS account:
 
 1. **Deploy the bootstrap stack** (`infra/github-deploy-role.yaml`):
@@ -313,15 +321,19 @@ What the CI role can and cannot do:
   group and budget, and the function's execution role. The bootstrap stack is never in scope.
 - **No escalation:** it can create or change the execution role only while the permissions
   boundary is attached, and the boundary allows nothing but writing the function's own logs.
-  Explicit denies stop it from touching its own role or the boundary, or removing any boundary.
+  Explicit denies stop it from touching its own role or the boundary, removing any boundary,
+  setting any other boundary, or creating a role without one.
+- **Older app stacks:** a stack created before the boundary existed needs no manual step. CI may
+  attach this one boundary (and no other), so the next deploy adds it to the execution role.
 
 `tests/test_deploy_config.py` keeps this safe. The build fails if:
-- the deploy could run before the tests, or outside `main`
+- the deploy could run before the tests, outside `main`, or for a commit that is no longer the head of `main`
 - an AWS key appears in the workflow, or the trust policy gains a wildcard
 - a permission reaches beyond careerfit's own resources, or a stack wildcard brings the bootstrap stack into scope
 - the CI role's name falls inside the app's resource names
 - an IAM change is allowed without the boundary, or the self-protecting denies go missing
 - the boundary allows more than writing the function's own logs
+- image cleanup could expire the image tagged `live`, or a deploy stops moving that tag
 
 ## Tech stack
 
