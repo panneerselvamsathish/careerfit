@@ -201,6 +201,24 @@ def test_explicit_denies_protect_the_deploy_role_and_the_boundary():
     assert only_this_boundary["Condition"] == {"StringNotEquals": {"iam:PermissionsBoundary": "ExecutionRoleBoundary"}}
 
 
+# ---- the image ----
+
+def _final_stage() -> list[tuple[str, str]]:
+    lines = (ROOT / "Dockerfile").read_text(encoding="utf-8").replace("\\\n", " ").splitlines()
+    instructions = [tuple(line.split(None, 1)) for line in lines if line.strip() and not line.lstrip().startswith("#")]
+    last_from = max(i for i, (op, *_) in enumerate(instructions) if op == "FROM")
+    return [(op, rest) for op, rest in instructions[last_from:]]
+
+
+def test_the_image_starts_for_any_user_without_path():
+    """Lambda ignores USER and may replace PATH: a home-dir WORKDIR or a bare command fails to start."""
+    stage = _final_stage()
+    workdir = [rest for op, rest in stage if op == "WORKDIR"][-1]
+    assert not workdir.startswith("/home/"), "useradd makes homes mode 700; Lambda's user can't enter them"
+    cmd = json.loads([rest for op, rest in stage if op == "CMD"][-1])
+    assert cmd[0].startswith("/"), "the start command must be an absolute path"
+
+
 # ---- the boundary, the image repository and the app template ----
 
 def test_the_boundary_allows_only_writing_the_functions_own_logs():
