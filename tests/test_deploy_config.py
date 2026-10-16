@@ -90,6 +90,12 @@ def test_deploy_pushes_to_the_bootstrap_repository_not_a_companion_stack():
     assert "--resolve-s3" not in text
 
 
+def test_pending_deploys_queue_instead_of_replacing_each_other():
+    # the default (queue: single) keeps one pending job, so a late older run could replace the newest one
+    assert workflow()["jobs"]["deploy"]["concurrency"] == {
+        "group": "deploy-production", "cancel-in-progress": False, "queue": "max"}
+
+
 def test_only_the_head_of_main_deploys():
     """Deploys queue in arrival order, not commit order: a late or re-run older commit must not roll back."""
     steps = workflow()["jobs"]["deploy"]["steps"]

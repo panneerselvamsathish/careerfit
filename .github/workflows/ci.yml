@@ -31,10 +31,13 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ROLE_ARN != ''
     # The function runs on arm64, so build the image natively on an arm64 runner.
     runs-on: ubuntu-24.04-arm
-    # One deploy at a time; a newer push waits instead of racing an older one.
+    # One deploy at a time; a newer push waits instead of racing an older one. queue: max keeps every
+    # pending deploy (up to 100): the default keeps only one, so an older run whose tests finished
+    # late would replace the newest commit's pending deploy, then skip at the head check below.
     concurrency:
       group: deploy-production
       cancel-in-progress: false
+      queue: max
     permissions:
       contents: read
       id-token: write  # lets the job ask GitHub for an OIDC token; AWS trades it for the role
