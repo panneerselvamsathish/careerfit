@@ -138,6 +138,10 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     ("jaspersoft", "Built JasperReports templates", "found"),
     ("oracle forms", "Oracle Forms/Reports, WebLogic", "found"),
     ("weblogic", "Oracle Forms/Reports, WebLogic", "found"),
+    # DLP spelled out as "leakage" (2026-10-16, found on the live site)
+    ("dlp", "Security: data-leakage prevention, secret scanning", "found"),
+    ("dlp", "Data leakage prevention controls for agent tools", "found"),
+    ("dlp", "Rolled out data loss prevention policies", "found"),
 ])
 def test_new_skills_detect_as_intended(skill, text, expected):
     from careerfit.analyze.matcher import detect
