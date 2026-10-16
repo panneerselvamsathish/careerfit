@@ -26,9 +26,13 @@ COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:1.1.0@sha256:17cfd08eff1df
 # address (or "*" if the container is reachable only through that proxy), or every visitor
 # shares one rate-limit bucket: the proxy's.
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 CAREERFIT_HOST=0.0.0.0 PORT=8000
+# USER applies to docker run. Lambda ignores it and runs the image as its own unprivileged user
+# on a read-only file system (only /tmp is writable), so everything the server needs must work
+# for any user: a root-owned, world-readable working directory, and a start command that
+# doesn't depend on PATH. (The user's home is mode 700: Lambda's user couldn't even enter it.)
 USER careerfit
-WORKDIR /home/careerfit
+WORKDIR /app
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s \
   CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ['PORT'] + '/healthz', timeout=3)"
-CMD ["careerfit-server"]
+CMD ["/app/.venv/bin/careerfit-server"]
