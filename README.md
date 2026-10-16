@@ -253,11 +253,12 @@ public HTTPS address for free. `template.yaml` (AWS SAM) describes the function,
 log retention and an optional $5/month budget alarm.
 
 ```bash
-# needs the AWS CLI signed in to your account, Docker, and the SAM CLI (brew install aws-sam-cli)
+# needs the AWS CLI signed in to your PERSONAL account, Docker, and the SAM CLI (brew install aws-sam-cli)
+# once first: the bootstrap stack (image repository, permissions boundary, CI role); see below
 sam build
-sam deploy --guided --resolve-image-repos   # first time: pick a stack name and region; prints the URL
+sam deploy --guided --image-repository <ImageRepositoryUri>   # stack name careerfit; prints the URL
 sam build && sam deploy                     # later deploys: rebuild, then reuse samconfig.toml
-sam delete                                  # removes everything the stack created
+sam delete                                  # removes everything the app stack created
 ```
 
 - **Architecture: arm64.** The image must be built for the function's architecture; on Apple
@@ -288,25 +289,39 @@ no AWS key is stored anywhere. Until it is connected, the job is skipped and CI 
 
 One-time setup, in your **personal** AWS account:
 
-1. **First deploy by hand**, so the stack exists: `sam build && sam deploy --guided --resolve-image-repos`
-   with the stack name `careerfit`.
-2. **Create the deploy role** (`infra/github-deploy-role.yaml`):
+1. **Deploy the bootstrap stack** (`infra/github-deploy-role.yaml`):
    ```bash
    aws cloudformation deploy --template-file infra/github-deploy-role.yaml \
-     --stack-name careerfit-github-deploy --capabilities CAPABILITY_IAM --profile <personal>
+     --stack-name github-deploy-careerfit --capabilities CAPABILITY_NAMED_IAM --profile <personal>
    ```
-   The role can be assumed only by workflows on `main` of this repository (an exact match on the
-   token's `sub` claim, no wildcard), and it can only manage resources named after the `careerfit`
-   stack. Add `--parameter-overrides CreateOidcProvider=false` if the account already has a
-   GitHub OIDC provider.
-3. **Add repository variables** (Settings → Secrets and variables → Actions → *Variables*):
-   `AWS_DEPLOY_ROLE_ARN` (the stack's `RoleArn` output), `AWS_REGION`, and `BUDGET_EMAIL` if you
-   set one in step 1. Leaving it out of a later deploy would delete the budget alarm.
-   `CAREERFIT_STACK` is only needed if the stack isn't called `careerfit`.
+   It creates the image repository `careerfit-web` (keeps the 5 newest images; only careerfit's
+   function may pull), the **permissions boundary** for the function's execution role, and the CI
+   role `github-actions-careerfit-deploy`. Add `--parameter-overrides CreateOidcProvider=false` if
+   the account already has a GitHub OIDC provider.
+2. **Add repository variables** (Settings → Secrets and variables → Actions → *Variables*):
+   `AWS_DEPLOY_ROLE_ARN` (the stack's `RoleArn` output), `AWS_REGION`, and `BUDGET_EMAIL` for the
+   $5 budget alarm. Leaving it out of a later deploy would delete the alarm. `CAREERFIT_STACK` is
+   only needed if the app stack isn't called `careerfit`.
+3. **Merge to `main`** (or re-run the workflow). The first green run creates the app stack and
+   prints the live URL.
 
-`tests/test_deploy_config.py` keeps this safe: it fails the build if the deploy could run before
-the tests or outside `main`, if any AWS key appears in the workflow, if the trust policy gains a
-wildcard, or if a permission reaches beyond careerfit's own resources.
+What the CI role can and cannot do:
+
+- **Who:** only workflows on `main` of this repository (an exact match on the token's `sub`
+  claim, never a wildcard). Forks, other branches and pull requests are refused.
+- **What:** the app stack `careerfit` by exact name, the image repository, the function, its log
+  group and budget, and the function's execution role. The bootstrap stack is never in scope.
+- **No escalation:** it can create or change the execution role only while the permissions
+  boundary is attached, and the boundary allows nothing but writing the function's own logs.
+  Explicit denies stop it from touching its own role or the boundary, or removing any boundary.
+
+`tests/test_deploy_config.py` keeps this safe. The build fails if:
+- the deploy could run before the tests, or outside `main`
+- an AWS key appears in the workflow, or the trust policy gains a wildcard
+- a permission reaches beyond careerfit's own resources, or a stack wildcard brings the bootstrap stack into scope
+- the CI role's name falls inside the app's resource names
+- an IAM change is allowed without the boundary, or the self-protecting denies go missing
+- the boundary allows more than writing the function's own logs
 
 ## Tech stack
 

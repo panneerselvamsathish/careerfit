@@ -1,7 +1,8 @@
 """The deploy setup's safety properties, checked in code like the architecture boundaries.
 
-A deploy pipeline is easy to loosen by accident (a wildcard in the trust policy, a stored key, a
-deploy that runs before the tests). These tests make each of those a failing build.
+A deploy pipeline is easy to loosen by accident: a wildcard in the trust policy, a stored key, a
+deploy that runs before the tests, or a permission wide enough for CI to grant itself more. Each of
+those is a failing build here.
 """
 
 from pathlib import Path
@@ -11,6 +12,13 @@ import yaml
 ROOT = Path(__file__).parent.parent
 CI = ROOT / ".github" / "workflows" / "ci.yml"
 ROLE = ROOT / "infra" / "github-deploy-role.yaml"
+APP = ROOT / "template.yaml"
+
+IAM_CHANGES = {"iam:CreateRole", "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:PutRolePolicy",
+               "iam:DeleteRolePolicy", "iam:UpdateAssumeRolePolicy", "iam:PutRolePermissionsBoundary",
+               "iam:DeleteRolePermissionsBoundary", "iam:CreatePolicyVersion", "iam:SetDefaultPolicyVersion"}
+UNSCOPED_LOOKUPS = {"cloudformation:ValidateTemplate", "cloudformation:GetTemplateSummary",
+                    "ecr:GetAuthorizationToken", "logs:DescribeLogGroups"}
 
 
 class _CloudFormationLoader(yaml.SafeLoader):
@@ -28,13 +36,27 @@ def _any_tag(loader, _suffix, node):
 _CloudFormationLoader.add_multi_constructor("!", _any_tag)
 
 
+def _cfn(path: Path) -> dict:
+    return yaml.load(path.read_text(encoding="utf-8"), Loader=_CloudFormationLoader)  # noqa: S506 - SafeLoader subclass
+
+
 def workflow() -> dict:
     return yaml.safe_load(CI.read_text(encoding="utf-8"))
 
 
-def role_template() -> dict:
-    return yaml.load(ROLE.read_text(encoding="utf-8"), Loader=_CloudFormationLoader)  # noqa: S506 - SafeLoader subclass
+def bootstrap() -> dict:
+    return _cfn(ROLE)
 
+
+def deploy_statements() -> list[dict]:
+    return bootstrap()["Resources"]["DeployRole"]["Properties"]["Policies"][0]["PolicyDocument"]["Statement"]
+
+
+def _as_list(value) -> list:
+    return value if isinstance(value, list) else [value]
+
+
+# ---- the workflow ----
 
 def test_deploy_runs_only_after_tests_and_only_for_main():
     deploy = workflow()["jobs"]["deploy"]
@@ -60,28 +82,87 @@ def test_no_aws_keys_are_stored_or_read_anywhere():
     assert sign_in["with"]["role-to-assume"] == "${{ vars.AWS_DEPLOY_ROLE_ARN }}"
 
 
+def test_deploy_pushes_to_the_bootstrap_repository_not_a_companion_stack():
+    text = CI.read_text(encoding="utf-8")
+    assert "--image-repository" in text
+    assert "--resolve-image-repos" not in text  # a companion stack needs S3 and UpdateStack rights
+    assert "--resolve-s3" not in text
+
+
+# ---- the bootstrap's trust and identity ----
+
 def test_trust_policy_admits_one_repo_on_one_branch_with_no_wildcards():
-    statement = role_template()["Resources"]["DeployRole"]["Properties"]["AssumeRolePolicyDocument"]["Statement"]
+    statement = bootstrap()["Resources"]["DeployRole"]["Properties"]["AssumeRolePolicyDocument"]["Statement"]
     assert len(statement) == 1
     condition = statement[0]["Condition"]
     assert set(condition) == {"StringEquals"}  # never StringLike: no wildcard can widen it
     assert condition["StringEquals"]["token.actions.githubusercontent.com:aud"] == "sts.amazonaws.com"
     assert condition["StringEquals"]["token.actions.githubusercontent.com:sub"] == \
         "repo:${GitHubRepo}:ref:refs/heads/${Branch}"
-    params = role_template()["Parameters"]
+    params = bootstrap()["Parameters"]
     assert (params["GitHubRepo"]["Default"], params["Branch"]["Default"]) == ("panneerselvamsathish/careerfit", "main")
 
 
-def test_deploy_permissions_are_scoped_to_careerfit_resources():
-    unscoped_ok = {"cloudformation:ValidateTemplate", "cloudformation:GetTemplateSummary",
-                   "ecr:GetAuthorizationToken", "logs:DescribeLogGroups"}
-    policy = role_template()["Resources"]["DeployRole"]["Properties"]["Policies"][0]["PolicyDocument"]
-    for statement in policy["Statement"]:
-        actions = statement["Action"] if isinstance(statement["Action"], list) else [statement["Action"]]
+def test_the_deploy_role_is_named_outside_the_app_resources():
+    name = bootstrap()["Resources"]["DeployRole"]["Properties"]["RoleName"]
+    assert not name.startswith("${AppStackName}-"), "no app-scoped permission may ever match the deploy role"
+
+
+# ---- the deploy role's permissions ----
+
+def test_every_allow_names_careerfit_resources_exactly():
+    for statement in (s for s in deploy_statements() if s["Effect"] == "Allow"):
+        actions = _as_list(statement["Action"])
         assert not any(a == "*" or a.endswith(":*") for a in actions), statement["Sid"]
-        resources = statement["Resource"] if isinstance(statement["Resource"], list) else [statement["Resource"]]
+        resources = _as_list(statement["Resource"])
         if "*" in resources:
-            assert set(actions) <= unscoped_ok, statement["Sid"]
-        else:
-            # every scoped resource is named after the app stack (or is the SAM transform)
-            assert all("${AppStackName}" in r or "transform/Serverless" in r for r in resources), statement["Sid"]
+            assert set(actions) <= UNSCOPED_LOOKUPS, statement["Sid"]
+            continue
+        for resource in resources:
+            # a stack wildcard such as stack/${AppStackName}-* would also cover the bootstrap stack
+            assert ":stack/${AppStackName}-" not in resource, statement["Sid"]
+            assert "${AppStackName}" in resource or resource in ("ImageRepository.Arn",) \
+                or "transform/Serverless" in resource, statement["Sid"]
+
+
+def test_iam_changes_are_allowed_only_while_the_boundary_is_attached():
+    for statement in (s for s in deploy_statements() if s["Effect"] == "Allow"):
+        changes = IAM_CHANGES & set(_as_list(statement["Action"]))
+        if not changes:
+            continue
+        assert changes <= {"iam:CreateRole", "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:PutRolePolicy",
+                           "iam:DeleteRolePolicy"}, statement["Sid"]
+        assert statement["Condition"]["StringEquals"]["iam:PermissionsBoundary"] == "ExecutionRoleBoundary"
+        assert statement["Resource"].endswith("role/${AppStackName}-WebFunctionRole-*")
+
+
+def test_explicit_denies_protect_the_deploy_role_and_the_boundary():
+    denies = [s for s in deploy_statements() if s["Effect"] == "Deny"]
+    self_protection = next(s for s in denies if s["Action"] == "iam:*")
+    assert set(self_protection["Resource"]) == {
+        "arn:aws:iam::${AWS::AccountId}:role/github-actions-${AppStackName}-deploy", "ExecutionRoleBoundary"}
+    boundary_lock = next(s for s in denies if s["Action"] != "iam:*")
+    assert set(boundary_lock["Action"]) == {"iam:DeleteRolePermissionsBoundary", "iam:PutRolePermissionsBoundary"}
+    assert boundary_lock["Resource"] == "*"
+
+
+# ---- the boundary, the image repository and the app template ----
+
+def test_the_boundary_allows_only_writing_the_functions_own_logs():
+    statements = bootstrap()["Resources"]["ExecutionRoleBoundary"]["Properties"]["PolicyDocument"]["Statement"]
+    allowed = {a for s in statements for a in _as_list(s["Action"])}
+    assert allowed == {"logs:CreateLogStream", "logs:PutLogEvents"}
+    assert all("/aws/lambda/${AppStackName}-web" in s["Resource"] for s in statements)
+
+
+def test_only_careerfits_function_may_pull_the_image():
+    policy = bootstrap()["Resources"]["ImageRepository"]["Properties"]["RepositoryPolicyText"]["Statement"]
+    assert len(policy) == 1
+    assert policy[0]["Principal"] == {"Service": "lambda.amazonaws.com"}
+    assert policy[0]["Condition"]["StringLike"]["aws:sourceArn"].endswith("function:${AppStackName}-web")
+
+
+def test_the_function_carries_the_boundary():
+    function = _cfn(APP)["Resources"]["WebFunction"]["Properties"]
+    assert function["PermissionsBoundary"] == \
+        "arn:aws:iam::${AWS::AccountId}:policy/${AWS::StackName}-execution-boundary"

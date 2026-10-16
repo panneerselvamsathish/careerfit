@@ -58,11 +58,15 @@ jobs:
         env:
           BUDGET_EMAIL: ${{ vars.BUDGET_EMAIL }}
         run: |
+          # The image repository comes from the bootstrap stack (infra/github-deploy-role.yaml), so
+          # there is no SAM companion stack and no S3 bucket to manage.
+          account=$(aws sts get-caller-identity --query Account --output text)
+          repository="${account}.dkr.ecr.${AWS_REGION}.amazonaws.com/${STACK}-web"
           # Pass the budget email on every deploy: a parameter left out falls back to the
           # template default (empty), and CloudFormation would delete the budget alarm.
           overrides=()
           if [ -n "$BUDGET_EMAIL" ]; then overrides=(--parameter-overrides "BudgetEmail=$BUDGET_EMAIL"); fi
-          sam deploy --stack-name "$STACK" --resolve-image-repos --capabilities CAPABILITY_IAM \
+          sam deploy --stack-name "$STACK" --image-repository "$repository" --capabilities CAPABILITY_IAM \
             --no-confirm-changeset --no-fail-on-empty-changeset "${overrides[@]}"
       - name: Smoke test the live URL
         run: |
