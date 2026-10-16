@@ -419,7 +419,8 @@ iso 27001:
   ambiguous: false
 
 dlp:
-  aliases: ["data loss prevention"]
+  # "leakage" is the same discipline; resumes write it with a hyphen as often as without
+  aliases: ["data loss prevention", "data leakage prevention", "data-leakage prevention"]
   ambiguous: false
 
 data governance:
