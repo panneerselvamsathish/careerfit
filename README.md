@@ -261,6 +261,9 @@ sam build && sam deploy                     # later deploys: rebuild, then reuse
 sam delete                                  # removes everything the app stack created
 ```
 
+`sam deploy --guided` saves its answers, including the budget email and `--profile`, in
+`samconfig.toml`. The file is gitignored, so the email never reaches the repository.
+
 - **Architecture: arm64.** The image must be built for the function's architecture; on Apple
   silicon and arm64 CI runners that's the native build.
 - **Cost (an estimate, not a cap):** at low traffic, Lambda's always-free allowance (1M requests
@@ -315,6 +318,19 @@ One-time setup, in your **personal** AWS account:
    Leaving it out of a later deploy would delete the alarm.
 3. **Merge to `main`** (or re-run the workflow). The first green run creates the app stack and
    prints the live URL.
+
+**Accounts that can't create an OIDC provider.** AWS's new sign-up experience (projects owned by
+an AWS Builder ID) denies `iam:*Provider*` on both its Free and Paid plans, until you activate
+advanced features, which needs the Paid plan and can't be undone. On such an account:
+
+1. Deploy the bootstrap stack with `--parameter-overrides GitHubDeployRole=false`. It creates the
+   image repository and the permissions boundary, but no GitHub provider and no CI role.
+2. Deploy by hand (above): sign in with `aws login --profile <personal>`, then
+   `sam build && sam deploy --guided --image-repository <ImageRepositoryUri> --profile <personal>`.
+3. Leave `AWS_DEPLOY_ROLE_ARN` unset, so the deploy job stays skipped and CI stays green.
+
+When the account can create the provider, update the bootstrap stack with `GitHubDeployRole=true`
+and follow steps 2 and 3 above. CI then takes over the existing app stack.
 
 What the CI role can and cannot do:
 
