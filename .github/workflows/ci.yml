@@ -79,7 +79,9 @@ jobs:
       - name: Deploy
         if: steps.head.outputs.current == 'true'
         env:
-          BUDGET_EMAIL: ${{ vars.BUDGET_EMAIL }}
+          # A secret, not a variable: sam deploy prints every parameter value, this repo's logs are
+          # public, and GitHub shows secrets in logs only as ***.
+          BUDGET_EMAIL: ${{ secrets.BUDGET_EMAIL }}
         run: |
           # The image repository comes from the bootstrap stack (infra/github-deploy-role.yaml), so
           # there is no SAM companion stack and no S3 bucket to manage.

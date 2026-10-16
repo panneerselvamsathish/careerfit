@@ -308,9 +308,11 @@ One-time setup, in your **personal** AWS account:
    role `github-actions-careerfit-deploy`. Add `--parameter-overrides CreateOidcProvider=false` if
    the account already has a GitHub OIDC provider.
 2. **Add repository variables** (Settings → Secrets and variables → Actions → *Variables*):
-   `AWS_DEPLOY_ROLE_ARN` (the stack's `RoleArn` output), `AWS_REGION`, and `BUDGET_EMAIL` for the
-   $5 budget alarm. Leaving it out of a later deploy would delete the alarm. `CAREERFIT_STACK` is
-   only needed if the app stack isn't called `careerfit`.
+   `AWS_DEPLOY_ROLE_ARN` (the stack's `RoleArn` output) and `AWS_REGION`. `CAREERFIT_STACK` is
+   only needed if the app stack isn't called `careerfit`. Then add the **secret** `BUDGET_EMAIL`
+   (the *Secrets* tab) for the $5 budget alarm. It's a secret because `sam deploy` prints every
+   parameter value and a public repo's logs are public; GitHub shows secrets only as `***`.
+   Leaving it out of a later deploy would delete the alarm.
 3. **Merge to `main`** (or re-run the workflow). The first green run creates the app stack and
    prints the live URL.
 

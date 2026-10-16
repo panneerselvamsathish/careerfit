@@ -83,6 +83,13 @@ def test_no_aws_keys_are_stored_or_read_anywhere():
     assert sign_in["with"]["role-to-assume"] == "${{ vars.AWS_DEPLOY_ROLE_ARN }}"
 
 
+def test_the_budget_email_is_a_masked_secret():
+    # sam deploy prints every parameter value, and a public repo's logs are public
+    deploy = next(s for s in workflow()["jobs"]["deploy"]["steps"] if s.get("name") == "Deploy")
+    assert deploy["env"]["BUDGET_EMAIL"] == "${{ secrets.BUDGET_EMAIL }}"
+    assert "vars.BUDGET_EMAIL" not in CI.read_text(encoding="utf-8")
+
+
 def test_deploy_pushes_to_the_bootstrap_repository_not_a_companion_stack():
     text = CI.read_text(encoding="utf-8")
     assert "--image-repository" in text
