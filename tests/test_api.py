@@ -1,3 +1,4 @@
+from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
@@ -160,6 +161,48 @@ def test_api_responses_are_not_cached(client):
     assert analyze(client).headers["cache-control"] == "no-store"
 
 
+WEB = Path(__file__).parent.parent / "src" / "careerfit" / "web"
+
+
+class _Controls(HTMLParser):
+    """Collects the page's form controls: (tag, type, name, id, value, accept)."""
+
+    def __init__(self):
+        super().__init__()
+        self.controls = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("input", "textarea"):
+            a = dict(attrs)
+            self.controls.append((tag, a.get("type"), a.get("name"), a.get("id"), a.get("value"), a.get("accept")))
+
+
+def test_page_keeps_the_native_controls_the_api_reads():
+    # Restyled upload areas and segmented controls still sit on real file inputs and radios,
+    # named exactly as /api/analyze expects.
+    parser = _Controls()
+    parser.feed((WEB / "index.html").read_text(encoding="utf-8"))
+    assert parser.controls == [
+        ("input", "file", "resume", "resume", None, ".pdf,.txt"),
+        ("input", "radio", "jd_mode", "jd-mode-file", "file", None),
+        ("input", "radio", "jd_mode", "jd-mode-text", "text", None),
+        ("input", "file", "jd", "jd", None, ".pdf,.txt"),
+        ("textarea", None, "jd_text", "jd_text", None, None),
+        ("input", "radio", "perspective", "perspective-candidate", "candidate", None),
+        ("input", "radio", "perspective", "perspective-hiring-manager", "hiring_manager", None),
+    ]
+
+
+def test_the_font_is_bundled_with_its_licence_and_nothing_is_fetched_remotely(client):
+    font = client.get("/static/fonts/SourceSans3VF-Upright.woff2")
+    assert font.status_code == 200
+    assert font.headers["content-type"] == "font/woff2"
+    assert "SIL Open Font License" in (WEB / "fonts" / "SourceSans3-LICENSE.md").read_text(encoding="utf-8")
+    for asset in ("index.html", "style.css"):
+        text = (WEB / asset).read_text(encoding="utf-8")
+        assert "http://" not in text and "https://" not in text and "//fonts." not in text, asset
+
+
 def test_page_never_inserts_document_text_as_html():
     script = (Path(__file__).parent.parent / "src" / "careerfit" / "web" / "app.js").read_text(encoding="utf-8")
     for sink in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write"):
@@ -195,6 +238,22 @@ def test_pdf_over_the_page_limit_is_refused(client, tmp_path):
     response = analyze(client, resume=("long.pdf", path.read_bytes()))
     assert response.status_code == 422
     assert response.json() == {"detail": "long.pdf has 21 pages; the limit is 20. Upload a shorter version."}
+
+
+def test_image_only_jd_pdf_is_accepted_and_says_nothing_was_read(client, tmp_path):
+    # The page words its empty state from jd_coverage: no skills found in what could be read,
+    # never "the job description mentions no skills".
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.rect(20, 20, 120, 60)  # a drawing only: no extractable text, like a scanned page
+    path = tmp_path / "scanned-jd.pdf"
+    pdf.output(str(path))
+    response = analyze(client, jd=("scanned-jd.pdf", path.read_bytes()))
+    assert response.status_code == 200
+    facts = response.json()["facts"]
+    assert facts["skill_observations"] == []
+    assert facts["jd_coverage"]["chars_extracted"] == 0
+    assert "scanned_pages" in facts["jd_coverage"]["known_blind_spots"]
 
 
 def test_analyses_are_rate_limited_per_client_and_the_window_slides():
