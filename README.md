@@ -215,11 +215,14 @@ cross-region inference profile `global.anthropic.claude-opus-5-5` on Bedrock).
 uv run careerfit-server          # then open http://127.0.0.1:8000/
 ```
 
-Upload a resume (`.pdf` or `.txt`), then upload the job description or paste it, and pick who
-the report is for. The page shows the must-have and nice-to-have tables with the quoted lines,
-the same **What this analysis could not see** notes as the Markdown report, and links to download
-the report (`.md`) and the facts (`.json`). It uses the same pipeline as the CLI, so the same
-files give the same verdicts.
+Choose or drop a resume (`.pdf` or `.txt`), then upload the job description or switch to pasting
+it (only the visible one is sent), and pick who the report is for. The page shows matched, gap and
+ambiguous counts for must-have and nice-to-have skills, filters, and one row per skill with the
+quoted job and resume lines. A long line is quoted once and referenced after that, with a control
+to show it again; nothing is cut off without a way to read it. It ends with the same **What this
+analysis could not see** notes as the Markdown report, and offers the report (`.md`) and the facts
+(`.json`) as downloads. It uses the same pipeline as the CLI, so the same files give the same
+verdicts.
 
 - **Keyword pass only.** The web app never calls an LLM, so nothing leaves the server. `--deep`
   stays in the CLI: a paid LLM call behind a web endpoint needs user identity, usage metering and
@@ -362,6 +365,7 @@ What the CI role can and cannot do:
 - [pypdf](https://pypdf.readthedocs.io/) — PDF parsing
 - [Anthropic API](https://docs.anthropic.com/) — LLM judge layer
 - [FastAPI](https://fastapi.tiangolo.com/) — web API
+- [Source Sans 3](https://github.com/adobe-fonts/source-sans) (SIL Open Font License) — bundled with the page, never fetched from elsewhere
 
 ## How this was built
 

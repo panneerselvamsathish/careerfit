@@ -6,6 +6,7 @@ endpoint needs identity, metering and rate limits first, and those belong here, 
 
 import argparse
 import math
+import mimetypes
 import os
 import re
 import tempfile
@@ -30,6 +31,9 @@ from careerfit.report import blind_spot_notes, render_markdown
 
 DEFAULT_ONTOLOGY = Path(__file__).parent / "ontology" / "skills.yaml"
 WEB_DIR = Path(__file__).parent / "web"
+# The page's bundled font. The slim container image has no system MIME table and Python 3.12's own
+# lacks .woff2, so without this the font is served as application/octet-stream.
+mimetypes.add_type("font/woff2", ".woff2")
 MAX_FILE_MB = 5  # AWS Lambda sets 2 (CAREERFIT_MAX_FILE_MB): its 6 MB payload limit counts base64'd bytes
 MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024
 MAX_PDF_PAGES = 20  # a resume or JD is a few pages; parsing hundreds is a way to burn the server's CPU

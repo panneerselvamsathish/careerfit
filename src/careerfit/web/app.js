@@ -11,11 +11,28 @@ const STATUS_LABEL = {
 };
 const STATUS_ORDER = ["matched", "partial", "gap", "unresolvable", "not_assessed"];
 const DECIDED = ["matched", "partial", "gap"];
+// Always shown in the summary; the other two statuses only when a result has them.
+const CORE_STATUSES = ["matched", "gap", "unresolvable"];
+const FILTERS = [
+  { key: "all", label: "All", statuses: null },
+  { key: "gap", label: "Gaps", statuses: ["gap"], noun: "gaps" },
+  { key: "unresolvable", label: "Ambiguous", statuses: ["unresolvable"], noun: "ambiguous skills" },
+  { key: "matched", label: "Matched", statuses: ["matched"], noun: "matched skills" },
+  { key: "partial", label: "Partly shown", statuses: ["partial"], noun: "partly shown skills", optional: true },
+  { key: "not_assessed", label: "Not assessed", statuses: ["not_assessed"], noun: "unassessed skills", optional: true },
+];
+const ACCEPTED_TYPES = [".pdf", ".txt"]; // the server's own rule (ingest/document.py); it still checks
+const LONG_QUOTE = 180; // characters: a longer quote starts clamped to three lines, with a toggle
+const REPEAT_QUOTE = 80; // a repeated line longer than this is shown once per view, then referenced
 
 const $ = (id) => document.getElementById(id);
 let downloadUrls = [];
 let maxFileMb = 5; // replaced by the server's own limit on load
 let limitsReady = Promise.resolve();
+let busy = false;
+let current = null; // the last result, kept so the filters can re-render it
+let activeFilter = "all";
+let nextId = 0;
 
 async function loadLimits() {
   try {
@@ -38,40 +55,414 @@ function el(tag, text, className) {
   return node;
 }
 
-function cite(evidence) {
-  if (!evidence) return "—";
-  // Same wording as the Markdown report: say when a skill is shown through another one.
-  const through = evidence.source === "derived" ? ` (shown through ${evidence.via})` : "";
-  return `${evidence.locator}${through}: "${evidence.excerpt}"`;
+function icon(name, className = "icon") {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", className);
+  svg.setAttribute("aria-hidden", "true");
+  const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+  use.setAttribute("href", `#i-${name}`);
+  svg.appendChild(use);
+  return svg;
 }
 
-function table(observations, perspective) {
-  if (observations.length === 0) return el("p", "None listed.", "muted");
-  const rows = [...observations].sort(
+function uid(prefix) {
+  nextId += 1;
+  return `${prefix}-${nextId}`;
+}
+
+function announce(message, regionId = "status") {
+  // Cleared first, so the same message twice in a row is still read out.
+  const region = $(regionId);
+  region.textContent = "";
+  window.setTimeout(() => (region.textContent = message), 60);
+}
+
+// ---- files ----
+
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fileProblem(file) {
+  const name = file.name.toLowerCase();
+  if (!ACCEPTED_TYPES.some((type) => name.endsWith(type))) return `${file.name} is not a PDF or TXT file.`;
+  if (tooLarge(file)) return `${file.name} is ${formatSize(file.size)}, larger than the ${maxFileMb} MB limit.`;
+  return null;
+}
+
+function setFieldError(field, control, errorId, message) {
+  const error = $(errorId);
+  error.textContent = message;
+  error.hidden = false;
+  control.setAttribute("aria-invalid", "true");
+  field.classList.add("has-error");
+}
+
+function clearFieldError(field, controls, errorId) {
+  const error = $(errorId);
+  error.textContent = "";
+  error.hidden = true;
+  controls.forEach((control) => control.removeAttribute("aria-invalid"));
+  field.classList.remove("has-error");
+}
+
+function hasFiles(event) {
+  return Array.from(event.dataTransfer?.types ?? []).includes("Files");
+}
+
+function setupUpload(inputId, errorId) {
+  const input = $(inputId);
+  const zone = input.closest(".upload");
+  const field = input.closest(".field");
+  const empty = zone.querySelector(".upload-empty");
+  const selected = zone.querySelector(".upload-selected");
+  const actions = zone.querySelector(".upload-actions");
+  let lastFile = null;
+
+  const refresh = () => {
+    const file = input.files[0] ?? null;
+    lastFile = file;
+    zone.classList.toggle("has-file", Boolean(file));
+    empty.hidden = Boolean(file);
+    selected.hidden = !file;
+    actions.hidden = !file;
+    clearFieldError(field, [input], errorId);
+    if (!file) return;
+    selected.querySelector(".file-name").textContent = file.name;
+    selected.querySelector(".file-size").textContent = formatSize(file.size);
+    const problem = fileProblem(file);
+    if (problem) setFieldError(field, input, errorId, problem);
+  };
+
+  const use = (file) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.files = transfer.files;
+  };
+
+  input.addEventListener("change", () => {
+    // Some browsers empty the input when the picker is cancelled; keep the file chosen before.
+    if (input.files.length === 0 && lastFile) use(lastFile);
+    refresh();
+  });
+  actions.querySelector('[data-action="replace"]').addEventListener("click", () => input.click());
+  actions.querySelector('[data-action="remove"]').addEventListener("click", () => {
+    input.value = "";
+    refresh();
+    input.focus();
+  });
+
+  let depth = 0;
+  zone.addEventListener("dragenter", (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    depth += 1;
+    zone.classList.add("is-dragover");
+  });
+  zone.addEventListener("dragover", (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+  });
+  zone.addEventListener("dragleave", () => {
+    depth = Math.max(0, depth - 1);
+    if (depth === 0) zone.classList.remove("is-dragover");
+  });
+  zone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    depth = 0;
+    zone.classList.remove("is-dragover");
+    const file = event.dataTransfer.files[0];
+    if (!file) return;
+    use(file);
+    refresh();
+    if (event.dataTransfer.files.length > 1) announce(`Only the first file, ${file.name}, was used.`);
+  });
+  return refresh;
+}
+
+// ---- job description: file or pasted text, never both ----
+
+function jdMode() {
+  return document.querySelector('input[name="jd_mode"]:checked').value;
+}
+
+function applyJdMode(refreshJd) {
+  const mode = jdMode();
+  $("jd-file-panel").hidden = mode !== "file";
+  $("jd-text-panel").hidden = mode !== "text";
+  $("jd").required = mode === "file";
+  $("jd_text").required = mode === "text";
+  // The other input keeps its content (switching back restores it) but is never sent.
+  clearFieldError($("jd").closest(".field"), [$("jd"), $("jd_text")], "jd-error");
+  if (mode === "file") refreshJd();
+}
+
+// ---- submitting ----
+
+function setBusy(on) {
+  busy = on;
+  const button = $("submit");
+  button.classList.toggle("is-busy", on);
+  button.setAttribute("aria-disabled", String(on));
+  button.querySelector(".button-label").textContent = on ? "Analysing…" : "Analyse fit";
+  $("form").setAttribute("aria-busy", String(on));
+}
+
+function showError(message) {
+  $("error").textContent = message;
+  $("error").hidden = false;
+}
+
+// Returns the first control that needs attention, after marking every problem next to its field.
+function validate() {
+  const problems = [];
+  const resume = $("resume");
+  const resumeField = resume.closest(".field");
+  const resumeFile = resume.files[0];
+  const resumeProblem = resumeFile ? fileProblem(resumeFile) : "Choose a resume file.";
+  if (resumeProblem) {
+    setFieldError(resumeField, resume, "resume-error", resumeProblem);
+    problems.push([resume, resumeProblem]);
+  }
+  const jdField = $("jd").closest(".field");
+  if (jdMode() === "file") {
+    const jdFile = $("jd").files[0];
+    const jdProblem = jdFile ? fileProblem(jdFile) : "Choose a job description file, or switch to Paste text.";
+    if (jdProblem) {
+      setFieldError(jdField, $("jd"), "jd-error", jdProblem);
+      problems.push([$("jd"), jdProblem]);
+    }
+  } else if (!$("jd_text").value.trim()) {
+    const jdProblem = "Paste the job description, or switch to Upload file.";
+    setFieldError(jdField, $("jd_text"), "jd-error", jdProblem);
+    problems.push([$("jd_text"), jdProblem]);
+  }
+  return problems;
+}
+
+async function submit(event) {
+  event.preventDefault();
+  if (busy) return; // one analysis at a time, including while the limits load
+  setBusy(true);
+  $("error").hidden = true;
+  $("result").hidden = true; // a failed run must never leave the previous files' results on screen
+  try {
+    await limitsReady; // on a cold start the limit lookup may still be in flight
+    // Fields are read after the wait, so edits made while it ran are the ones sent.
+    const problems = validate();
+    if (problems.length) {
+      problems[0][0].focus();
+      announce(problems.map(([, message]) => message).join(" "));
+      return;
+    }
+
+    // Only the visible job description input is sent, so a file or text left in the other mode
+    // can never override what the user is looking at. The server still requires exactly one.
+    const form = new FormData();
+    form.append("resume", $("resume").files[0]);
+    if (jdMode() === "file") form.append("jd", $("jd").files[0]);
+    else form.append("jd_text", $("jd_text").value.trim());
+    form.append("perspective", document.querySelector('input[name="perspective"]:checked').value);
+
+    announce("Analysing. This usually takes a few seconds.");
+    const response = await fetch("/api/analyze", { method: "POST", body: form });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = typeof payload.detail === "string" ? payload.detail
+        : response.status === 413 ? `The upload is too large for this server (limit ${maxFileMb} MB per file).`
+        : response.status === 429 ? "Too many analyses from this address. Wait a minute and try again."
+        : "The server could not read that request.";
+      return showError(detail);
+    }
+    render(payload);
+    const n = payload.facts.skill_observations.length;
+    announce(`Analysis ready: ${n} skill${n === 1 ? "" : "s"} from the job description.`);
+    $("title").focus();
+  } catch {
+    showError("Could not reach the careerfit server.");
+  } finally {
+    setBusy(false);
+  }
+}
+
+// ---- results ----
+
+function sorted(observations) {
+  return [...observations].sort(
     (a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status) || a.skill.localeCompare(b.skill),
   );
-  const t = el("table");
-  const head = t.createTHead().insertRow();
-  const resumeHeader = perspective === "candidate" ? "Your resume shows" : "The resume shows";
-  for (const h of ["Skill", "Status", "The job description says", resumeHeader]) head.appendChild(el("th", h));
+}
+
+function statusBadge(status) {
+  const badge = el("span", undefined, `status ${status}`);
+  badge.append(icon(status), document.createTextNode(STATUS_LABEL[status] ?? status));
+  return badge;
+}
+
+function tally(title, observations) {
+  const box = el("div", undefined, "tally");
+  const head = el("p", undefined, "tally-title");
+  head.append(el("span", title), el("span", `${observations.length} skill${observations.length === 1 ? "" : "s"}`, "tally-total"));
+  const list = el("ul", undefined, "tally-counts");
+  const statuses = STATUS_ORDER.filter(
+    (s) => CORE_STATUSES.includes(s) || observations.some((o) => o.status === s),
+  );
+  for (const status of statuses) {
+    const item = el("li", undefined, "tally-count");
+    item.append(el("span", String(observations.filter((o) => o.status === status).length), "tally-number"), statusBadge(status));
+    list.append(item);
+  }
+  box.append(head, list);
+  return box;
+}
+
+function quoteToggle(quote, more, less, mode, describedBy) {
+  const button = el("button", more, "text-button quote-toggle");
+  button.type = "button";
+  button.setAttribute("aria-expanded", "false");
+  button.setAttribute("aria-controls", quote.id);
+  button.setAttribute("aria-describedby", describedBy);
+  button.addEventListener("click", () => {
+    const open = button.getAttribute("aria-expanded") !== "true";
+    button.setAttribute("aria-expanded", String(open));
+    button.textContent = open ? less : more;
+    if (mode === "hidden") quote.hidden = !open;
+    else quote.classList.toggle("is-clamped", !open);
+  });
+  return button;
+}
+
+function evidence(ev, doc, observation, seen, skillId) {
+  const box = el("div", undefined, "evidence-item");
+  const meta = el("p", undefined, "evidence-meta");
+  const locator = ev.locator.charAt(0).toUpperCase() + ev.locator.slice(1);
+  meta.append(el("span", locator, "locator"));
+  // Same wording as the Markdown report: say when a skill is shown through another one.
+  if (ev.source === "derived") meta.append(el("span", `shown through ${ev.via}`, "via"));
+  box.append(meta);
+
+  const quote = el("p", `“${ev.excerpt}”`, "quote");
+  quote.id = uid("quote");
+  const key = `${doc}:${ev.locator}`;
+  const first = seen.get(key);
+  if (first !== undefined && ev.excerpt.length > REPEAT_QUOTE) {
+    // Quoted in full on an earlier row of this view: point at it, and keep it one click away.
+    meta.append(el("span", `same line as ${first}`, "same-line"));
+    quote.hidden = true;
+    box.append(quote, quoteToggle(quote, "Show quote", "Hide quote", "hidden", skillId));
+    return box;
+  }
+  if (first === undefined) seen.set(key, observation.skill);
+  box.append(quote);
+  if (ev.excerpt.length > LONG_QUOTE) {
+    quote.classList.add("is-clamped");
+    box.append(quoteToggle(quote, "Show full line", "Show less", "clamp", skillId));
+  }
+  return box;
+}
+
+function noEvidence(observation) {
+  // Precise per status: only a gap is a confirmed absence.
+  const text = {
+    gap: "No supporting resume evidence found.",
+    unresolvable: "No resume line mentions it. Not counted as a gap: the job description's wording is ambiguous.",
+    not_assessed: "Not assessed: part of the resume could not be read, so a missing mention is not reported as a gap.",
+  }[observation.status] ?? "No resume line quoted.";
+  return el("p", text, "no-evidence");
+}
+
+function cell(tag, className, label, content) {
+  const node = el(tag, undefined, className);
+  node.setAttribute("role", tag === "th" ? "rowheader" : "cell");
+  if (label) node.append(el("span", label, "cell-label"));
+  node.append(content);
+  return node;
+}
+
+function table(observations, seen) {
+  // Explicit roles keep the table's meaning for screen readers when small screens restyle it.
+  const t = el("table", undefined, "evidence");
+  t.setAttribute("role", "table");
+  const cols = el("colgroup");
+  for (const c of ["c-skill", "c-status", "c-jd", "c-resume"]) cols.append(el("col", undefined, c));
+  t.append(cols);
+  const head = t.createTHead();
+  head.setAttribute("role", "rowgroup");
+  const headRow = head.insertRow();
+  headRow.setAttribute("role", "row");
+  for (const h of ["Skill", "Status", "Job requirement", "Resume evidence"]) {
+    const th = el("th", h);
+    th.scope = "col";
+    th.setAttribute("role", "columnheader");
+    headRow.append(th);
+  }
   const body = t.createTBody();
-  for (const o of rows) {
-    const r = body.insertRow();
-    r.appendChild(el("td", o.skill));
-    const status = el("td");
-    status.appendChild(el("span", STATUS_LABEL[o.status] ?? o.status, `chip ${o.status}`));
-    r.appendChild(status);
-    r.appendChild(el("td", cite(o.jd_evidence), "quote"));
-    r.appendChild(el("td", cite(o.resume_evidence), "quote"));
+  body.setAttribute("role", "rowgroup");
+  for (const o of observations) {
+    const row = body.insertRow();
+    row.setAttribute("role", "row");
+    const skillId = uid("skill");
+    const skill = cell("th", "cell-skill", null, document.createTextNode(o.skill));
+    skill.scope = "row";
+    skill.id = skillId;
+    row.append(
+      skill,
+      cell("td", "cell-status", null, statusBadge(o.status)),
+      cell("td", "cell-evidence", "Job requirement", evidence(o.jd_evidence, "jd", o, seen, skillId)),
+      cell("td", "cell-evidence", "Resume evidence",
+        o.resume_evidence ? evidence(o.resume_evidence, "resume", o, seen, skillId) : noEvidence(o)),
+    );
   }
   return t;
 }
 
-function counts(observations) {
-  const parts = STATUS_ORDER.map((s) => [s, observations.filter((o) => o.status === s).length])
-    .filter(([, n]) => n > 0)
-    .map(([s, n]) => `${n} ${STATUS_LABEL[s].toLowerCase()}`);
-  return parts.length ? `${parts.join(", ")} (of ${observations.length})` : "none listed";
+function filterCounts(all) {
+  return Object.fromEntries(FILTERS.map((f) => [f.key, f.statuses ? all.filter((o) => f.statuses.includes(o.status)).length : all.length]));
+}
+
+function renderFilters(all) {
+  const counts = filterCounts(all);
+  const buttons = FILTERS.filter((f) => !f.optional || counts[f.key] > 0).map((f) => {
+    const button = el("button", undefined, "filter");
+    button.type = "button";
+    button.dataset.filter = f.key;
+    button.setAttribute("aria-pressed", String(f.key === activeFilter));
+    button.append(el("span", f.label), el("span", String(counts[f.key]), "filter-count"));
+    button.addEventListener("click", () => {
+      activeFilter = f.key;
+      $("filters").querySelectorAll(".filter").forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
+      renderGroups();
+      announce(f.statuses ? `Showing ${counts[f.key]} of ${all.length} skills: ${f.label.toLowerCase()}.` : `Showing all ${all.length} skills.`, "filter-status");
+    });
+    return button;
+  });
+  $("filters").replaceChildren(...buttons);
+  $("filters").hidden = all.length === 0;
+}
+
+function renderGroups() {
+  const all = current.facts.skill_observations;
+  const filter = FILTERS.find((f) => f.key === activeFilter);
+  const seen = new Map(); // repeated long quotes: shown once per view, then referenced
+  $("groups").hidden = all.length === 0;
+  $("no-skills").hidden = all.length !== 0;
+  for (const [level, id, name] of [["must", "must", "must-have"], ["nice", "nice", "nice-to-have"]]) {
+    const group = all.filter((o) => o.requirement === level);
+    const shown = sorted(filter.statuses ? group.filter((o) => filter.statuses.includes(o.status)) : group);
+    $(`${id}-count`).textContent = filter.statuses ? `(${shown.length} of ${group.length})` : `(${group.length})`;
+    let content;
+    if (group.length === 0) content = el("p", `The job description lists no ${name} skills that careerfit knows.`, "empty-state");
+    else if (shown.length === 0) content = el("p", `No ${filter.noun} among the ${name} skills.`, "empty-state");
+    else content = table(shown, seen);
+    $(id).replaceChildren(content);
+  }
+}
+
+function source(name) {
+  return name === "pasted-job-description.txt" ? "pasted text" : name;
 }
 
 function setDownload(id, text, type) {
@@ -82,19 +473,42 @@ function setDownload(id, text, type) {
 
 function render(payload) {
   const { facts, blind_spots: blindSpots, report_markdown: markdown } = payload;
+  current = { facts };
+  activeFilter = "all";
   const all = facts.skill_observations;
   const must = all.filter((o) => o.requirement === "must");
   const nice = all.filter((o) => o.requirement === "nice");
   const decided = all.filter((o) => DECIDED.includes(o.status));
   const byKeywords = decided.filter((o) => o.confidence === null).length;
+  const ambiguous = all.filter((o) => o.status === "unresolvable").length;
 
-  $("title").textContent = facts.perspective === "candidate" ? "Your fit for this job" : "Candidate against the job description";
-  $("summary").textContent =
-    `Must have: ${counts(must)}. Nice to have: ${counts(nice)}. ` +
-    `${byKeywords} of ${decided.length} decided skills were settled by keyword matching, without an LLM.`;
-  $("must").replaceChildren(table(must, facts.perspective));
-  $("nice").replaceChildren(table(nice, facts.perspective));
+  const candidate = facts.perspective === "candidate";
+  $("title").textContent = candidate ? "Your fit for this job" : "Candidate against the job description";
+  $("meta").textContent =
+    `${candidate ? "Candidate" : "Hiring manager"} report · ${source(facts.resume_source)} compared with ${source(facts.jd_source)}`;
+
+  const summary = $("summary");
+  summary.setAttribute("role", "group");
+  summary.setAttribute("aria-label", "Summary");
+  summary.replaceChildren(tally("Must have", must), tally("Nice to have", nice));
+  summary.hidden = all.length === 0;
+
+  renderFilters(all);
+  renderGroups();
+
   $("blind-spots").replaceChildren(...blindSpots.map((n) => el("li", n)));
+  const judged = decided.length - byKeywords;
+  const settled = decided.length === 0
+    ? (all.length === 0 ? "There were no skills to decide." : "No skill could be decided from keywords alone.")
+    : `${byKeywords} of ${decided.length} decided skill${decided.length === 1 ? " was" : "s were"} settled by keyword matching` +
+      (judged ? `, ${judged} by the LLM judge.` : ", without an LLM.");
+  $("decided").replaceChildren(
+    settled +
+      (ambiguous ? ` ${ambiguous} ambiguous skill${ambiguous === 1 ? " stays" : "s stay"} undecided.` : "") +
+      " The web app runs the keyword pass only; ",
+    el("code", "--deep"),
+    ", which asks Claude to settle ambiguous skills, is part of the command-line tool.",
+  );
 
   downloadUrls.forEach((u) => URL.revokeObjectURL(u));
   downloadUrls = [];
@@ -103,56 +517,19 @@ function render(payload) {
   $("result").hidden = false;
 }
 
-function showError(message) {
-  $("error").textContent = message;
-  $("error").hidden = false;
-}
-
-async function submit(event) {
-  event.preventDefault();
-  if ($("submit").disabled) return; // one analysis at a time, including while the limits load
-  $("error").hidden = true;
-  $("result").hidden = true; // a failed run must never leave the previous files' results on screen
-  $("submit").disabled = true;
-  $("submit").textContent = "Analysing…";
-  try {
-    await limitsReady; // on a cold start the limit lookup may still be in flight
-    // Fields are read after the wait, so edits made while it ran are the ones sent.
-    const resume = $("resume").files[0];
-    const jdFile = $("jd").files[0];
-    const jdText = $("jd_text").value.trim();
-    if (!resume) return showError("Choose a resume file.");
-    if (Boolean(jdFile) === Boolean(jdText)) return showError("Give the job description either as a file or as pasted text, not both.");
-    // Checked here as well as on the server: some hosts refuse a large body before careerfit sees it.
-    for (const file of [resume, jdFile]) {
-      if (tooLarge(file)) return showError(`${file.name} is larger than ${maxFileMb} MB.`);
-    }
-
-    // Only fields that were filled in are sent, so the server never sees an empty file part.
-    const form = new FormData();
-    form.append("resume", resume);
-    if (jdFile) form.append("jd", jdFile);
-    else form.append("jd_text", jdText);
-    form.append("perspective", document.querySelector('input[name="perspective"]:checked').value);
-
-    const response = await fetch("/api/analyze", { method: "POST", body: form });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const detail = typeof payload.detail === "string" ? payload.detail
-        : response.status === 413 ? `The upload is too large for this server (limit ${maxFileMb} MB per file).`
-        : "The server could not read that request.";
-      return showError(detail);
-    }
-    render(payload);
-  } catch {
-    showError("Could not reach the careerfit server.");
-  } finally {
-    $("submit").disabled = false;
-    $("submit").textContent = "Analyse";
-  }
-}
-
 document.addEventListener("DOMContentLoaded", () => {
-  limitsReady = loadLimits();
+  const refreshResume = setupUpload("resume", "resume-error");
+  const refreshJd = setupUpload("jd", "jd-error");
+  limitsReady = loadLimits().then(() => {
+    // Files chosen before the limit arrived are checked against the real one.
+    refreshResume();
+    if (jdMode() === "file") refreshJd();
+  });
+  document.querySelectorAll('input[name="jd_mode"]').forEach((radio) => radio.addEventListener("change", () => applyJdMode(refreshJd)));
+  $("jd_text").addEventListener("input", () => clearFieldError($("jd").closest(".field"), [$("jd"), $("jd_text")], "jd-error"));
+  // A file dropped outside an upload area would make the browser open it and lose the form.
+  window.addEventListener("dragover", (event) => { if (hasFiles(event)) event.preventDefault(); });
+  window.addEventListener("drop", (event) => { if (hasFiles(event)) event.preventDefault(); });
+  applyJdMode(refreshJd);
   $("form").addEventListener("submit", submit);
 });

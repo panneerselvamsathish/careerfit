@@ -4,60 +4,173 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>careerfit — resume vs job description</title>
+  <link rel="preload" href="/static/fonts/SourceSans3VF-Upright.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/app.js" defer></script>
 </head>
 <body>
-  <header>
-    <h1>careerfit</h1>
-    <p class="lede">Compare a resume with a job description. Every result quotes the line it relies on.</p>
+  <!-- Icons, referenced with <use>. Decorative: every icon sits next to text that says the same. -->
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15v3.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7.5A1.5 1.5 0 0 0 6 4.5v15A1.5 1.5 0 0 0 7.5 21h9a1.5 1.5 0 0 0 1.5-1.5V7m-4-4 4 4m-4-4v4h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19.5h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><path d="M7 10.5V8a5 5 0 0 1 10 0v2.5M6.5 10.5h11A1.5 1.5 0 0 1 19 12v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19v-7a1.5 1.5 0 0 1 1.5-1.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-matched" viewBox="0 0 16 16"><path d="m3.5 8.5 3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-gap" viewBox="0 0 16 16"><path d="m4.5 4.5 7 7m0-7-7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-unresolvable" viewBox="0 0 16 16"><path d="M5.8 6a2.3 2.3 0 1 1 3.2 2.1c-.6.3-1 .8-1 1.4v.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="12.6" r="1.1" fill="currentColor"/></symbol>
+    <symbol id="i-partial" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 2.8a5.2 5.2 0 0 1 0 10.4Z" fill="currentColor"/></symbol>
+    <symbol id="i-not_assessed" viewBox="0 0 16 16"><path d="M4 8h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  </svg>
+
+  <header class="app-header">
+    <div class="wrap">
+      <h1 class="brand">careerfit</h1>
+      <p class="tagline">Compare a resume with a job description. Every result quotes the line it relies on.</p>
+    </div>
   </header>
 
-  <main>
-    <form id="form" novalidate>
-      <fieldset>
-        <legend>Resume</legend>
-        <label>File (.pdf or .txt, up to <span class="max-mb">5</span> MB)
-          <input type="file" name="resume" id="resume" accept=".pdf,.txt" required>
-        </label>
-      </fieldset>
+  <main class="wrap">
+    <form id="form" class="panel" novalidate>
+      <div class="inputs">
+        <section class="field" aria-labelledby="resume-heading">
+          <div class="field-head">
+            <h2 id="resume-heading" class="field-title">Resume</h2>
+          </div>
+          <div class="upload" id="resume-upload">
+            <input type="file" name="resume" id="resume" class="file-input" accept=".pdf,.txt" required
+                   aria-describedby="resume-hint resume-error">
+            <label for="resume" class="upload-target">
+              <span class="upload-empty">
+                <svg class="icon icon-lg" aria-hidden="true"><use href="#i-upload"/></svg>
+                <span class="upload-cta"><span class="upload-action">Choose a resume file</span> or drag it here</span>
+              </span>
+              <span class="upload-selected" hidden>
+                <svg class="icon icon-lg" aria-hidden="true"><use href="#i-file"/></svg>
+                <span class="file-name"></span>
+                <span class="file-size"></span>
+              </span>
+            </label>
+            <div class="upload-actions" hidden>
+              <button type="button" class="text-button" data-action="replace" aria-describedby="resume-heading">Replace</button>
+              <button type="button" class="text-button" data-action="remove" aria-describedby="resume-heading">Remove</button>
+            </div>
+          </div>
+          <p id="resume-hint" class="hint">PDF or TXT, up to <span class="max-mb">5</span> MB</p>
+          <p id="resume-error" class="field-error" hidden></p>
+        </section>
 
-      <fieldset>
-        <legend>Job description</legend>
-        <label>File (.pdf or .txt, up to <span class="max-mb">5</span> MB)
-          <input type="file" name="jd" id="jd" accept=".pdf,.txt">
-        </label>
-        <p class="or">or paste it</p>
-        <label class="sr-only" for="jd_text">Job description text</label>
-        <textarea name="jd_text" id="jd_text" rows="8" placeholder="Paste the job description here"></textarea>
-      </fieldset>
+        <section class="field" aria-labelledby="jd-heading">
+          <div class="field-head">
+            <h2 id="jd-heading" class="field-title">Job description</h2>
+            <fieldset class="choice">
+              <legend class="visually-hidden">How to give the job description</legend>
+              <div class="segmented segmented-sm">
+                <input type="radio" name="jd_mode" id="jd-mode-file" value="file" class="segment-input" checked>
+                <label for="jd-mode-file" class="segment">Upload file</label>
+                <input type="radio" name="jd_mode" id="jd-mode-text" value="text" class="segment-input">
+                <label for="jd-mode-text" class="segment">Paste text</label>
+              </div>
+            </fieldset>
+          </div>
 
-      <fieldset>
-        <legend>Report for</legend>
-        <label><input type="radio" name="perspective" value="candidate" checked> Candidate — what to work on</label>
-        <label><input type="radio" name="perspective" value="hiring_manager"> Hiring manager — how the candidate meets the JD</label>
-      </fieldset>
+          <div id="jd-file-panel">
+            <div class="upload" id="jd-upload">
+              <input type="file" name="jd" id="jd" class="file-input" accept=".pdf,.txt"
+                     aria-describedby="jd-hint jd-error">
+              <label for="jd" class="upload-target">
+                <span class="upload-empty">
+                  <svg class="icon icon-lg" aria-hidden="true"><use href="#i-upload"/></svg>
+                  <span class="upload-cta"><span class="upload-action">Choose a job description file</span> or drag it here</span>
+                </span>
+                <span class="upload-selected" hidden>
+                  <svg class="icon icon-lg" aria-hidden="true"><use href="#i-file"/></svg>
+                  <span class="file-name"></span>
+                  <span class="file-size"></span>
+                </span>
+              </label>
+              <div class="upload-actions" hidden>
+                <button type="button" class="text-button" data-action="replace" aria-describedby="jd-heading">Replace</button>
+                <button type="button" class="text-button" data-action="remove" aria-describedby="jd-heading">Remove</button>
+              </div>
+            </div>
+            <p id="jd-hint" class="hint">PDF or TXT, up to <span class="max-mb">5</span> MB</p>
+          </div>
 
-      <button type="submit" id="submit">Analyse</button>
-      <p class="note">Keyword pass only, no LLM: nothing leaves this server. Uploads are written to a temporary folder for parsing and deleted before the result comes back; nothing is kept.</p>
-      <p id="error" class="error" role="alert" hidden></p>
-    </form>
-
-    <section id="result" hidden aria-live="polite">
-      <h2 id="title"></h2>
-      <p id="summary" class="summary"></p>
-      <div class="downloads">
-        <a id="download-report" download="careerfit-report.md">Download report (.md)</a>
-        <a id="download-facts" download="facts.json">Download facts (.json)</a>
+          <div id="jd-text-panel" hidden>
+            <label for="jd_text" class="visually-hidden">Job description text</label>
+            <textarea name="jd_text" id="jd_text" rows="9" placeholder="Paste the job description here"
+                      aria-describedby="jd-error"></textarea>
+          </div>
+          <p id="jd-error" class="field-error" hidden></p>
+        </section>
       </div>
 
-      <h3>Must have</h3>
-      <div id="must"></div>
-      <h3>Nice to have</h3>
-      <div id="nice"></div>
+      <div class="options">
+      <fieldset class="choice" aria-describedby="perspective-hint">
+        <legend class="option-label">Report for</legend>
+        <div class="segmented">
+          <input type="radio" name="perspective" id="perspective-candidate" value="candidate" class="segment-input" checked>
+          <label for="perspective-candidate" class="segment">Candidate</label>
+          <input type="radio" name="perspective" id="perspective-hiring-manager" value="hiring_manager" class="segment-input">
+          <label for="perspective-hiring-manager" class="segment">Hiring manager</label>
+        </div>
+        <p id="perspective-hint" class="hint">Candidate: what to work on. Hiring manager: how the candidate meets the job description.</p>
+      </fieldset>
+      </div>
 
-      <h3>What this analysis could not see</h3>
-      <ul id="blind-spots"></ul>
+      <div class="actions">
+        <button type="submit" id="submit" class="button-primary">
+          <span class="spinner" aria-hidden="true"></span>
+          <span class="button-label">Analyse fit</span>
+        </button>
+        <p class="privacy">
+          <svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>
+          <span>Keyword matching only, no LLM. Files are parsed on this server, never sent anywhere else, and deleted before the results come back. Nothing from them is kept.</span>
+        </p>
+      </div>
+      <p id="error" class="form-error" role="alert" hidden></p>
+      <p id="status" class="visually-hidden" role="status" aria-live="polite"></p>
+    </form>
+
+    <section id="result" class="panel results" hidden aria-labelledby="title">
+      <div class="results-head">
+        <div class="results-heading">
+          <h2 id="title" tabindex="-1"></h2>
+          <p id="meta" class="results-meta"></p>
+        </div>
+        <div class="downloads">
+          <a id="download-report" class="button-secondary" download="careerfit-report.md">
+            <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Report (.md)
+          </a>
+          <a id="download-facts" class="button-secondary" download="facts.json">
+            <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>Facts (.json)
+          </a>
+        </div>
+      </div>
+
+      <div id="summary" class="tallies"></div>
+
+      <div id="filters" class="filters" role="group" aria-label="Show skills"></div>
+      <p id="filter-status" class="visually-hidden" role="status" aria-live="polite"></p>
+
+      <div id="groups">
+        <section class="group" aria-labelledby="must-heading">
+          <h3 id="must-heading" class="group-title">Must have <span class="group-count" id="must-count"></span></h3>
+          <div id="must"></div>
+        </section>
+        <section class="group" aria-labelledby="nice-heading">
+          <h3 id="nice-heading" class="group-title">Nice to have <span class="group-count" id="nice-count"></span></h3>
+          <div id="nice"></div>
+        </section>
+      </div>
+      <p id="no-skills" class="empty-state" hidden>The job description mentions no skill from careerfit's skill list, so there is nothing to compare. Skills outside the list are not checked.</p>
+
+      <section class="limits" aria-labelledby="limits-heading">
+        <h3 id="limits-heading" class="group-title">What this analysis could not see</h3>
+        <ul id="blind-spots"></ul>
+        <h4 class="limits-subtitle">How this was decided</h4>
+        <p id="decided" class="limits-text"></p>
+      </section>
     </section>
   </main>
 </body>
