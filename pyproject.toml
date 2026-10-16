@@ -11,7 +11,8 @@ dependencies = [
     "pypdf>=4.0",
     "fastapi>=0.100",
     "uvicorn[standard]>=0.20",
-    "python-multipart>=0.0.6"
+    "python-multipart>=0.0.6",
+    "boto3>=1.35",  # DynamoDB: usage events, skill stats, the waitlist, donated JDs (store.py only)
 ]
 
 [build-system]

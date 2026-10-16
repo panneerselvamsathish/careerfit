@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -7,6 +8,7 @@ from fpdf import FPDF
 
 from careerfit.api import MAX_FILE_BYTES, MAX_PDF_PAGES, RateLimiter, create_app, max_request_bytes, run, safe_filename
 from careerfit.facts.schema import GapAnalysisFacts, SkillStatus
+from careerfit.store import MemoryStore
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 RESUME = (FIXTURES / "resume.txt").read_bytes()
@@ -188,9 +190,12 @@ def test_page_keeps_the_native_controls_the_api_reads():
         ("input", "radio", "jd_mode", "jd-mode-text", "text", None),
         ("input", "file", "jd", "jd", None, ".pdf,.txt"),
         ("textarea", None, "jd_text", "jd_text", None, None),
+        ("input", "checkbox", "donate_jd", "donate_jd", None, None),  # unticked unless the visitor ticks it
         ("input", "radio", "perspective", "perspective-candidate", "candidate", None),
         ("input", "radio", "perspective", "perspective-hiring-manager", "hiring_manager", None),
+        ("input", "email", "email", "waitlist-email", None, None),
     ]
+    assert 'id="donate_jd" name="donate_jd" class="checkbox">' in (WEB / "index.html").read_text(encoding="utf-8")
 
 
 def test_the_font_is_bundled_with_its_licence_and_nothing_is_fetched_remotely(client):
@@ -204,9 +209,124 @@ def test_the_font_is_bundled_with_its_licence_and_nothing_is_fetched_remotely(cl
 
 
 def test_page_never_inserts_document_text_as_html():
-    script = (Path(__file__).parent.parent / "src" / "careerfit" / "web" / "app.js").read_text(encoding="utf-8")
-    for sink in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write"):
-        assert sink not in script
+    for name in ("app.js", "privacy.js"):
+        script = (WEB / name).read_text(encoding="utf-8")
+        for sink in ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write"):
+            assert sink not in script, name
+
+
+# ---- usage records, the waitlist and donations ----
+
+NOW = datetime(2026, 10, 16, 21, 45, 12, tzinfo=timezone.utc)
+VISITOR = "3f2b8c1e-9a4d-4c7b-8e2f-1a2b3c4d5e6f"
+
+
+class FailingStore(MemoryStore):
+    def put(self, record):
+        raise ConnectionError("DynamoDB unreachable")
+
+    def delete(self, pk, sk):
+        raise ConnectionError("DynamoDB unreachable")
+
+
+def _client(store, **kwargs):
+    return TestClient(create_app(rate_limit=(1000, 60.0), store=store, now=lambda: NOW, **kwargs))
+
+
+def test_an_event_is_stored_with_the_day_and_no_address():
+    store = MemoryStore()
+    response = _client(store).post("/api/event", json={"type": "download", "visitor": VISITOR, "props": {"kind": "md"}})
+    assert response.status_code == 204
+    [record] = store.records.values()
+    assert set(record) == {"pk", "sk", "type", "day", "props", "expires_at", "visitor"}
+    assert (record["pk"], record["type"], record["props"]) == ("EVENT#2026-10-16", "download", {"kind": "md"})
+    assert "testclient" not in repr(record)  # TestClient's client address
+
+
+def test_an_event_outside_the_allow_list_is_a_400_and_not_stored():
+    store = MemoryStore()
+    response = _client(store).post("/api/event", json={"type": "download", "props": {"resume_text": "Jane Doe"}})
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Property 'resume_text' is not allowed for download."}
+    assert store.records == {}
+
+
+def test_an_oversized_or_non_json_event_is_refused():
+    client = _client(MemoryStore())
+    assert client.post("/api/event", content=b"{" + b" " * 3000 + b"}").status_code == 413
+    assert client.post("/api/event", content=b"not json").json() == {"detail": "Send a JSON object."}
+
+
+def test_events_have_their_own_rate_limit():
+    client = TestClient(create_app(store=MemoryStore(), clock=lambda: 0.0))  # every request inside one window
+    for _ in range(120):
+        assert client.post("/api/event", json={"type": "waitlist_joined"}).status_code == 204
+    refused = client.post("/api/event", json={"type": "waitlist_joined"})
+    assert refused.status_code == 429
+    assert refused.json()["detail"].startswith("Too many events from this address.")
+
+
+def test_joining_and_leaving_the_waitlist():
+    store = MemoryStore()
+    client = _client(store)
+    joined = client.post("/api/waitlist", json={"email": "  Jane.Doe@Example.com "})
+    assert joined.status_code == 201
+    assert store.query("WAITLIST") == [{"pk": "WAITLIST", "sk": "jane.doe@example.com", "day": "2026-10-16",
+                                        "consent": "v1: email me when careerfit's AI analysis launches"}]
+    left = client.post("/api/waitlist/remove", json={"email": "jane.doe@example.com"})
+    assert left.json() == {"detail": "If that address was on the waitlist, it has been removed."}
+    assert store.query("WAITLIST") == []
+    # the same answer for an address that was never listed, so the form can't look one up
+    assert client.post("/api/waitlist/remove", json={"email": "never@example.com"}).json() == left.json()
+
+
+def test_an_invalid_waitlist_email_is_a_clear_422():
+    response = _client(MemoryStore()).post("/api/waitlist", json={"email": "jane@"})
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Enter a valid email address."}
+
+
+def test_a_waitlist_that_cannot_be_saved_says_so():
+    response = _client(FailingStore()).post("/api/waitlist", json={"email": "jane@example.com"})
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Your email could not be saved just now. Please try again later."}
+
+
+def test_an_analysis_keeps_skill_statistics_only_and_never_document_text():
+    store = MemoryStore()
+    response = analyze(_client(store))
+    assert response.status_code == 200
+    assert response.json()["jd_donated"] is False
+    [record] = store.records.values()
+    assert record["pk"] == "SKILLS#2026-10-16"
+    assert set(record) == {"pk", "sk", "day", "skills", "expires_at"}
+    assert sorted(record["skills"]) == sorted([name, level, status.value] for name, (status, level) in EXPECTED.items())
+    assert "Backend Engineer" not in repr(store.records)  # a line from both documents
+
+
+def test_a_donated_job_description_is_kept_scrubbed_and_never_the_resume():
+    store = MemoryStore()
+    jd = "Requirements\n- Python\n- Kubernetes\nQuestions: hiring@acme.example or 980-555-0101\n"
+    response = analyze(_client(store), jd=None, jd_text=jd, donate_jd="true")
+    assert response.json()["jd_donated"] is True
+    [donation] = store.query("JD#2026-10-16")
+    assert donation["text"] == "Requirements\n- Python\n- Kubernetes\nQuestions: [email removed] or [phone removed]"
+    assert donation["source_format"] == "pasted"
+    assert "Backend Engineer" not in repr(store.records)  # the resume's title line
+
+
+def test_a_storage_failure_never_breaks_an_analysis():
+    response = analyze(_client(FailingStore()), jd=None, jd_text="Requirements\n- Python\n", donate_jd="true")
+    assert response.status_code == 200
+    assert response.json()["jd_donated"] is False
+
+
+def test_the_privacy_page_is_served_with_the_csp_and_states_the_log_retention():
+    page = _client(MemoryStore()).get("/privacy")
+    assert page.status_code == 200
+    assert "script-src 'self'" in page.headers["content-security-policy"]
+    assert '<script src="/static/privacy.js" defer></script>' in page.text
+    assert "14 days" in page.text and "IP address" in page.text
 
 
 def test_no_api_docs_are_exposed(client):

@@ -221,11 +221,37 @@ def test_the_image_starts_for_any_user_without_path():
 
 # ---- the boundary, the image repository and the app template ----
 
-def test_the_boundary_allows_only_writing_the_functions_own_logs():
+def _boundary_statements() -> dict[str, dict]:
     statements = bootstrap()["Resources"]["ExecutionRoleBoundary"]["Properties"]["PolicyDocument"]["Statement"]
-    allowed = {a for s in statements for a in _as_list(s["Action"])}
-    assert allowed == {"logs:CreateLogStream", "logs:PutLogEvents"}
-    assert all("/aws/lambda/${AppStackName}-web" in s["Resource"] for s in statements)
+    return {s["Sid"]: s for s in statements}
+
+
+def test_the_boundary_allows_only_writing_the_functions_own_logs():
+    logs = _boundary_statements()["WriteOwnLogsOnly"]
+    assert set(_as_list(logs["Action"])) == {"logs:CreateLogStream", "logs:PutLogEvents"}
+    assert "/aws/lambda/${AppStackName}-web" in logs["Resource"]
+
+
+def test_the_boundary_allows_nothing_but_those_logs_and_writes_to_the_apps_own_table():
+    statements = _boundary_statements()
+    assert set(statements) == {"WriteOwnLogsOnly", "WriteOwnTableOnly"}
+    assert all(s["Effect"] == "Allow" for s in statements.values())
+    table = statements["WriteOwnTableOnly"]
+    assert set(_as_list(table["Action"])) == {"dynamodb:PutItem", "dynamodb:DeleteItem"}  # no reads, no scans
+    assert table["Resource"] == "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AppStackName}-data"
+
+
+def test_the_table_is_retained_expires_usage_records_and_the_function_may_only_write_it():
+    resources = _cfn(APP)["Resources"]
+    table = resources["DataTable"]
+    assert (table["DeletionPolicy"], table["UpdateReplacePolicy"]) == ("Retain", "Retain")
+    assert table["Properties"]["TableName"] == "${AWS::StackName}-data"  # the name the boundary allows
+    assert table["Properties"]["BillingMode"] == "PAY_PER_REQUEST"
+    assert table["Properties"]["TimeToLiveSpecification"] == {"AttributeName": "expires_at", "Enabled": True}
+    function = resources["WebFunction"]["Properties"]
+    assert function["Environment"]["Variables"]["CAREERFIT_TABLE"] == "DataTable"
+    assert function["Policies"] == [{"Statement": [{"Effect": "Allow", "Action": ["dynamodb:PutItem", "dynamodb:DeleteItem"],
+                                                    "Resource": "DataTable.Arn"}]}]
 
 
 def test_cleanup_never_expires_the_running_image():

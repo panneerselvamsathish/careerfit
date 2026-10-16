@@ -92,3 +92,23 @@ def test_facts_imports_no_other_careerfit_module() -> None:
         if own:
             offenders[str(file.relative_to(PKG))] = own
     assert not offenders, f"facts/ may only import from careerfit.facts: {offenders}"
+
+
+def test_only_store_talks_to_aws() -> None:
+    """boto3 stays in store.py: the pipeline, the report and the usage rules never reach DynamoDB."""
+    offenders = {}
+    for file in PKG.glob("**/*.py"):
+        if file == PKG / "store.py":
+            continue
+        aws = {imp for imp in imports_of(file) if imp.split(".")[0] in {"boto3", "botocore"}}
+        if aws:
+            offenders[str(file.relative_to(PKG))] = aws
+    assert not offenders, f"only store.py may import boto3: {offenders}"
+
+
+def test_the_usage_rules_are_pure() -> None:
+    """usage.py decides what may be stored about a visitor; it reaches no web framework, network or store."""
+    banned = WEB | RAW_HTTP | LLM_SDKS | {"boto3", "botocore", "careerfit.store"}
+    imported = imports_of(PKG / "usage.py")
+    found = {imp for imp in imported if any(imp == ban or imp.startswith(ban + ".") for ban in banned)}
+    assert not found, f"usage.py imports {found}"

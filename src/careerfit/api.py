@@ -2,9 +2,14 @@
 
 Keyword pass only. The LLM judge (--deep) stays in the CLI: a paid call behind a public
 endpoint needs identity, metering and rate limits first, and those belong here, not in judge/.
+
+Also the only place that stores anything about visitors (usage events, skill statistics, the opt-in
+waitlist and donated job descriptions). What may be stored is decided in usage.py; where, in store.py.
 """
 
 import argparse
+import json
+import logging
 import math
 import mimetypes
 import os
@@ -22,12 +27,15 @@ import uvicorn
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
+from careerfit import usage
 from careerfit.analyze.observations import build_facts
 from careerfit.analyze.ontology import load_ontology
 from careerfit.facts.schema import Coverage
 from careerfit.ingest.document import read_document
 from careerfit.report import blind_spot_notes, render_markdown
+from careerfit.store import DynamoStore, MemoryStore, Store
 
 DEFAULT_ONTOLOGY = Path(__file__).parent / "ontology" / "skills.yaml"
 WEB_DIR = Path(__file__).parent / "web"
@@ -38,6 +46,11 @@ MAX_FILE_MB = 5  # AWS Lambda sets 2 (CAREERFIT_MAX_FILE_MB): its 6 MB payload l
 MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024
 MAX_PDF_PAGES = 20  # a resume or JD is a few pages; parsing hundreds is a way to burn the server's CPU
 RATE_LIMIT = (10, 60.0)  # analyses per client IP per window (seconds)
+EVENT_RATE_LIMIT = (120, 60.0)  # usage events: a busy page sends a few per minute
+SIGNUP_RATE_LIMIT = (5, 60.0)  # waitlist joins and removals
+MAX_JSON_BYTES = 2048  # an event or a waitlist request is a few hundred bytes
+
+log = logging.getLogger("careerfit")
 
 SECURITY_HEADERS = {
     # No inline script or style anywhere, so the page cannot run markup injected from a document.
@@ -199,21 +212,31 @@ def create_app(
     rate_limit: tuple[int, float] = RATE_LIMIT,
     clock: Callable[[], float] = time.monotonic,
     max_file_mb: int = MAX_FILE_MB,
+    store: Store | None = None,
+    now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> FastAPI:
     if max_file_mb < 1:
         raise ValueError(f"max_file_mb must be at least 1, got {max_file_mb}")
     ontology = load_ontology(ontology_path)
+    store = MemoryStore() if store is None else store
     limiter = RateLimiter(*rate_limit, clock=clock)
+    limited = {
+        "/api/analyze": (limiter, "analyses"),
+        "/api/event": (RateLimiter(*EVENT_RATE_LIMIT, clock=clock), "events"),
+        "/api/waitlist": (signups := RateLimiter(*SIGNUP_RATE_LIMIT, clock=clock), "waitlist requests"),
+        "/api/waitlist/remove": (signups, "waitlist requests"),
+    }
     app = FastAPI(title="careerfit", docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.middleware("http")
     async def limits_and_headers(request: Request, call_next):
-        wait = None
-        if request.url.path == "/api/analyze" and request.method == "POST":
+        wait, what = None, ""
+        if request.method == "POST" and request.url.path in limited:
+            bucket, what = limited[request.url.path]
             # request.client is the real client only when uvicorn trusts the proxy (see run()).
-            wait = limiter.retry_after(request.client.host if request.client else "unknown")
+            wait = bucket.retry_after(request.client.host if request.client else "unknown")
         if wait is not None:
-            response = JSONResponse({"detail": f"Too many analyses from this address. Try again in {wait} s."},
+            response = JSONResponse({"detail": f"Too many {what} from this address. Try again in {wait} s."},
                                     status_code=429, headers={"Retry-After": str(wait)})
         else:
             response = await call_next(request)
@@ -229,6 +252,64 @@ def create_app(
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:
         return FileResponse(WEB_DIR / "index.html")
+
+    def keep(record: dict) -> bool:
+        """Stores a record. A storage failure is logged by kind only (never content) and never fails
+        the request it rides on: an analysis must not depend on DynamoDB being reachable."""
+        try:
+            store.put(record)
+            return True
+        except Exception as e:  # noqa: BLE001 - any storage error leaves the response intact
+            log.warning("careerfit: could not store a %s record (%s)", record["pk"].split("#")[0], type(e).__name__)
+            return False
+
+    async def json_body(request: Request) -> object:
+        body = await request.body()
+        if len(body) > MAX_JSON_BYTES:
+            raise UploadError(413, f"The request is larger than {MAX_JSON_BYTES} bytes.")
+        try:
+            return json.loads(body)
+        except ValueError as e:
+            raise UploadError(400, "Send a JSON object.") from e
+
+    @app.get("/privacy", include_in_schema=False)
+    def privacy() -> FileResponse:
+        return FileResponse(WEB_DIR / "privacy.html")
+
+    @app.post("/api/event", status_code=204)
+    async def event(request: Request) -> Response:
+        try:
+            kind, visitor, props = usage.parse_event(await json_body(request))
+        except ValueError as e:
+            raise UploadError(400, str(e)) from e
+        await run_in_threadpool(keep, usage.event_record(kind, visitor, props, now()))
+        return Response(status_code=204)
+
+    @app.post("/api/waitlist", status_code=201)
+    async def waitlist(request: Request) -> JSONResponse:
+        payload = await json_body(request)
+        try:
+            email = usage.normalise_email(payload.get("email") if isinstance(payload, dict) else None)
+        except ValueError as e:
+            raise UploadError(422, str(e)) from e
+        if not await run_in_threadpool(keep, usage.waitlist_record(email, now())):
+            raise UploadError(503, "Your email could not be saved just now. Please try again later.")
+        return JSONResponse({"detail": "Thanks. We'll email you when the AI analysis launches."}, status_code=201)
+
+    @app.post("/api/waitlist/remove")
+    async def waitlist_remove(request: Request) -> JSONResponse:
+        payload = await json_body(request)
+        try:
+            email = usage.normalise_email(payload.get("email") if isinstance(payload, dict) else None)
+        except ValueError as e:
+            raise UploadError(422, str(e)) from e
+        try:
+            await run_in_threadpool(store.delete, "WAITLIST", email)
+        except Exception as e:  # noqa: BLE001
+            log.warning("careerfit: could not remove a WAITLIST record (%s)", type(e).__name__)
+            raise UploadError(503, "The address could not be removed just now. Please try again later.") from e
+        # The same answer whether or not the address was listed, so this can't be used to look one up.
+        return JSONResponse({"detail": "If that address was on the waitlist, it has been removed."})
 
     @app.get("/healthz", include_in_schema=False)
     def healthz() -> dict[str, str]:
@@ -250,6 +331,7 @@ def create_app(
         jd: UploadFile | None = File(None),
         jd_text: str | None = Form(None),
         perspective: Literal["candidate", "hiring_manager"] = Form("candidate"),
+        donate_jd: bool = Form(False),
     ) -> JSONResponse:
         # Sync on purpose: FastAPI runs it in a worker thread, so PDF parsing never blocks the event loop.
         has_text = bool(jd_text and jd_text.strip())
@@ -268,6 +350,7 @@ def create_app(
             resume_text, resume_coverage = _read(resume_path)
             jd_text_read, jd_coverage = _read(jd_path)
 
+        at = now()
         facts = build_facts(
             resume_text=resume_text,
             resume_coverage=resume_coverage,
@@ -276,13 +359,21 @@ def create_app(
             jd_coverage=jd_coverage,
             jd_source=jd_path.name,
             ontology=ontology,
-            at=datetime.now(timezone.utc),
+            at=at,
             perspective=perspective,
         )
+        # Aggregate demand: careerfit's own skill names and verdicts, no text, no visitor ID.
+        if facts.skill_observations:
+            keep(usage.skill_stats_record(
+                ((o.skill, o.requirement, o.status.value) for o in facts.skill_observations), at))
+        # Only when the visitor ticked the box: the job description, contacts removed. Never the resume.
+        donation = usage.donation_record(jd_text_read, "pasted" if has_text else jd_coverage.source_format, at) \
+            if donate_jd else None
         return JSONResponse({
             "facts": facts.model_dump(mode="json"),
             "blind_spots": blind_spot_notes(facts),  # plain text: the page shows it with textContent
             "report_markdown": render_markdown(facts),
+            "jd_donated": donation is not None and keep(donation),
         })
 
     app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
@@ -303,8 +394,12 @@ def run(argv: list[str] | None = None, env: dict[str, str] | None = None) -> Non
     if not raw.isdigit() or int(raw) < 1:  # fail at startup, not on every upload
         parser.error(f"CAREERFIT_MAX_FILE_MB must be a whole number of MB, at least 1 (got {raw!r})")
     max_file_mb = int(raw)
+    table = env.get("CAREERFIT_TABLE")
+    store = DynamoStore(table) if table else MemoryStore()
+    print(f"careerfit: usage records, waitlist and donations go to "
+          f"{'DynamoDB table ' + table if table else 'memory only (set CAREERFIT_TABLE to keep them)'}")
     # proxy_headers: behind the platform's proxy, the client IP for rate limiting comes from
     # X-Forwarded-For, trusted only from FORWARDED_ALLOW_IPS (uvicorn's default: 127.0.0.1).
     # On Lambda the Web Adapter is that proxy and connects from 127.0.0.1, so the default is right.
-    uvicorn.run(create_app(max_file_mb=max_file_mb), host=args.host, port=args.port, proxy_headers=True,
+    uvicorn.run(create_app(max_file_mb=max_file_mb, store=store), host=args.host, port=args.port, proxy_headers=True,
                 server_header=False)

@@ -25,6 +25,12 @@ const ACCEPTED_TYPES = [".pdf", ".txt"]; // the server's own rule (ingest/docume
 const LONG_QUOTE = 180; // characters: a longer quote starts clamped to three lines, with a toggle
 const REPEAT_QUOTE = 80; // a repeated line longer than this is shown once per view, then referenced
 
+// Usage counts (see /privacy). Only these fields are ever sent, and the server refuses anything else.
+const VISITOR_KEY = "careerfit-visitor";
+const OPT_OUT_KEY = "careerfit-usage-opt-out";
+const TOKEN_RE = /^[A-Za-z0-9._-]{1,64}$/;
+const HOST_RE = /^[a-z0-9.-]{1,253}$/;
+
 const $ = (id) => document.getElementById(id);
 let downloadUrls = [];
 let maxFileMb = 5; // replaced by the server's own limit on load
@@ -68,6 +74,67 @@ function icon(name, className = "icon") {
 function uid(prefix) {
   nextId += 1;
   return `${prefix}-${nextId}`;
+}
+
+// ---- usage counts ----
+
+function storageGet(key) {
+  try { return window.localStorage.getItem(key); } catch { return null; }
+}
+
+function storageSet(key, value) {
+  try { window.localStorage.setItem(key, value); } catch { /* private mode: no ID, events go anonymous */ }
+}
+
+// "off" after an opt-out on /privacy; "anonymous" (no visitor ID) under Global Privacy Control or Do
+// Not Track; otherwise "on": a random ID that only this browser holds.
+function trackingMode() {
+  if (storageGet(OPT_OUT_KEY) === "1") return "off";
+  if (navigator.globalPrivacyControl === true || navigator.doNotTrack === "1") return "anonymous";
+  return "on";
+}
+
+function visitorId() {
+  if (trackingMode() !== "on") return null;
+  let id = storageGet(VISITOR_KEY);
+  if (!id && window.crypto?.randomUUID) {
+    id = window.crypto.randomUUID();
+    storageSet(VISITOR_KEY, id);
+  }
+  return id || null;
+}
+
+function track(type, props = {}) {
+  if (trackingMode() === "off") return;
+  const visitor = visitorId();
+  const body = JSON.stringify(visitor ? { type, visitor, props } : { type, props });
+  try {
+    if (navigator.sendBeacon?.("/api/event", new Blob([body], { type: "application/json" }))) return;
+    fetch("/api/event", { method: "POST", body, keepalive: true, headers: { "Content-Type": "application/json" } })
+      .catch(() => {});
+  } catch {
+    // counting must never get in the way of the page
+  }
+}
+
+function pageViewProps() {
+  const props = { path: "/" };
+  try {
+    const ref = document.referrer ? new URL(document.referrer).hostname.toLowerCase() : "";
+    if (ref && ref !== window.location.hostname && HOST_RE.test(ref)) props.ref_host = ref;
+  } catch {
+    // an unparsable referrer is simply not counted
+  }
+  const params = new URLSearchParams(window.location.search);
+  for (const key of ["utm_source", "utm_medium", "utm_campaign"]) {
+    const value = params.get(key);
+    if (value && TOKEN_RE.test(value)) props[key] = value;
+  }
+  return props;
+}
+
+function fileType(file) {
+  return file.name.toLowerCase().endsWith(".pdf") ? "pdf" : "txt";
 }
 
 function announce(message, regionId = "status") {
@@ -264,10 +331,16 @@ async function submit(event) {
     // Only the visible job description input is sent, so a file or text left in the other mode
     // can never override what the user is looking at. The server still requires exactly one.
     const form = new FormData();
-    form.append("resume", $("resume").files[0]);
-    if (jdMode() === "file") form.append("jd", $("jd").files[0]);
+    const resumeFile = $("resume").files[0];
+    const mode = jdMode();
+    form.append("resume", resumeFile);
+    if (mode === "file") form.append("jd", $("jd").files[0]);
     else form.append("jd_text", $("jd_text").value.trim());
-    form.append("perspective", document.querySelector('input[name="perspective"]:checked').value);
+    const perspective = document.querySelector('input[name="perspective"]:checked').value;
+    form.append("perspective", perspective);
+    const donate = $("donate_jd").checked;
+    if (donate) form.append("donate_jd", "true"); // opt-in only: unticked, nothing about the JD is kept
+    const started = performance.now();
 
     announce("Analysing. This usually takes a few seconds.");
     const response = await fetch("/api/analyze", { method: "POST", body: form });
@@ -277,13 +350,25 @@ async function submit(event) {
         : response.status === 413 ? `The upload is too large for this server (limit ${maxFileMb} MB per file).`
         : response.status === 429 ? "Too many analyses from this address. Wait a minute and try again."
         : "The server could not read that request.";
+      track("analysis_failed", { status: response.status });
       return showError(detail);
     }
     render(payload);
+    const facts = payload.facts.skill_observations;
+    const count = (status) => facts.filter((o) => o.status === status).length;
+    track("analysis_completed", {
+      perspective, jd_mode: mode, resume_type: fileType(resumeFile),
+      jd_type: mode === "text" ? "pasted" : fileType($("jd").files[0]),
+      skills: facts.length, must: facts.filter((o) => o.requirement === "must").length,
+      nice: facts.filter((o) => o.requirement === "nice").length,
+      matched: count("matched"), gaps: count("gap"), ambiguous: count("unresolvable"),
+      ms: Math.min(600000, Math.round(performance.now() - started)), donated: payload.jd_donated ? "yes" : "no",
+    });
     const n = payload.facts.skill_observations.length;
     announce(`Analysis ready: ${n} skill${n === 1 ? "" : "s"} from the job description.`);
     $("title").focus();
   } catch {
+    track("analysis_failed", { status: 0 });
     showError("Could not reach the careerfit server.");
   } finally {
     setBusy(false);
@@ -333,6 +418,7 @@ function quoteToggle(quote, more, less, mode, describedBy) {
     button.textContent = open ? less : more;
     if (mode === "hidden") quote.hidden = !open;
     else quote.classList.toggle("is-clamped", !open);
+    if (open) track("expand", { kind: mode === "hidden" ? "repeat" : "clamp" });
   });
   return button;
 }
@@ -437,6 +523,7 @@ function renderFilters(all) {
       activeFilter = f.key;
       $("filters").querySelectorAll(".filter").forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
       renderGroups();
+      track("filter", { key: f.key });
       announce(f.statuses ? `Showing ${counts[f.key]} of ${all.length} skills: ${f.label.toLowerCase()}.` : `Showing all ${all.length} skills.`, "filter-status");
     });
     return button;
@@ -509,7 +596,11 @@ function render(payload) {
   const candidate = facts.perspective === "candidate";
   $("title").textContent = candidate ? "Your fit for this job" : "Candidate against the job description";
   $("meta").textContent =
-    `${candidate ? "Candidate" : "Hiring manager"} report · ${source(facts.resume_source)} compared with ${source(facts.jd_source)}`;
+    `${candidate ? "Candidate" : "Hiring manager"} report · ${source(facts.resume_source)} compared with ${source(facts.jd_source)}` +
+    (payload.jd_donated ? " · Job description donated, thank you" : "");
+  $("waitlist-pitch").textContent =
+    `An optional AI pass that settles ${ambiguous ? `the ${ambiguous} ambiguous skill${ambiguous === 1 ? "" : "s"} in this result` : "ambiguous skills"}, ` +
+    "scores the fit and writes a learning plan for the gaps. Leave your email to hear when it launches.";
 
   const summary = $("summary");
   summary.setAttribute("role", "group");
@@ -541,6 +632,45 @@ function render(payload) {
   $("result").hidden = false;
 }
 
+async function joinWaitlist(event) {
+  event.preventDefault();
+  const button = $("waitlist-submit");
+  const input = $("waitlist-email");
+  const message = $("waitlist-message");
+  if (button.getAttribute("aria-disabled") === "true") return;
+  const email = input.value.trim();
+  if (!email) {
+    message.textContent = "Enter your email address.";
+    message.className = "waitlist-message is-error";
+    input.setAttribute("aria-invalid", "true");
+    input.focus();
+    return;
+  }
+  button.setAttribute("aria-disabled", "true");
+  try {
+    const response = await fetch("/api/waitlist", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    const ok = response.ok;
+    message.textContent = typeof payload.detail === "string" ? payload.detail
+      : ok ? "Thanks. We'll email you when it launches." : "That didn't work. Please try again later.";
+    message.className = `waitlist-message ${ok ? "is-ok" : "is-error"}`;
+    if (ok) {
+      input.removeAttribute("aria-invalid");
+      input.value = "";
+      track("waitlist_joined");
+    } else {
+      input.setAttribute("aria-invalid", "true");
+    }
+  } catch {
+    message.textContent = "Could not reach the careerfit server.";
+    message.className = "waitlist-message is-error";
+  } finally {
+    button.removeAttribute("aria-disabled");
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const refreshResume = setupUpload("resume", "resume-error");
   const refreshJd = setupUpload("jd", "jd-error");
@@ -556,4 +686,8 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("drop", (event) => { if (hasFiles(event)) event.preventDefault(); });
   applyJdMode(refreshJd);
   $("form").addEventListener("submit", submit);
+  $("waitlist-form").addEventListener("submit", joinWaitlist);
+  $("download-report").addEventListener("click", () => track("download", { kind: "md" }));
+  $("download-facts").addEventListener("click", () => track("download", { kind: "json" }));
+  track("page_view", pageViewProps());
 });

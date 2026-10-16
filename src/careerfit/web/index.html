@@ -102,6 +102,11 @@
                       aria-describedby="jd-error"></textarea>
           </div>
           <p id="jd-error" class="field-error" hidden></p>
+          <div class="donate">
+            <input type="checkbox" id="donate_jd" name="donate_jd" class="checkbox">
+            <label for="donate_jd">Donate this job description to help careerfit learn more skills. Its text is
+              kept, with emails and phone numbers removed. Your resume is never kept.</label>
+          </div>
         </section>
       </div>
 
@@ -125,7 +130,9 @@
         </button>
         <p class="privacy">
           <svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>
-          <span>Keyword matching only, no LLM. Files are parsed on this server, never sent anywhere else, and deleted before the results come back. Nothing from them is kept.</span>
+          <span>Keyword matching only, no LLM. Files are parsed on this server, never sent anywhere else, and
+            deleted before the results come back. Your resume is never kept. Anonymous usage counts help improve
+            careerfit. <a href="/privacy">Privacy</a></span>
         </p>
       </div>
       <p id="error" class="form-error" role="alert" hidden></p>
@@ -164,6 +171,21 @@
         </section>
       </div>
       <p id="no-skills" class="empty-state" hidden></p>
+
+      <section class="waitlist" aria-labelledby="waitlist-heading">
+        <h3 id="waitlist-heading" class="group-title">Coming next: AI analysis</h3>
+        <p id="waitlist-pitch" class="waitlist-text">An optional AI pass that settles ambiguous skills, scores the fit
+          and writes a learning plan for the gaps. Leave your email to hear when it launches.</p>
+        <form id="waitlist-form" class="waitlist-form" novalidate>
+          <label for="waitlist-email" class="visually-hidden">Email address</label>
+          <input type="email" id="waitlist-email" name="email" autocomplete="email" inputmode="email"
+                 placeholder="you@example.com" aria-describedby="waitlist-note waitlist-message">
+          <button type="submit" id="waitlist-submit" class="button-secondary">Notify me</button>
+        </form>
+        <p id="waitlist-note" class="hint">Used only for that news, never shared. Remove it any time on the
+          <a href="/privacy">privacy page</a>.</p>
+        <p id="waitlist-message" class="waitlist-message" role="status"></p>
+      </section>
 
       <section class="limits" aria-labelledby="limits-heading">
         <h3 id="limits-heading" class="group-title">What this analysis could not see</h3>

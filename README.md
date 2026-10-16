@@ -227,14 +227,45 @@ verdicts.
 - **Keyword pass only.** The web app never calls an LLM, so nothing leaves the server. `--deep`
   stays in the CLI: a paid LLM call behind a web endpoint needs user identity, usage metering and
   rate limits first.
-- **Nothing is kept.** Uploads are buffered and written to temporary files for parsing, and deleted
-  before the response is sent; API responses carry `Cache-Control: no-store`.
+- **The resume is never kept.** Uploads are buffered and written to temporary files for parsing, and
+  deleted before the response is sent; API responses carry `Cache-Control: no-store`. What careerfit
+  does keep is listed below and on the page's `/privacy` notice.
 - **Document text is shown, never run.** The page sets every value with `textContent`, and a
   strict Content-Security-Policy allows only the app's own script and stylesheet.
 - **Limits:** 5 MB per file and about 10 MB per request, enforced while the upload streams in;
   20 pages per PDF; 10 analyses per minute per client address (HTTP 429 with `Retry-After`).
   The server binds to `127.0.0.1` by default; `--host`/`--port` (or `CAREERFIT_HOST`/`PORT`)
   change that. There is no authentication yet: accounts come with Milestone 10.
+
+### Usage counts, the waitlist and donations
+
+The web app keeps a few things, all described on `/privacy`. What may be stored is decided in one pure
+module, `src/careerfit/usage.py`; only `src/careerfit/store.py` talks to DynamoDB.
+
+| Record | When | Holds | Kept for |
+|---|---|---|---|
+| Usage event | each page view, analysis, download, filter, opened quote | a random ID the browser made (none under Global Privacy Control or Do Not Track; none at all after an opt-out on `/privacy`), the event's allow-listed fields, the referring site and `utm_*` tags, the **day** | 400 days (DynamoDB TTL) |
+| Skill statistics | each analysis | careerfit's skill names, must/nice, matched/gap/ambiguous, the day; no visitor ID | 400 days |
+| Waitlist email | only when submitted | the address, the day, the consent text | until removed on `/privacy` |
+| Donated job description | only when the box is ticked | the text with emails and phone numbers removed, its type, the day; never the resume | kept |
+
+- **No document text in events.** `/api/event` refuses any type or field not on the allow-list, so a
+  visitor's text can't reach an event. Records hold the day, never the time, so they can't be lined
+  up with the 14-day access logs (which do hold IP addresses).
+- **Storage never breaks an analysis.** If DynamoDB is unreachable, the analysis still returns; only
+  the waitlist reports the failure.
+- **Locally**, without `CAREERFIT_TABLE`, records go to memory and vanish on restart.
+
+The report, with your own credentials (the function's role can only write the table, never read it):
+
+```bash
+uv run python scripts/usage_report.py --profile careerfit --region us-east-2 --days 30
+```
+
+It prints daily views, unique and repeat visitors, how many ran an analysis, downloads, referrers and
+`utm_source`, waitlist and donation counts, and the most requested skills with their gap rates. It never
+prints addresses or donated text. Tag links you share to see where visitors come from, e.g.
+`https://<your URL>/?utm_source=linkedin&utm_campaign=launch`.
 
 ### Running it in a container
 
@@ -261,7 +292,7 @@ log retention and an optional $5/month budget alarm.
 sam build
 sam deploy --guided --image-repository <ImageRepositoryUri>   # stack name careerfit; prints the URL
 sam build && sam deploy                     # later deploys: rebuild, then reuse samconfig.toml
-sam delete                                  # removes everything the app stack created
+sam delete                                  # removes the app stack; its DynamoDB table is retained
 ```
 
 `sam deploy --guided` saves its answers, including the budget email and `--profile`, in

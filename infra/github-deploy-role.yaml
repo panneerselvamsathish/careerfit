@@ -93,7 +93,8 @@ Resources:
                 aws:sourceArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppStackName}-web
 
   # The ceiling for the function's execution role. CI may only create or change that role with this
-  # boundary attached, so even a role CI rewrote can do no more than write the function's own logs.
+  # boundary attached, so even a role CI rewrote can do no more than write the function's own logs
+  # and add or remove items in the app's own table.
   ExecutionRoleBoundary:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -108,6 +109,12 @@ Resources:
               - logs:CreateLogStream
               - logs:PutLogEvents
             Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AppStackName}-web:*
+          - Sid: WriteOwnTableOnly
+            Effect: Allow
+            Action:
+              - dynamodb:PutItem
+              - dynamodb:DeleteItem
+            Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AppStackName}-data
 
   DeployRole:
     Type: AWS::IAM::Role
@@ -253,6 +260,20 @@ Resources:
                 Resource:
                   - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AppStackName}-web
                   - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AppStackName}-web:*
+              # Create and configure the app's table. The table is retained on stack delete, so no DeleteTable.
+              - Sid: TheAppTableOnly
+                Effect: Allow
+                Action:
+                  - dynamodb:CreateTable
+                  - dynamodb:DescribeTable
+                  - dynamodb:UpdateTable
+                  - dynamodb:UpdateTimeToLive
+                  - dynamodb:DescribeTimeToLive
+                  - dynamodb:DescribeContinuousBackups
+                  - dynamodb:TagResource
+                  - dynamodb:UntagResource
+                  - dynamodb:ListTagsOfResource
+                Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AppStackName}-data
               - Sid: TheAppBudgetOnly
                 Effect: Allow
                 Action:

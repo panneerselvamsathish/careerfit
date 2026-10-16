@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy · careerfit</title>
+  <link rel="preload" href="/static/fonts/SourceSans3VF-Upright.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/privacy.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="wrap">
+      <a class="brand brand-link" href="/">careerfit</a>
+      <p class="tagline">Compare a resume with a job description. Every result quotes the line it relies on.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <article class="panel prose">
+      <h1 id="title" class="page-title">Privacy</h1>
+      <p class="updated">Last updated 16 October 2026</p>
+
+      <h2>The short version</h2>
+      <ul>
+        <li>Your resume is read on careerfit's server to produce the result, then deleted. It is never kept.</li>
+        <li>careerfit counts visits with a random ID that only your browser holds. You can turn that off below.</li>
+        <li>Your email and a job description's text are kept only if you choose to give them.</li>
+        <li>No cookies, no advertising, no third-party analytics, and nothing is sold or shared.</li>
+      </ul>
+
+      <h2>Your files</h2>
+      <p>careerfit runs on Amazon Web Services (AWS Lambda, US East, Ohio). When you analyse, your resume and the
+        job description are written to a temporary folder on that server, read by careerfit's keyword rules, and
+        deleted before the result is sent back. The web app never sends them to an AI model or anyone else. Only a
+        job description you choose to donate is kept (below); your resume never is.</p>
+
+      <h2>What careerfit keeps</h2>
+      <table class="records">
+        <thead>
+          <tr><th scope="col">What</th><th scope="col">When</th><th scope="col">What it holds</th><th scope="col">Kept for</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Usage counts</th>
+            <td>On every visit, unless you turn them off</td>
+            <td>A random ID your browser made (none if your browser sends Global Privacy Control or Do Not Track),
+              what happened (a page view, an analysis with its counts of matched, gap and ambiguous skills, a
+              download, a filter, a quote opened, a waitlist sign-up), the name of the site that linked to careerfit
+              and any campaign tags in that link, and the day. No IP address, no time of day, no file names or
+              document text.</td>
+            <td>About 13 months</td>
+          </tr>
+          <tr>
+            <th scope="row">Skill statistics</th>
+            <td>Each analysis</td>
+            <td>The names of the skills from careerfit's own list that the job description asked for, whether each
+              was a must or nice to have, whether it was matched, a gap or ambiguous, and the day. Not linked to your
+              ID or to you.</td>
+            <td>About 13 months</td>
+          </tr>
+          <tr>
+            <th scope="row">Waitlist email</th>
+            <td>Only if you submit it</td>
+            <td>Your email address, the day you joined, and what you agreed to: news of careerfit's AI analysis.
+              Never shared.</td>
+            <td>Until you remove it</td>
+          </tr>
+          <tr>
+            <th scope="row">Donated job description</th>
+            <td>Only if you tick the box</td>
+            <td>The job description's text with email addresses and phone numbers removed (a best effort, so
+              don't donate one with other personal details), its file type, and the day. Not linked to you, and never
+              your resume.</td>
+            <td>Kept to grow careerfit's skill list</td>
+          </tr>
+          <tr>
+            <th scope="row">Server logs</th>
+            <td>Every request</td>
+            <td>Your IP address, the time, the page or API address requested, and the response status, recorded by
+              AWS. They are used to run the service and spot abuse. The limit of analyses per minute is counted per
+              address in memory and not stored.</td>
+            <td>14 days</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Your choices</h2>
+      <p>careerfit doesn't show a consent banner: the first visit is counted. To stop being counted in this browser,
+        turn usage counts off. That also deletes the random ID.</p>
+      <div class="control">
+        <span id="tracking-status" class="control-status">Checking this browser…</span>
+        <button type="button" id="tracking-toggle" class="button-secondary" hidden></button>
+      </div>
+      <p id="tracking-message" class="waitlist-message" role="status"></p>
+
+      <p>Clearing this site's data in your browser also removes the ID. To remove your email from the waitlist:</p>
+      <form id="remove-form" class="waitlist-form" novalidate>
+        <label for="remove-email" class="visually-hidden">Email address to remove</label>
+        <input type="email" id="remove-email" autocomplete="email" inputmode="email" placeholder="you@example.com"
+               aria-describedby="remove-message">
+        <button type="submit" id="remove-submit" class="button-secondary">Remove my email</button>
+      </form>
+      <p id="remove-message" class="waitlist-message" role="status"></p>
+
+      <h2>Who runs careerfit</h2>
+      <p>careerfit is an independent, open-source project. The code, including exactly what is recorded
+        (<code>usage.py</code>), is public at
+        <a href="https://github.com/panneerselvamsathish/careerfit">github.com/panneerselvamsathish/careerfit</a>.
+        Questions can go to a GitHub issue; don't post personal details there. If this page changes, the date at the
+        top changes with it.</p>
+
+      <p><a href="/">Back to careerfit</a></p>
+    </article>
+  </main>
+</body>
+</html>

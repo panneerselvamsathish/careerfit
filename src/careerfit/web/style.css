@@ -81,6 +81,8 @@ button, input, textarea { font: inherit; color: inherit; }
 }
 .brand { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
 .tagline { color: var(--muted); }
+.brand-link { color: var(--ink); text-decoration: none; }
+.page-title { font-size: 1.75rem; font-weight: 700; line-height: 1.25; }
 
 main.wrap { padding-top: 24px; padding-bottom: 56px; }
 
@@ -179,6 +181,13 @@ textarea {
 }
 textarea::placeholder { color: var(--muted); }
 textarea[aria-invalid="true"] { border-color: var(--bad); }
+
+.donate { display: flex; align-items: flex-start; gap: 10px; margin-top: 16px; font-size: 0.9375rem; color: var(--ink-soft); }
+.checkbox { flex: none; width: 18px; height: 18px; margin: 3px 0 0; accent-color: var(--teal); }
+.donate label { cursor: pointer; }
+
+a { color: var(--teal); text-underline-offset: 3px; }
+a:hover { color: var(--teal-hover); }
 
 /* ---- segmented choices (radio inputs underneath) ---- */
 
@@ -388,6 +397,26 @@ table.evidence tbody tr:last-child > * { border-bottom: 0; }
 
 .empty-state { margin-top: 8px; padding: 14px 16px; border-radius: var(--radius); background: var(--bg); color: var(--ink-soft); }
 
+.waitlist { margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--line-strong); }
+.waitlist-text { max-width: 720px; color: var(--ink-soft); }
+.waitlist-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.waitlist-form input {
+  flex: 1 1 260px;
+  max-width: 420px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--control);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.waitlist-form input[aria-invalid="true"] { border-color: var(--bad); }
+.waitlist-form .button-secondary { cursor: pointer; }
+.waitlist-form .button-secondary[aria-disabled="true"] { cursor: progress; color: var(--muted); }
+.waitlist-message { margin-top: 8px; font-weight: 600; }
+.waitlist-message:empty { display: none; }
+.waitlist-message.is-ok { color: var(--ok); }
+.waitlist-message.is-error { color: var(--bad); }
+
 .limits { margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--line-strong); }
 .limits ul { margin: 0; padding-left: 20px; }
 .limits li + li { margin-top: 4px; }
@@ -401,6 +430,21 @@ code {
   font-size: 0.875em;
   white-space: nowrap;
 }
+
+/* ---- the privacy page ---- */
+
+.prose { max-width: 760px; }
+.prose h2 { margin: 28px 0 8px; font-size: 1.25rem; font-weight: 700; }
+.prose h2:first-child { margin-top: 0; }
+.prose p + p, .prose p + ul, .prose ul + p { margin-top: 10px; }
+.prose ul { margin: 8px 0 0; padding-left: 20px; }
+.prose li + li { margin-top: 6px; }
+.updated { margin-top: 4px; color: var(--muted); }
+table.records { width: 100%; margin-top: 12px; border-collapse: collapse; }
+table.records th, table.records td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+table.records thead th { font-size: 0.875rem; color: var(--muted); border-bottom-color: var(--line-strong); }
+.control { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.control-status { font-weight: 600; }
 
 /* ---- small screens: stack the inputs; each skill becomes one labelled evidence item ---- */
 
@@ -447,6 +491,13 @@ code {
   .cell-status { grid-column: 2; justify-self: end; }
   .cell-evidence { grid-column: 1 / -1; margin-top: 6px; }
   .cell-label { display: block; margin-bottom: 2px; font-size: 0.8125rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+}
+
+@media (max-width: 720px) {
+  table.records thead { display: none; }
+  table.records, table.records tbody, table.records tr, table.records th, table.records td { display: block; }
+  table.records tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
+  table.records th, table.records td { padding: 2px 0; border: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
