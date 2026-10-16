@@ -137,6 +137,21 @@ def test_trust_policy_admits_one_repo_on_one_branch_with_no_wildcards():
     assert (params["GitHubRepo"]["Default"], params["Branch"]["Default"]) == ("panneerselvamsathish/careerfit", "main")
 
 
+def test_the_ci_parts_can_be_left_out_but_are_in_by_default():
+    """Accounts that deny iam:*Provider* still get what the app stack needs; CI is on unless turned off."""
+    template = bootstrap()
+    assert template["Parameters"]["GitHubDeployRole"]["Default"] == "true"
+    assert template["Conditions"]["MakeRole"] == ["GitHubDeployRole", "true"]
+    assert template["Conditions"]["MakeProvider"] == ["MakeRole", ["CreateOidcProvider", "true"]]
+    resources = template["Resources"]
+    assert resources["DeployRole"]["Condition"] == "MakeRole"
+    assert resources["GitHubOidcProvider"]["Condition"] == "MakeProvider"
+    assert template["Outputs"]["RoleArn"]["Condition"] == "MakeRole"
+    # template.yaml needs these whatever the setting: --image-repository and the PermissionsBoundary
+    for always in ("ImageRepository", "ExecutionRoleBoundary"):
+        assert "Condition" not in resources[always], always
+
+
 def test_the_deploy_role_is_named_outside_the_app_resources():
     name = bootstrap()["Resources"]["DeployRole"]["Properties"]["RoleName"]
     assert not name.startswith("${AppStackName}-"), "no app-scoped permission may ever match the deploy role"

@@ -19,3 +19,5 @@ scratch/
 
 # SAM build output (sam build)
 .aws-sam/
+# sam deploy --guided saves parameter values here, including the budget email
+samconfig.toml

@@ -10,6 +10,10 @@ Description: >
       --stack-name github-deploy-careerfit --capabilities CAPABILITY_NAMED_IAM --profile <personal>
   then copy the RoleArn output into the repository variable AWS_DEPLOY_ROLE_ARN.
 
+  Accounts that cannot create an OIDC provider (AWS's new sign-up experience, until advanced
+  features are activated) add --parameter-overrides GitHubDeployRole=false: the stack then creates
+  only the image repository and the boundary, and you deploy by hand.
+
 Parameters:
   GitHubRepo:
     Type: String
@@ -28,9 +32,18 @@ Parameters:
     Default: "true"
     AllowedValues: ["true", "false"]
     Description: An account can hold only one GitHub OIDC provider. Set "false" if it already exists.
+  GitHubDeployRole:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: >
+      "false" leaves out the GitHub OIDC provider and the CI role, for accounts whose policies deny
+      iam:*Provider* (AWS's new sign-up experience before advanced features). Deploy by hand; CI's
+      deploy job stays skipped while AWS_DEPLOY_ROLE_ARN is unset. Update to "true" once allowed.
 
 Conditions:
-  MakeProvider: !Equals [!Ref CreateOidcProvider, "true"]
+  MakeRole: !Equals [!Ref GitHubDeployRole, "true"]
+  MakeProvider: !And [!Condition MakeRole, !Equals [!Ref CreateOidcProvider, "true"]]
 
 Resources:
   GitHubOidcProvider:
@@ -98,6 +111,7 @@ Resources:
 
   DeployRole:
     Type: AWS::IAM::Role
+    Condition: MakeRole
     Properties:
       # Named outside the app's resource names, so no deploy permission below can ever reach it.
       RoleName: !Sub github-actions-${AppStackName}-deploy
@@ -270,6 +284,7 @@ Resources:
 
 Outputs:
   RoleArn:
+    Condition: MakeRole
     Description: Put this in the GitHub repository variable AWS_DEPLOY_ROLE_ARN
     Value: !GetAtt DeployRole.Arn
   ImageRepositoryUri:
