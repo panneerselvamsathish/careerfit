@@ -240,6 +240,22 @@ def test_pdf_over_the_page_limit_is_refused(client, tmp_path):
     assert response.json() == {"detail": "long.pdf has 21 pages; the limit is 20. Upload a shorter version."}
 
 
+def test_image_only_jd_pdf_is_accepted_and_says_nothing_was_read(client, tmp_path):
+    # The page words its empty state from jd_coverage: no skills found in what could be read,
+    # never "the job description mentions no skills".
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.rect(20, 20, 120, 60)  # a drawing only: no extractable text, like a scanned page
+    path = tmp_path / "scanned-jd.pdf"
+    pdf.output(str(path))
+    response = analyze(client, jd=("scanned-jd.pdf", path.read_bytes()))
+    assert response.status_code == 200
+    facts = response.json()["facts"]
+    assert facts["skill_observations"] == []
+    assert facts["jd_coverage"]["chars_extracted"] == 0
+    assert "scanned_pages" in facts["jd_coverage"]["known_blind_spots"]
+
+
 def test_analyses_are_rate_limited_per_client_and_the_window_slides():
     now = [1000.0]
     limited = TestClient(create_app(rate_limit=(2, 60.0), clock=lambda: now[0]))

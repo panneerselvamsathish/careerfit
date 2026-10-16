@@ -208,7 +208,9 @@ function setBusy(on) {
   button.classList.toggle("is-busy", on);
   button.setAttribute("aria-disabled", String(on));
   button.querySelector(".button-label").textContent = on ? "Analysing…" : "Analyse fit";
-  $("form").setAttribute("aria-busy", String(on));
+  // On the button, not the form: a busy ancestor lets screen readers hold back the #status
+  // announcement until the request ends.
+  button.setAttribute("aria-busy", String(on));
 }
 
 function showError(message) {
@@ -443,20 +445,42 @@ function renderFilters(all) {
   $("filters").hidden = all.length === 0;
 }
 
+// An empty list only says what the readable text shows: a scanned page can hold requirements.
+function noSkillsMessage(coverage) {
+  if (coverage.chars_extracted === 0) {
+    return "No text could be read from the job description (a scanned or image-only PDF, for example), " +
+      "so no skills were checked. Paste the text, or upload a PDF that contains text.";
+  }
+  return "No skill from careerfit's skill list was found in the readable text of the job description, so " +
+    "there is nothing to compare. Skills outside the list are not checked." + unreadPart(coverage);
+}
+
+function unreadPart(coverage) {
+  return coverage.known_blind_spots.includes("scanned_pages")
+    ? " Part of the job description could not be read, so skills there were not checked." : "";
+}
+
 function renderGroups() {
   const all = current.facts.skill_observations;
+  const coverage = current.facts.jd_coverage;
   const filter = FILTERS.find((f) => f.key === activeFilter);
   const seen = new Map(); // repeated long quotes: shown once per view, then referenced
   $("groups").hidden = all.length === 0;
   $("no-skills").hidden = all.length !== 0;
+  $("no-skills").textContent = all.length === 0 ? noSkillsMessage(coverage) : "";
   for (const [level, id, name] of [["must", "must", "must-have"], ["nice", "nice", "nice-to-have"]]) {
     const group = all.filter((o) => o.requirement === level);
     const shown = sorted(filter.statuses ? group.filter((o) => filter.statuses.includes(o.status)) : group);
     $(`${id}-count`).textContent = filter.statuses ? `(${shown.length} of ${group.length})` : `(${group.length})`;
     let content;
-    if (group.length === 0) content = el("p", `The job description lists no ${name} skills that careerfit knows.`, "empty-state");
-    else if (shown.length === 0) content = el("p", `No ${filter.noun} among the ${name} skills.`, "empty-state");
-    else content = table(shown, seen);
+    if (group.length === 0) {
+      content = el("p", `No ${name} skills from careerfit's skill list were found in the readable job description text.` +
+        unreadPart(coverage), "empty-state");
+    } else if (shown.length === 0) {
+      content = el("p", `No ${filter.noun} among the ${name} skills.`, "empty-state");
+    } else {
+      content = table(shown, seen);
+    }
     $(id).replaceChildren(content);
   }
 }
