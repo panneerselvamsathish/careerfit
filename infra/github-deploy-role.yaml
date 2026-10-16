@@ -1,0 +1,280 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  One-time bootstrap for careerfit's continuous deployment. GitHub Actions signs in to AWS with
+  OpenID Connect: no access keys are stored anywhere. The role can only be assumed by workflows
+  running on the main branch of one repository, it can only manage careerfit's own stack, and it
+  can never change itself, this bootstrap, or the boundary that caps the function's permissions.
+
+  Deploy it once, by hand, with your PERSONAL AWS account (never the work one):
+    aws cloudformation deploy --template-file infra/github-deploy-role.yaml \
+      --stack-name github-deploy-careerfit --capabilities CAPABILITY_NAMED_IAM --profile <personal>
+  then copy the RoleArn output into the repository variable AWS_DEPLOY_ROLE_ARN.
+
+Parameters:
+  GitHubRepo:
+    Type: String
+    Default: panneerselvamsathish/careerfit
+    Description: owner/name of the only repository allowed to assume the role.
+  Branch:
+    Type: String
+    Default: main
+    Description: The only branch whose workflows may assume the role.
+  AppStackName:
+    Type: String
+    Default: careerfit
+    Description: The stack sam deploy manages. Every deploy permission names its resources exactly.
+  CreateOidcProvider:
+    Type: String
+    Default: "true"
+    AllowedValues: ["true", "false"]
+    Description: An account can hold only one GitHub OIDC provider. Set "false" if it already exists.
+
+Conditions:
+  MakeProvider: !Equals [!Ref CreateOidcProvider, "true"]
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: MakeProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+      # AWS verifies GitHub's certificate itself; the list is still accepted for older tooling.
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+        - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+
+  # The image repository lives here, not in a SAM companion stack: CI then needs no S3 bucket,
+  # no UpdateStack on a second stack, and no right to create or delete repositories.
+  ImageRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Sub ${AppStackName}-web
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      # CI moves the "live" tag to each image Lambda runs, so tags must stay movable.
+      ImageTagMutability: MUTABLE
+      # Rule 1 never expires anything (only one image can carry "live"), but it claims the running
+      # image: ECR never lets a lower-priority rule expire an image a higher one matched. So failed
+      # deploys pushing newer images can't push the running one out of the 5 that rule 2 keeps.
+      LifecyclePolicy:
+        LifecyclePolicyText: >
+          {"rules": [{"rulePriority": 1, "description": "Never expire the image Lambda runs",
+          "selection": {"tagStatus": "tagged", "tagPrefixList": ["live"],
+          "countType": "imageCountMoreThan", "countNumber": 1}, "action": {"type": "expire"}},
+          {"rulePriority": 2, "description": "Keep the 5 newest of the rest",
+          "selection": {"tagStatus": "any", "countType": "imageCountMoreThan", "countNumber": 5},
+          "action": {"type": "expire"}}]}
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: OnlyCareerfitsFunctionMayPull
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action:
+              - ecr:BatchGetImage
+              - ecr:GetDownloadUrlForLayer
+            Condition:
+              StringLike:
+                aws:sourceArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppStackName}-web
+
+  # The ceiling for the function's execution role. CI may only create or change that role with this
+  # boundary attached, so even a role CI rewrote can do no more than write the function's own logs.
+  ExecutionRoleBoundary:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub ${AppStackName}-execution-boundary
+      Description: Permissions boundary for careerfit's Lambda execution role
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: WriteOwnLogsOnly
+            Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AppStackName}-web:*
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      # Named outside the app's resource names, so no deploy permission below can ever reach it.
+      RoleName: !Sub github-actions-${AppStackName}-deploy
+      Description: careerfit CI deploy (GitHub Actions OIDC, main branch only)
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - MakeProvider
+                - !Ref GitHubOidcProvider
+                - !Sub arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              # Exact matches, never a wildcard: a fork, another branch or a pull request
+              # gets a different "sub" claim and is refused.
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubRepo}:ref:refs/heads/${Branch}
+      Policies:
+        - PolicyName: careerfit-sam-deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            # Least privilege for `sam deploy --image-repository` of one image function. If a deploy
+            # fails with AccessDenied, the error names the missing action: add that one action here,
+            # on the narrowest resource that works.
+            Statement:
+              - Sid: ReadOnlyLookupsThatHaveNoResourceScope
+                Effect: Allow
+                Action:
+                  - cloudformation:ValidateTemplate
+                  - cloudformation:GetTemplateSummary
+                  - ecr:GetAuthorizationToken
+                  - logs:DescribeLogGroups
+                Resource: "*"
+              - Sid: TheAppStackOnly
+                Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:ListChangeSets
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResource
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:ListStackResources
+                  - cloudformation:GetTemplate
+                # The exact stack name: this bootstrap stack is never in scope, whatever it is called.
+                Resource: !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AppStackName}/*
+              - Sid: SamTransform
+                Effect: Allow
+                Action: cloudformation:CreateChangeSet
+                Resource: !Sub arn:aws:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31
+              - Sid: PushToTheAppRepositoryOnly
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:DescribeRepositories
+                  - ecr:DescribeImages
+                Resource: !GetAtt ImageRepository.Arn
+              - Sid: TheAppFunctionOnly
+                Effect: Allow
+                Action:
+                  - lambda:CreateFunction
+                  - lambda:DeleteFunction
+                  - lambda:GetFunction
+                  - lambda:GetFunctionConfiguration
+                  - lambda:GetFunctionCodeSigningConfig
+                  - lambda:UpdateFunctionCode
+                  - lambda:UpdateFunctionConfiguration
+                  - lambda:CreateFunctionUrlConfig
+                  - lambda:UpdateFunctionUrlConfig
+                  - lambda:GetFunctionUrlConfig
+                  - lambda:DeleteFunctionUrlConfig
+                  - lambda:AddPermission
+                  - lambda:RemovePermission
+                  - lambda:GetPolicy
+                  - lambda:PutFunctionConcurrency
+                  - lambda:DeleteFunctionConcurrency
+                  - lambda:TagResource
+                  - lambda:UntagResource
+                  - lambda:ListTags
+                Resource: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${AppStackName}-web
+              # Changes to the execution role are allowed only while it carries the boundary above.
+              # PutRolePermissionsBoundary can only attach that same boundary (AWS's delegation
+              # pattern), so a stack created before the boundary existed picks it up on its next deploy.
+              - Sid: ExecutionRoleChangesOnlyWithTheBoundary
+                Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:PutRolePermissionsBoundary
+                Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/${AppStackName}-WebFunctionRole-*
+                Condition:
+                  StringEquals:
+                    iam:PermissionsBoundary: !Ref ExecutionRoleBoundary
+              - Sid: ExecutionRoleReadAndCleanup
+                Effect: Allow
+                Action:
+                  - iam:GetRole
+                  - iam:GetRolePolicy
+                  - iam:ListRolePolicies
+                  - iam:ListAttachedRolePolicies
+                  - iam:ListRoleTags
+                  - iam:DeleteRole
+                  - iam:TagRole
+                  - iam:UntagRole
+                Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/${AppStackName}-WebFunctionRole-*
+              - Sid: PassTheExecutionRoleToLambdaOnly
+                Effect: Allow
+                Action: iam:PassRole
+                Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/${AppStackName}-WebFunctionRole-*
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: lambda.amazonaws.com
+              - Sid: TheAppLogGroupOnly
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:DeleteLogGroup
+                  - logs:PutRetentionPolicy
+                  - logs:DeleteRetentionPolicy
+                  - logs:TagResource
+                  - logs:UntagResource
+                  - logs:ListTagsForResource
+                Resource:
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AppStackName}-web
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AppStackName}-web:*
+              - Sid: TheAppBudgetOnly
+                Effect: Allow
+                Action:
+                  - budgets:ViewBudget
+                  - budgets:ModifyBudget
+                Resource: !Sub arn:aws:budgets::${AWS::AccountId}:budget/${AppStackName}-monthly
+              # Explicit denies win over any allow, now or added later by mistake.
+              - Sid: NeverChangeItselfOrTheBoundary
+                Effect: Deny
+                Action: iam:*
+                Resource:
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/github-actions-${AppStackName}-deploy
+                  - !Ref ExecutionRoleBoundary
+              - Sid: NeverRemoveABoundary
+                Effect: Deny
+                Action: iam:DeleteRolePermissionsBoundary
+                Resource: "*"
+              # StringNotEquals also matches a request with no boundary at all, so this denies
+              # creating any role without the boundary and attaching any other boundary.
+              - Sid: NeverCreateARoleOrSetABoundaryExceptWithTheBoundary
+                Effect: Deny
+                Action:
+                  - iam:CreateRole
+                  - iam:PutRolePermissionsBoundary
+                Resource: "*"
+                Condition:
+                  StringNotEquals:
+                    iam:PermissionsBoundary: !Ref ExecutionRoleBoundary
+
+Outputs:
+  RoleArn:
+    Description: Put this in the GitHub repository variable AWS_DEPLOY_ROLE_ARN
+    Value: !GetAtt DeployRole.Arn
+  ImageRepositoryUri:
+    Description: Where CI pushes the image (sam deploy --image-repository)
+    Value: !GetAtt ImageRepository.RepositoryUri
+  ExecutionRoleBoundaryArn:
+    Description: Attached by template.yaml to the function's execution role
+    Value: !Ref ExecutionRoleBoundary

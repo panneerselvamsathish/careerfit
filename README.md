@@ -40,7 +40,7 @@ not conventions, not comments. A build constraint.
 - [x] Milestone 6: Judge — Anthropic API with structured output, versioned prompt YAML files
 - [x] Milestone 7: Report + CLI — Markdown reports for two perspectives, every claim quoted, blind spots disclosed
 - [x] Milestone 8: Web API + UI — FastAPI file upload, vanilla JS client, strict CSP
-- [ ] Milestone 9: Deploy — public-safe server limits, container image, CI deploy, live URL (free keyword tier)
+- [ ] Milestone 9: Deploy — public-safe server limits, container image, CI deploy, live URL (free keyword tier) · *server limits, image and CI deploy done; the live URL follows the one-time AWS setup below*
 - [ ] Milestone 10: Paid tier — accounts, usage metering and rate limits, Stripe, `--deep` on the web
 
 ## Getting started
@@ -253,11 +253,12 @@ public HTTPS address for free. `template.yaml` (AWS SAM) describes the function,
 log retention and an optional $5/month budget alarm.
 
 ```bash
-# needs the AWS CLI signed in to your account, Docker, and the SAM CLI (brew install aws-sam-cli)
+# needs the AWS CLI signed in to your PERSONAL account, Docker, and the SAM CLI (brew install aws-sam-cli)
+# once first: the bootstrap stack (image repository, permissions boundary, CI role); see below
 sam build
-sam deploy --guided --resolve-image-repos   # first time: pick a stack name and region; prints the URL
+sam deploy --guided --image-repository <ImageRepositoryUri>   # stack name careerfit; prints the URL
 sam build && sam deploy                     # later deploys: rebuild, then reuse samconfig.toml
-sam delete                                  # removes everything the stack created
+sam delete                                  # removes everything the app stack created
 ```
 
 - **Architecture: arm64.** The image must be built for the function's architecture; on Apple
@@ -278,6 +279,63 @@ sam delete                                  # removes everything the stack creat
 `POST /api/analyze` takes `multipart/form-data` with `resume` (file), either `jd` (file) or
 `jd_text`, and `perspective` (`candidate` or `hiring_manager`), and returns `facts`,
 `blind_spots` (plain text) and `report_markdown`. Bad input gets a 4xx with a readable `detail`.
+
+### Continuous deployment (GitHub Actions + OIDC)
+
+Every push to `main` deploys, but only after the tests and evals pass: the `deploy` job in
+`.github/workflows/ci.yml` builds the arm64 image, runs `sam deploy`, then checks `/healthz` on the
+live URL and prints the URL in the run summary. GitHub signs in to AWS with **OpenID Connect**, so
+no AWS key is stored anywhere. Until it is connected, the job is skipped and CI stays green.
+
+- **No rollbacks:** deploys run one at a time, every pending deploy keeps its place in the queue
+  (`queue: max`), and each one first checks that its commit is still the head of `main`. An older
+  run whose tests finished late, or a re-run of an old workflow, is skipped instead of putting old
+  code back, and it can't push the newest commit's deploy out of the queue.
+- **The running image is never cleaned up:** the image repository keeps the 5 newest images, plus
+  the one tagged `live`. After each deploy, CI moves `live` to the image Lambda now runs, so failed
+  deploys can't push it out. (Lambda pulls the image again when an idle function wakes up.) A
+  manual `sam deploy` doesn't move the tag; the next CI deploy does.
+
+One-time setup, in your **personal** AWS account:
+
+1. **Deploy the bootstrap stack** (`infra/github-deploy-role.yaml`):
+   ```bash
+   aws cloudformation deploy --template-file infra/github-deploy-role.yaml \
+     --stack-name github-deploy-careerfit --capabilities CAPABILITY_NAMED_IAM --profile <personal>
+   ```
+   It creates the image repository `careerfit-web` (keeps the 5 newest images; only careerfit's
+   function may pull), the **permissions boundary** for the function's execution role, and the CI
+   role `github-actions-careerfit-deploy`. Add `--parameter-overrides CreateOidcProvider=false` if
+   the account already has a GitHub OIDC provider.
+2. **Add repository variables** (Settings → Secrets and variables → Actions → *Variables*):
+   `AWS_DEPLOY_ROLE_ARN` (the stack's `RoleArn` output), `AWS_REGION`, and `BUDGET_EMAIL` for the
+   $5 budget alarm. Leaving it out of a later deploy would delete the alarm. `CAREERFIT_STACK` is
+   only needed if the app stack isn't called `careerfit`.
+3. **Merge to `main`** (or re-run the workflow). The first green run creates the app stack and
+   prints the live URL.
+
+What the CI role can and cannot do:
+
+- **Who:** only workflows on `main` of this repository (an exact match on the token's `sub`
+  claim, never a wildcard). Forks, other branches and pull requests are refused.
+- **What:** the app stack `careerfit` by exact name, the image repository, the function, its log
+  group and budget, and the function's execution role. The bootstrap stack is never in scope.
+- **No escalation:** it can create or change the execution role only while the permissions
+  boundary is attached, and the boundary allows nothing but writing the function's own logs.
+  Explicit denies stop it from touching its own role or the boundary, removing any boundary,
+  setting any other boundary, or creating a role without one.
+- **Older app stacks:** a stack created before the boundary existed needs no manual step. CI may
+  attach this one boundary (and no other), so the next deploy adds it to the execution role.
+
+`tests/test_deploy_config.py` keeps this safe. The build fails if:
+- the deploy could run before the tests, outside `main`, or for a commit that is no longer the head of `main`
+- a pending deploy could be replaced instead of queued
+- an AWS key appears in the workflow, or the trust policy gains a wildcard
+- a permission reaches beyond careerfit's own resources, or a stack wildcard brings the bootstrap stack into scope
+- the CI role's name falls inside the app's resource names
+- an IAM change is allowed without the boundary, or the self-protecting denies go missing
+- the boundary allows more than writing the function's own logs
+- image cleanup could expire the image tagged `live`, or a deploy stops moving that tag
 
 ## Tech stack
 

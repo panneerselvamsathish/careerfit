@@ -43,6 +43,10 @@ Resources:
     Properties:
       FunctionName: !Sub ${AWS::StackName}-web
       PackageType: Image
+      # The ceiling for the execution role, created by infra/github-deploy-role.yaml: whatever is
+      # attached to the role, it can do no more than write this function's own logs. CI is only
+      # allowed to create or change the role while this boundary is on it.
+      PermissionsBoundary: !Sub arn:aws:iam::${AWS::AccountId}:policy/${AWS::StackName}-execution-boundary
       # arm64 (Graviton): matches images built on Apple silicon and GitHub's arm64 runners, ~20% cheaper.
       Architectures: [arm64]
       MemorySize: !Ref MemorySize
