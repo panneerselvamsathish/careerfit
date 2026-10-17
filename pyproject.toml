@@ -25,6 +25,7 @@ dev = [
     "pytest-cov>=5.0",
     "httpx>=0.26",
     "fpdf2>=2.8.8",
+    "botocore[crt]>=1.43.114",  # the usage report signs in with `aws login`, whose credentials need awscrt
 ]
 
 [project.scripts]
