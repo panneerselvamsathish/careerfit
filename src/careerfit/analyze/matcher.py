@@ -170,59 +170,96 @@ def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> di
     return found
 
 
-# Skills a clause joins with "or" are alternatives: either one meets the requirement ("OpenAI or
-# Anthropic APIs", "Python, Java, or Go"). Up to two words may sit between "or" and the next skill
-# ("software engineering or applied machine learning"). Anything else between two skills, "and"
-# included, keeps them separate requirements.
-_OR_JOIN = re.compile(r"\s*,?\s*(and/)?or\s+([\w-]+\s+){0,2}", re.IGNORECASE)
+# Skills a clause joins with "or" are alternatives: any one meets the requirement ("OpenAI or
+# Anthropic APIs", "Python, Java, or Go", "Python or Java or Go"). Up to two words may sit between
+# "or" and the next skill ("software engineering or applied machine learning"), but never a word
+# that starts another requirement ("Python or equivalent and Kubernetes"). Anything else between
+# two skills, "and" included, keeps them separate requirements.
+_OR_JOIN = re.compile(r"\s*,?\s*(and/)?or\s+((?!(and|but|plus)\b)[\w-]+\s+){0,2}", re.IGNORECASE)
 _COMMA_JOIN = re.compile(r"\s*,\s*")
+Span = tuple[int, int, str]
 
 
-def _mention_spans(clause: str, ontology: dict[str, SkillEntry]) -> list[tuple[int, int, str]]:
-    """Each skill mention in the clause as (start, end, skill), left to right. Of two overlapping
-    mentions the longer is kept: "SQL" inside "PL/SQL" belongs to PL/SQL."""
-    spans = [(m.start(), m.end(), name)
-             for name, entry in ontology.items() for term in (*entry.aliases, name)
-             for m in mention_pattern(term).finditer(clause)]
-    spans.sort(key=lambda span: (span[0], span[0] - span[1], span[2]))
-    kept: list[tuple[int, int, str]] = []
+def _mention_spans(clause: str, ontology: dict[str, SkillEntry]) -> tuple[list[Span], list[tuple[Span, int]]]:
+    """Each skill mention in the clause as (start, end, skill), left to right, and the nested ones.
+
+    Of two overlapping mentions the longer is kept; the other is nested in it, paired with the index
+    of the kept mention it sits in: "SQL" inside "PL/SQL" is nested in PL/SQL's mention.
+    """
+    spans = sorted(((m.start(), m.end(), name)
+                    for name, entry in ontology.items() for term in (*entry.aliases, name)
+                    for m in mention_pattern(term).finditer(clause)),
+                   key=lambda span: (span[0], span[0] - span[1], span[2]))
+    kept: list[Span] = []
+    nested: list[tuple[Span, int]] = []
     for span in spans:
-        if not kept or span[0] >= kept[-1][1]:
+        if kept and span[0] < kept[-1][1]:
+            nested.append((span, len(kept) - 1))
+        else:
             kept.append(span)
-    return kept
+    return kept, nested
+
+
+def _choice_of(clause: str, kept: list[Span]) -> list[int]:
+    """For each kept mention, an id shared by every mention in the same either/or choice.
+
+    A comma list ending in "or" is one choice ("A, B, or C"), and so is a chain of "or"s ("A or B or
+    C"); a comma after a choice starts a new list ("A or B, C or D" is two choices).
+    """
+    parent = list(range(len(kept)))
+
+    def root(i: int) -> int:
+        while parent[i] != i:
+            i = parent[i]
+        return i
+
+    run = [0] if kept else []  # the comma-joined mentions ending at the current one
+    after_or = False
+    for i in range(1, len(kept)):
+        between = clause[kept[i - 1][1]:kept[i][0]]
+        if _OR_JOIN.fullmatch(between):
+            for j in run:
+                parent[root(j)] = root(i)
+            run, after_or = [i], True
+        elif _COMMA_JOIN.fullmatch(between):
+            run, after_or = ([i] if after_or else [*run, i]), False
+        else:
+            run, after_or = [i], False
+    return [root(i) for i in range(len(kept))]
+
+
+def mention_alternatives(clause: str, ontology: dict[str, SkillEntry]) -> list[tuple[str, frozenset[str]]]:
+    """Every skill mention in the clause, nested ones included, with the other skills the clause
+    accepts in its place: an empty set for a mention that stands alone. A nested mention shares the
+    choice of the mention it sits in ("PL/SQL or Python" offers Python for the SQL in PL/SQL too)."""
+    kept, nested = _mention_spans(clause, ontology)
+    choice = _choice_of(clause, kept)
+
+    def others(i: int) -> frozenset[str]:
+        return frozenset(kept[j][2] for j in range(len(kept)) if choice[j] == choice[i]) - {kept[i][2]}
+
+    return ([(span[2], others(i)) for i, span in enumerate(kept)]
+            + [(span[2], others(i) - {span[2]}) for span, i in nested])
 
 
 def alternative_groups(clause: str, ontology: dict[str, SkillEntry]) -> list[frozenset[str]]:
-    """The groups of skills the clause offers as either/or alternatives.
-
-    A comma list ending in "or" is one group ("Python, Java, or Go"); one ending in "and" is none.
-    """
-    spans = _mention_spans(clause, ontology)
-    groups: list[frozenset[str]] = []
-    run = [spans[0][2]] if spans else []  # the comma-joined skills ending at the current one
-    for (_, end, _), (start, _, name) in zip(spans, spans[1:]):
-        between = clause[end:start]
-        if _OR_JOIN.fullmatch(between):
-            group = frozenset((*run, name))
-            if len(group) > 1:
-                groups.append(group)
-            run = [name]
-        elif _COMMA_JOIN.fullmatch(between):
-            run.append(name)
-        else:
-            run = [name]
-    return groups
+    """The groups of skills the clause offers as either/or choices, in order of first mention."""
+    kept, _ = _mention_spans(clause, ontology)
+    groups: dict[int, set[str]] = {}
+    for span, choice in zip(kept, _choice_of(clause, kept)):
+        groups.setdefault(choice, set()).add(span[2])
+    return [frozenset(g) for g in groups.values() if len(g) > 1]
 
 
 def requirement_alternatives(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, list[frozenset[str]]]:
-    """For every JD mention of each skill, counted as requirement_occurrences counts them, the other
-    skills the same clause accepts in its place: an empty set where the mention stands alone."""
+    """For every JD mention of each skill, in the clauses requirement_occurrences reads, the other
+    skills the JD accepts in its place: an empty set where the mention stands alone. Mentions are
+    kept apart, so "Python or Java experience and Python certification" still asks for Python."""
     found: dict[str, list[frozenset[str]]] = {}
     for _level, _line, clause in requirement_clauses(jd_text):
-        groups = alternative_groups(clause, ontology)
-        for name, result in scan(clause, ontology).items():
-            if result != "absent":
-                others = frozenset().union(*(group - {name} for group in groups if name in group))
+        detected = {name for name, result in scan(clause, ontology).items() if result != "absent"}
+        for name, others in mention_alternatives(clause, ontology):
+            if name in detected:
                 found.setdefault(name, []).append(others)
     return found
 

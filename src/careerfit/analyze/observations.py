@@ -6,8 +6,9 @@ from careerfit.analyze.matcher import (decide_status, detect, first_mention_line
 from careerfit.analyze.ontology import SkillEntry
 from careerfit.facts.schema import Coverage, GapAnalysisFacts, Provenance, SkillObservation, SkillStatus
 
-# What an alternative can stand in for: a skill the resume doesn't show, or can't be read for.
-REPLACEABLE = (SkillStatus.GAP, SkillStatus.NOT_ASSESSED)
+# What a matched alternative can stand in for: a skill the resume doesn't show, can't be read for,
+# or shows only partly (half credit would mark down a requirement the alternative fully meets).
+REPLACEABLE = (SkillStatus.GAP, SkillStatus.NOT_ASSESSED, SkillStatus.PARTIAL)
 
 
 def build_observations(

@@ -83,8 +83,14 @@ def check_evidence(
             elif evidence.source == "alternative":
                 # The JD must really offer the choice, and the cited line must be exactly the evidence
                 # the alternative is matched on, which its own row has checked against the resume.
-                if not any(evidence.via in m for m in requirement_alternatives(jd_text, ontology).get(o.skill, [])):
+                mentions = requirement_alternatives(jd_text, ontology).get(o.skill, [])
+                if not any(evidence.via in m for m in mentions):
                     bad.append(f"{o.skill}: the job description never offers {evidence.via!r} in its place")
+                    continue
+                matched = {m.skill for m in facts.skill_observations if m.status == SkillStatus.MATCHED}
+                if not all(m & matched for m in mentions):
+                    # Asked for on its own somewhere: no alternative can waive that requirement.
+                    bad.append(f"{o.skill}: not every JD mention offers a matched alternative")
                     continue
                 met = next((m.resume_evidence for m in facts.skill_observations if m.skill == evidence.via), None)
                 same = met is not None and (met.locator, met.excerpt) == (evidence.locator, evidence.excerpt)

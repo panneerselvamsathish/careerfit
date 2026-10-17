@@ -37,6 +37,11 @@ GEICO_LINE = ("Hands-on AI engineering: Strong experience with Python and modern
     ("Python or a JVM language such as Java", []),  # too far apart to be a plain either/or
     ("PL/SQL or Python", [{"pl/sql", "python"}]),  # "SQL" inside "PL/SQL" is PL/SQL's mention
     ("Python experience", []),
+    # Copilot review on #26: a chain of "or"s is one choice, a comma after a choice starts another,
+    # and a filler word never swallows the "and" of the next requirement.
+    ("Python or Java or Kubernetes", [{"python", "java", "kubernetes"}]),
+    ("Python or Java, Kubernetes or Terraform", [{"python", "java"}, {"kubernetes", "terraform"}]),
+    ("Python or equivalent and Kubernetes experience", []),
 ])
 def test_alternative_groups(clause, groups):
     assert [set(g) for g in alternative_groups(clause, SKILLS)] == groups
@@ -122,6 +127,54 @@ def test_an_alternative_shown_through_another_skill_cites_that_line():
     assert honest(facts, resume, jd) == []
 
 
+@pytest.mark.parametrize("shown", ["python", "java", "kubernetes"])
+def test_any_option_of_an_or_chain_meets_the_others(shown):
+    resume = {"python": "Python services", "java": "Java services", "kubernetes": "Kubernetes clusters"}[shown]
+    facts = analyse(resume, "Requirements:\n- Python or Java or Kubernetes experience")
+    statuses = {skill: o.status for skill, o in by_skill(facts).items()}
+    assert statuses == {s: SkillStatus.MATCHED if s == shown else SkillStatus.ALTERNATIVE_MET
+                        for s in ("python", "java", "kubernetes")}
+    assert honest(facts, resume, "Requirements:\n- Python or Java or Kubernetes experience") == []
+
+
+def test_or_equivalent_does_not_waive_the_next_requirement():
+    observed = by_skill(analyse("Python services", "Requirements:\n- Python or equivalent and Kubernetes experience"))
+    assert observed["kubernetes"].status == SkillStatus.GAP
+
+
+def test_a_nested_skill_shares_the_choice_it_sits_in():
+    resume, jd = "Python services", "Requirements:\n- PL/SQL or Python"
+    facts = analyse(resume, jd)
+    observed = by_skill(facts)
+    assert observed["pl/sql"].status == observed["sql"].status == SkillStatus.ALTERNATIVE_MET  # SQL in "PL/SQL"
+    assert observed["sql"].resume_evidence.via == "python"
+    assert honest(facts, resume, jd) == []
+
+
+def test_the_same_skill_asked_for_alone_in_the_same_clause_is_still_a_gap():
+    jd = "Requirements:\n- Python or Java experience and Python certification"
+    observed = by_skill(analyse("Java services", jd))
+    assert observed["python"].status == SkillStatus.GAP
+
+
+def test_a_partly_shown_skill_is_met_by_a_matched_alternative():
+    from careerfit.analyze.observations import apply_alternatives
+    jd = "Requirements:\n- Go or Kubernetes experience"
+    k8s_line = Provenance(source="resume", locator="line 1", excerpt="Kubernetes clusters", retrieved_at=AT)
+    go_line = Provenance(source="llm_judge", locator="line 2", excerpt="Some Go scripts", retrieved_at=AT)
+    jd_line = Provenance(source="jd", locator="line 2", excerpt="- Go or Kubernetes experience", retrieved_at=AT)
+    observations = (
+        SkillObservation(skill="kubernetes", status=SkillStatus.MATCHED, requirement="must", jd_evidence=jd_line,
+                         resume_evidence=k8s_line),
+        SkillObservation(skill="go", status=SkillStatus.PARTIAL, requirement="must", jd_evidence=jd_line,
+                         resume_evidence=go_line, confidence=0.6),
+    )
+    go = {o.skill: o for o in apply_alternatives(observations, jd, GO_OR_K8S)}["go"]
+    assert (go.status, go.confidence, go.resume_evidence.via) == (SkillStatus.ALTERNATIVE_MET, None, "kubernetes")
+    fit = compute_fit_score(apply_alternatives(observations, jd, GO_OR_K8S))
+    assert fit is not None and fit.overall == 1.0  # the requirement is fully met, not marked down for Go
+
+
 def test_alternatives_are_not_counted_in_the_fit_score():
     facts = analyse("Built an assistant on the Anthropic SDK",
                     "Requirements:\n- Experience with OpenAI or Anthropic APIs\n- Kubernetes")
@@ -188,6 +241,17 @@ def test_invariants_refuse_an_alternative_that_is_not_matched_or_not_offered():
         k8s if o.skill == "kubernetes" else o for o in facts.skill_observations)})
     assert ("kubernetes: the job description never offers 'anthropic api' in its place"
             in invariants.check_evidence(claimed, resume, jd, SKILLS))
+
+    # Copilot review on #26: a requirement asked for on its own somewhere can't be waived.
+    waived_jd = jd + "\n- OpenAI fine-tuning in production"
+    waived_facts = analyse(resume, waived_jd)
+    assert by_skill(waived_facts)["openai"].status == SkillStatus.GAP
+    waived = waived_facts.model_copy(update={"skill_observations": tuple(
+        o.model_copy(update={"status": SkillStatus.ALTERNATIVE_MET,
+                             "resume_evidence": by_skill(facts)["openai"].resume_evidence}) if o.skill == "openai" else o
+        for o in waived_facts.skill_observations)})
+    assert ("openai: not every JD mention offers a matched alternative"
+            in invariants.check_evidence(waived, resume, waived_jd, SKILLS))
 
     moved = by_skill(facts)["openai"].resume_evidence.model_copy(update={"locator": "line 2"})
     wrong_line = facts.model_copy(update={"skill_observations": tuple(
