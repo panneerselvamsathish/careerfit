@@ -45,6 +45,12 @@ GEICO_LINE = ("Hands-on AI engineering: Strong experience with Python and modern
     ("Python or equivalent on Kubernetes", []),
     ("Python or equivalent with Kubernetes", []),
     ("Experience with OpenAI or the Anthropic API", [{"openai", "anthropic api"}]),
+    # Copilot review on #26: a count above one means no single skill meets the list
+    ("At least two of Python, Java, or Kubernetes are required", []),
+    ("Two or more of Python, Java, or Kubernetes", []),
+    ("2+ of Python, Java, or Kubernetes", []),
+    ("Any one of Python, Java, or Kubernetes", [{"python", "java", "kubernetes"}]),
+    ("4+ years of Python or Java", [{"python", "java"}]),  # a count of years, not of skills
 ])
 def test_alternative_groups(clause, groups):
     assert [set(g) for g in alternative_groups(clause, SKILLS)] == groups
@@ -156,6 +162,29 @@ def test_a_long_run_of_spaces_between_skills_is_read_in_linear_time():
     assert time.perf_counter() - started < 0.1
     assert alternative_groups("Python" + " " * 61 + "or Java", SKILLS) == []  # past MAX_JOIN: never a plain "or"
     assert alternative_groups("Python  or  Java", SKILLS) == [{"python", "java"}]
+
+
+def test_a_minimum_count_is_never_met_by_one_skill():
+    jd = "Requirements:\n- At least two of Python, Java, or Kubernetes are required"
+    observed = by_skill(analyse("Python services", jd))
+    assert observed["java"].status == observed["kubernetes"].status == SkillStatus.GAP
+
+
+@pytest.mark.parametrize("joiner", [" or ", " and "])
+def test_long_or_chains_and_repeated_mentions_stay_linear(joiner):
+    # Copilot review on #26: an unhalved parent chain and a per-mention rescan were both quadratic.
+    import time
+    from careerfit.analyze.matcher import mention_alternatives
+    two = {"python": SkillEntry(aliases=(), ambiguous=False), "java": SkillEntry(aliases=(), ambiguous=False)}
+
+    def seconds(n):
+        text = joiner.join(["Python", "Java"] * n)
+        started = time.perf_counter()
+        mention_alternatives(text, two)
+        return time.perf_counter() - started
+
+    small, large = seconds(2_000), seconds(8_000)
+    assert large < 1.0 and large < 8 * small + 0.02  # 4x the mentions: linear is ~4x, quadratic ~16x
 
 
 def test_a_nested_skill_shares_the_choice_it_sits_in():

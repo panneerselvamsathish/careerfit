@@ -56,6 +56,7 @@ def check_evidence(
 ) -> list[str]:
     """Violations that need the source texts: every cited line must really mention the skill."""
     bad: list[str] = []
+    alternatives = requirement_alternatives(jd_text, ontology)  # once per result, not once per skill
     for o in facts.skill_observations:
         entry = ontology.get(o.skill)
         if entry is None:
@@ -83,7 +84,7 @@ def check_evidence(
             elif evidence.source == "alternative":
                 # The JD must really offer the choice, and the cited line must be exactly the evidence
                 # the alternative is matched on, which its own row has checked against the resume.
-                mentions = requirement_alternatives(jd_text, ontology).get(o.skill, [])
+                mentions = alternatives.get(o.skill, [])
                 if not any(evidence.via in m for m in mentions):
                     bad.append(f"{o.skill}: the job description never offers {evidence.via!r} in its place")
                     continue

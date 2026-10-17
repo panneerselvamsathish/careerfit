@@ -190,6 +190,10 @@ _OR_JOIN = re.compile(r"\s*(,\s*)?(and/)?or\s+((a|an|the|applied|modern|similar|
                       re.IGNORECASE)
 _COMMA_JOIN = re.compile(r"\s*,\s*")
 MAX_JOIN = 60  # characters: a longer stretch between two skills is never a plain "or" or comma
+# "At least two of Python, Java, or Kubernetes" needs more than one: no single skill meets it, so a
+# sentence that asks for a count above one offers no either/or choice at all.
+_COUNTED = re.compile(r"\b(two|three|four|five|six|several|multiple|both|all|\d+\+?)(\s+or\s+more)?\s+of\b",
+                      re.IGNORECASE)
 Span = tuple[int, int, str]
 
 
@@ -217,12 +221,16 @@ def _choice_of(clause: str, kept: list[Span]) -> list[int]:
     """For each kept mention, an id shared by every mention in the same either/or choice.
 
     A comma list ending in "or" is one choice ("A, B, or C"), and so is a chain of "or"s ("A or B or
-    C"); a comma after a choice starts a new list ("A or B, C or D" is two choices).
+    C"); a comma after a choice starts a new list ("A or B, C or D" is two choices). A sentence that
+    asks for a count above one ("at least two of") gives every mention its own choice.
     """
     parent = list(range(len(kept)))
+    if _COUNTED.search(clause):
+        return parent
 
     def root(i: int) -> int:
         while parent[i] != i:
+            parent[i] = parent[parent[i]]  # path halving: a long "or" chain stays near-linear
             i = parent[i]
         return i
 
@@ -249,9 +257,12 @@ def mention_alternatives(clause: str, ontology: dict[str, SkillEntry]) -> list[t
     choice of the mention it sits in ("PL/SQL or Python" offers Python for the SQL in PL/SQL too)."""
     kept, nested = _mention_spans(clause, ontology)
     choice = _choice_of(clause, kept)
+    members: dict[int, set[str]] = {}  # built once: looking each choice up again per mention is quadratic
+    for span, group in zip(kept, choice):
+        members.setdefault(group, set()).add(span[2])
 
     def others(i: int) -> frozenset[str]:
-        return frozenset(kept[j][2] for j in range(len(kept)) if choice[j] == choice[i]) - {kept[i][2]}
+        return frozenset(members[choice[i]] - {kept[i][2]})
 
     return ([(span[2], others(i)) for i, span in enumerate(kept)]
             + [(span[2], others(i) - {span[2]}) for span, i in nested])
