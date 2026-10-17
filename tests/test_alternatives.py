@@ -264,3 +264,47 @@ def test_invariants_refuse_an_alternative_that_is_not_matched_or_not_offered():
 def test_the_alternative_filter_is_an_accepted_usage_event():
     assert usage.parse_event({"type": "filter", "props": {"key": "alternative_met"}}) == \
         ("filter", None, {"key": "alternative_met"})
+
+
+def test_a_mixed_required_and_preferred_sentence_keeps_its_either_or_list():
+    # Copilot review on #26: the sentence is split at commas for its levels, never for its choices.
+    resume, jd = "Python services", "Requirements:\n- Python, Java, or Kubernetes are required, but Terraform is preferred."
+    facts = analyse(resume, jd)
+    observed = by_skill(facts)
+    assert observed["python"].status == SkillStatus.MATCHED
+    assert observed["java"].status == observed["kubernetes"].status == SkillStatus.ALTERNATIVE_MET
+    assert (observed["terraform"].status, observed["terraform"].requirement) == (SkillStatus.GAP, "nice")
+    assert honest(facts, resume, jd) == []
+
+
+def go_verdict(jd_line):
+    return {"skill": "go", "jd_requires_skill": True, "jd_line": jd_line, "resume_status": "absent",
+            "resume_quote": "", "confidence": 0.9, "reason": "not on the resume"}
+
+
+def test_an_ordinary_word_does_not_block_the_alternative_once_the_judge_has_validated_the_line():
+    # Copilot review on #26: "go onsite" is the verb; the judge validated line 3 as the Go requirement.
+    resume = "Kubernetes clusters"
+    jd = "Requirements:\n- You must go onsite twice a week\n- Go or Kubernetes experience"
+    keyword = analyse(resume, jd, ontology=GO_OR_K8S)
+    assert by_skill(keyword)["go"].status == SkillStatus.UNRESOLVABLE
+    llm = FakeLLM({"verdicts": [go_verdict(3)]})
+    judged = judge_facts(keyword, resume_text=resume, jd_text=jd, llm=llm, model="m", at=AT, ontology=GO_OR_K8S)
+    go = by_skill(judged)["go"]
+    assert (go.status, go.jd_evidence.locator, go.resume_evidence.via) == (SkillStatus.ALTERNATIVE_MET, "line 3",
+                                                                          "kubernetes")
+    assert len(llm.calls) == 1  # nothing left for a learning plan
+    assert honest(judged, resume, jd, GO_OR_K8S) == []
+
+
+def test_a_standalone_line_the_judge_validated_is_still_a_gap():
+    resume = "Kubernetes clusters"
+    jd = "Requirements:\n- Go is required\n- Go or Kubernetes experience"
+    plan = {"steps": [{"skill": "go", "priority": 1, "why_it_matters": "the JD asks for it",
+                       "resources": ["go official documentation"], "estimated_weeks": 4}]}
+    llm = FakeLLM({"verdicts": [go_verdict(2)]}, plan)
+    judged = judge_facts(analyse(resume, jd, ontology=GO_OR_K8S), resume_text=resume, jd_text=jd, llm=llm, model="m",
+                         at=AT, ontology=GO_OR_K8S)
+    assert by_skill(judged)["go"].status == SkillStatus.GAP
+    assert [step.skill for step in judged.learning_steps] == ["go"]
+    assert honest(judged, resume, jd, GO_OR_K8S) == []

@@ -1,6 +1,6 @@
 import re
 from collections.abc import Iterator
-from typing import Literal
+from typing import Literal, NamedTuple
 
 from careerfit.analyze.ontology import SkillEntry
 from careerfit.facts.schema import SkillStatus
@@ -131,8 +131,9 @@ def clauses(sentence: str) -> list[str]:
 Occurrence = tuple[Literal["must", "nice"], int, Literal["found", "unclear"]]
 
 
-def requirement_clauses(jd_text: str) -> Iterator[tuple[Level, int, str]]:
-    """Every clause of the JD that can hold a requirement, as (level, line, clause), in document order."""
+def requirement_sentences(jd_text: str) -> Iterator[tuple[int, str, list[tuple[Level, str]]]]:
+    """Every sentence of the JD that can hold a requirement, as (line, sentence, its clauses with their
+    levels), in document order. A sentence mixing a must and a nice marker is split into clauses."""
     current: Literal["must", "nice"] = "must"
     counting = True  # off inside a benefits / equal-opportunity / pay section
     for line_no, raw_line in enumerate(jd_text.splitlines(), start=1):
@@ -149,6 +150,7 @@ def requirement_clauses(jd_text: str) -> Iterator[tuple[Level, int, str]]:
         if not counting:
             continue
         for sentence in re.split(r"(?<=[.!?])\s+", line):
+            levelled: list[tuple[Level, str]] = []
             for clause in clauses(sentence):
                 level: Literal["must", "nice"]
                 if has_must_marker(clause):
@@ -157,7 +159,15 @@ def requirement_clauses(jd_text: str) -> Iterator[tuple[Level, int, str]]:
                     level = "nice"
                 else:
                     level = current
-                yield level, line_no, clause
+                levelled.append((level, clause))
+            yield line_no, sentence, levelled
+
+
+def requirement_clauses(jd_text: str) -> Iterator[tuple[Level, int, str]]:
+    """Every clause of the JD that can hold a requirement, as (level, line, clause), in document order."""
+    for line_no, _sentence, levelled in requirement_sentences(jd_text):
+        for level, clause in levelled:
+            yield level, line_no, clause
 
 
 def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, list[Occurrence]]:
@@ -177,16 +187,25 @@ def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> di
 # two skills, "and" included, keeps them separate requirements.
 _OR_JOIN = re.compile(r"\s*,?\s*(and/)?or\s+((?!(and|but|plus)\b)[\w-]+\s+){0,2}", re.IGNORECASE)
 _COMMA_JOIN = re.compile(r"\s*,\s*")
-Span = tuple[int, int, str]
+Span = tuple[int, int, str, bool]  # (start, end, skill, clear): clear unless an ambiguous skill's bare name
+
+
+class Mention(NamedTuple):
+    """One JD mention of a skill: its line, whether it is clearly the skill (not "you must go onsite"),
+    and the other skills the JD accepts in its place (empty when it stands alone)."""
+
+    line: int
+    clear: bool
+    others: frozenset[str]
 
 
 def _mention_spans(clause: str, ontology: dict[str, SkillEntry]) -> tuple[list[Span], list[tuple[Span, int]]]:
-    """Each skill mention in the clause as (start, end, skill), left to right, and the nested ones.
+    """Each skill mention in the clause as (start, end, skill, clear), left to right, and the nested ones.
 
     Of two overlapping mentions the longer is kept; the other is nested in it, paired with the index
     of the kept mention it sits in: "SQL" inside "PL/SQL" is nested in PL/SQL's mention.
     """
-    spans = sorted(((m.start(), m.end(), name)
+    spans = sorted(((m.start(), m.end(), name, term != name or not entry.ambiguous)
                     for name, entry in ontology.items() for term in (*entry.aliases, name)
                     for m in mention_pattern(term).finditer(clause)),
                    key=lambda span: (span[0], span[0] - span[1], span[2]))
@@ -228,7 +247,7 @@ def _choice_of(clause: str, kept: list[Span]) -> list[int]:
     return [root(i) for i in range(len(kept))]
 
 
-def mention_alternatives(clause: str, ontology: dict[str, SkillEntry]) -> list[tuple[str, frozenset[str]]]:
+def mention_alternatives(clause: str, ontology: dict[str, SkillEntry]) -> list[tuple[str, bool, frozenset[str]]]:
     """Every skill mention in the clause, nested ones included, with the other skills the clause
     accepts in its place: an empty set for a mention that stands alone. A nested mention shares the
     choice of the mention it sits in ("PL/SQL or Python" offers Python for the SQL in PL/SQL too)."""
@@ -238,8 +257,8 @@ def mention_alternatives(clause: str, ontology: dict[str, SkillEntry]) -> list[t
     def others(i: int) -> frozenset[str]:
         return frozenset(kept[j][2] for j in range(len(kept)) if choice[j] == choice[i]) - {kept[i][2]}
 
-    return ([(span[2], others(i)) for i, span in enumerate(kept)]
-            + [(span[2], others(i) - {span[2]}) for span, i in nested])
+    return ([(span[2], span[3], others(i)) for i, span in enumerate(kept)]
+            + [(span[2], span[3], others(i) - {span[2]}) for span, i in nested])
 
 
 def alternative_groups(clause: str, ontology: dict[str, SkillEntry]) -> list[frozenset[str]]:
@@ -251,16 +270,18 @@ def alternative_groups(clause: str, ontology: dict[str, SkillEntry]) -> list[fro
     return [frozenset(g) for g in groups.values() if len(g) > 1]
 
 
-def requirement_alternatives(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, list[frozenset[str]]]:
-    """For every JD mention of each skill, in the clauses requirement_occurrences reads, the other
-    skills the JD accepts in its place: an empty set where the mention stands alone. Mentions are
-    kept apart, so "Python or Java experience and Python certification" still asks for Python."""
-    found: dict[str, list[frozenset[str]]] = {}
-    for _level, _line, clause in requirement_clauses(jd_text):
-        detected = {name for name, result in scan(clause, ontology).items() if result != "absent"}
-        for name, others in mention_alternatives(clause, ontology):
+def requirement_alternatives(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, list[Mention]]:
+    """Every JD mention of each skill, in the sentences requirement_occurrences reads, with the other
+    skills the JD accepts in its place. Mentions are kept apart, so "Python or Java experience and
+    Python certification" still asks for Python. Choices are read across the whole sentence, so
+    "Python, Java, or Kubernetes are required, but Terraform is preferred" keeps its list, though
+    the sentence is split into a must clause and a nice clause for the requirement levels."""
+    found: dict[str, list[Mention]] = {}
+    for line_no, sentence, _clauses in requirement_sentences(jd_text):
+        detected = {name for name, result in scan(sentence, ontology).items() if result != "absent"}
+        for name, clear, others in mention_alternatives(sentence, ontology):
             if name in detected:
-                found.setdefault(name, []).append(others)
+                found.setdefault(name, []).append(Mention(line_no, clear, others))
     return found
 
 

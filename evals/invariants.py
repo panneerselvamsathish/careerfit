@@ -5,6 +5,7 @@ result claims more than the run could actually see.
 """
 
 from careerfit.analyze.matcher import detect, requirement_alternatives
+from careerfit.analyze.observations import requiring_mentions
 from careerfit.analyze.ontology import SkillEntry
 from careerfit.facts.schema import GapAnalysisFacts, Provenance, SkillStatus
 
@@ -83,12 +84,15 @@ def check_evidence(
             elif evidence.source == "alternative":
                 # The JD must really offer the choice, and the cited line must be exactly the evidence
                 # the alternative is matched on, which its own row has checked against the resume.
-                mentions = requirement_alternatives(jd_text, ontology).get(o.skill, [])
-                if not any(evidence.via in m for m in mentions):
+                # Before judging every mention asks for the skill; after, an ambiguous one off the
+                # validated line may be an ordinary word, as in apply_alternatives.
+                mentions = requiring_mentions(requirement_alternatives(jd_text, ontology).get(o.skill, []), o,
+                                              judged=facts.llm_used)
+                if not any(evidence.via in m.others for m in mentions):
                     bad.append(f"{o.skill}: the job description never offers {evidence.via!r} in its place")
                     continue
                 matched = {m.skill for m in facts.skill_observations if m.status == SkillStatus.MATCHED}
-                if not all(m & matched for m in mentions):
+                if not all(m.others & matched for m in mentions):
                     # Asked for on its own somewhere: no alternative can waive that requirement.
                     bad.append(f"{o.skill}: not every JD mention offers a matched alternative")
                     continue
