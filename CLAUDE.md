@@ -40,6 +40,9 @@ uv run python -m evals.ontology_coverage scratch/jds/*.txt
 sam build && sam deploy --guided --resolve-image-repos   # first time: creates the ECR repo, writes samconfig.toml
 sam build && sam deploy                                  # later deploys reuse samconfig.toml
 
+# Usage report from the live table (your own AWS profile; the function can't read the table)
+uv run python scripts/usage_report.py --profile careerfit --region us-east-2 --days 30
+
 # Run every golden case through the pipeline: expectations + honesty invariants (exit 1 on any failure)
 uv run python -m evals.harness
 ```
@@ -72,6 +75,10 @@ src/careerfit/
                set with textContent, never parsed as HTML. No inline script (strict CSP).
   cache.py     Disk cache of judge answers, used by the composition roots. Kept out of
                judge/ because it needs storage; it never imports an LLM SDK.
+  usage.py     What the web app may store about visitors: the event allow-list, records keyed by
+               day (never time), contact scrubbing for donated JDs, the usage report. Pure.
+  store.py     Where those records go: DynamoDB (CAREERFIT_TABLE) or memory. The only module
+               that imports boto3 (enforced by tests/test_architecture.py).
 ```
 
 ### The enforced boundary

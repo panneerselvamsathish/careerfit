@@ -34,6 +34,30 @@ Resources:
       LogGroupName: !Sub /aws/lambda/${AWS::StackName}-web
       RetentionInDays: 14  # access logs only; careerfit never logs document text
 
+  # Usage events, skill statistics, the opt-in waitlist and donated job descriptions (see /privacy).
+  # Retained if the stack is deleted, so `sam delete` can't silently drop the waitlist; delete it by hand.
+  DataTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub ${AWS::StackName}-data
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      # Usage events and skill statistics carry expires_at (about 13 months); DynamoDB deletes them after it.
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
+
   WebFunction:
     Type: AWS::Serverless::Function
     Metadata:
@@ -59,6 +83,20 @@ Resources:
           AWS_LWA_READINESS_CHECK_PATH: /healthz
           # 6 MB Lambda payload limit, counted after base64: 2 MB per file keeps a request under it.
           CAREERFIT_MAX_FILE_MB: "2"
+          CAREERFIT_TABLE: !Ref DataTable
+      # Write-only: the function adds records and removes waitlist addresses; it can't read the table,
+      # not even the old item a write can return (ReturnValues stays NONE). The permissions boundary
+      # allows the same two actions, with the same condition, on this one table and nothing else.
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+                - dynamodb:DeleteItem
+              Resource: !GetAtt DataTable.Arn
+              Condition:
+                StringEqualsIfExists:
+                  dynamodb:ReturnValues: NONE
       # Public HTTPS endpoint. SAM adds both permissions a NONE-auth URL needs since Oct 2025
       # (lambda:InvokeFunctionUrl and lambda:InvokeFunction).
       FunctionUrlConfig:
