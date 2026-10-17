@@ -28,6 +28,9 @@ def test_an_event_without_a_visitor_id_is_accepted():
 
 @pytest.mark.parametrize("payload,message", [
     ({"type": "keystrokes"}, "Unknown event type."),
+    ({"type": []}, "Unknown event type."),  # unhashable: must be a 400, not a TypeError
+    ({"type": {}}, "Unknown event type."),
+    ({"type": 5}, "Unknown event type."),
     ({"type": "download", "props": {"kind": "md", "resume": "Jane Doe"}}, "Property 'resume' is not allowed for download."),
     ({"type": "download", "props": {"kind": "docx"}}, "Property 'kind' is not allowed for download."),
     ({"type": "page_view", "props": {"utm_source": "has spaces"}}, "Property 'utm_source' is not allowed for page_view."),
@@ -49,8 +52,14 @@ def test_an_event_record_keeps_the_day_not_the_time_and_expires():
     record = usage.event_record("download", VISITOR, {"kind": "md"}, NOW)
     assert set(record) == {"pk", "sk", "type", "day", "props", "expires_at", "visitor"}
     assert (record["pk"], record["day"], record["visitor"]) == ("EVENT#2026-10-16", "2026-10-16", VISITOR)
-    assert record["expires_at"] == 1826747112  # 400 days on: 2027-11-20
+    assert record["expires_at"] == 1826668800  # midnight UTC 2027-11-20: 400 days from the start of the day
     assert "21:45" not in repr(record)
+
+
+def test_the_expiry_gives_away_the_day_but_not_the_time():
+    morning = usage.event_record("download", None, {"kind": "md"}, NOW.replace(hour=0, minute=0, second=1))
+    night = usage.skill_stats_record([("python", "must", "matched")], NOW.replace(hour=23, minute=59, second=59))
+    assert morning["expires_at"] == night["expires_at"] == 1826668800
 
 
 def test_an_anonymous_event_record_has_no_visitor_field():
@@ -183,3 +192,17 @@ def test_the_report_script_prints_counts_never_addresses_or_donated_text(monkeyp
     assert "waitlist (all time)    1" in printed and "donated JDs            1" in printed
     assert "python" in printed
     assert "jane.doe@example.com" not in printed and "Secret donated text" not in printed
+
+
+def test_the_dynamodb_client_cannot_outlast_the_function_timeout():
+    from careerfit.store import DynamoStore
+
+    seen = {}
+
+    class Session:
+        def resource(self, name, config):
+            seen.update(name=name, connect=config.connect_timeout, read=config.read_timeout, retries=config.retries)
+            return type("Resource", (), {"Table": lambda self, table: table})()
+
+    DynamoStore("careerfit-data", session=Session())
+    assert seen == {"name": "dynamodb", "connect": 1, "read": 2, "retries": {"max_attempts": 2, "mode": "standard"}}

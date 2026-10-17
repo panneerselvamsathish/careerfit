@@ -245,7 +245,7 @@ module, `src/careerfit/usage.py`; only `src/careerfit/store.py` talks to DynamoD
 | Record | When | Holds | Kept for |
 |---|---|---|---|
 | Usage event | each page view, analysis, download, filter, opened quote | a random ID the browser made (none under Global Privacy Control or Do Not Track; none at all after an opt-out on `/privacy`), the event's allow-listed fields, the referring site and `utm_*` tags, the **day** | 400 days (DynamoDB TTL) |
-| Skill statistics | each analysis | careerfit's skill names, must/nice, matched/gap/ambiguous, the day; no visitor ID | 400 days |
+| Skill statistics | each analysis, unless the browser opted out | careerfit's skill names, must/nice, matched/gap/ambiguous, the day; no visitor ID | 400 days |
 | Waitlist email | only when submitted | the address, the day, the consent text | until removed on `/privacy` |
 | Donated job description | only when the box is ticked | the text with emails and phone numbers removed, its type, the day; never the resume | kept |
 

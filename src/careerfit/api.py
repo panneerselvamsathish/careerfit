@@ -332,6 +332,7 @@ def create_app(
         jd_text: str | None = Form(None),
         perspective: Literal["candidate", "hiring_manager"] = Form("candidate"),
         donate_jd: bool = Form(False),
+        usage_opt_out: bool = Form(False),
     ) -> JSONResponse:
         # Sync on purpose: FastAPI runs it in a worker thread, so PDF parsing never blocks the event loop.
         has_text = bool(jd_text and jd_text.strip())
@@ -362,8 +363,9 @@ def create_app(
             at=at,
             perspective=perspective,
         )
-        # Aggregate demand: careerfit's own skill names and verdicts, no text, no visitor ID.
-        if facts.skill_observations:
+        # Aggregate demand: careerfit's own skill names and verdicts, no text, no visitor ID. Skipped when
+        # the browser turned usage counts off on /privacy: "stop counting me" covers analyses too.
+        if facts.skill_observations and not usage_opt_out:
             keep(usage.skill_stats_record(
                 ((o.skill, o.requirement, o.status.value) for o in facts.skill_observations), at))
         # Only when the visitor ticked the box: the job description, contacts removed. Never the resume.

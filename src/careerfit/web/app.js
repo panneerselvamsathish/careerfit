@@ -100,6 +100,9 @@ function visitorId() {
   if (!id && window.crypto?.randomUUID) {
     id = window.crypto.randomUUID();
     storageSet(VISITOR_KEY, id);
+    // Storage that refuses writes would give every event a new ID and inflate unique visitors:
+    // without a stored ID the event goes anonymous instead.
+    if (storageGet(VISITOR_KEY) !== id) return null;
   }
   return id || null;
 }
@@ -331,15 +334,18 @@ async function submit(event) {
     // Only the visible job description input is sent, so a file or text left in the other mode
     // can never override what the user is looking at. The server still requires exactly one.
     const form = new FormData();
+    // Captured once: Replace and Remove stay usable while the request runs, so the inputs may change.
     const resumeFile = $("resume").files[0];
     const mode = jdMode();
+    const jdFile = mode === "file" ? $("jd").files[0] : null;
     form.append("resume", resumeFile);
-    if (mode === "file") form.append("jd", $("jd").files[0]);
+    if (jdFile) form.append("jd", jdFile);
     else form.append("jd_text", $("jd_text").value.trim());
     const perspective = document.querySelector('input[name="perspective"]:checked').value;
     form.append("perspective", perspective);
     const donate = $("donate_jd").checked;
     if (donate) form.append("donate_jd", "true"); // opt-in only: unticked, nothing about the JD is kept
+    if (trackingMode() === "off") form.append("usage_opt_out", "true"); // and no skill statistics either
     const started = performance.now();
 
     announce("Analysing. This usually takes a few seconds.");
@@ -358,7 +364,7 @@ async function submit(event) {
     const count = (status) => facts.filter((o) => o.status === status).length;
     track("analysis_completed", {
       perspective, jd_mode: mode, resume_type: fileType(resumeFile),
-      jd_type: mode === "text" ? "pasted" : fileType($("jd").files[0]),
+      jd_type: jdFile ? fileType(jdFile) : "pasted",
       skills: facts.length, must: facts.filter((o) => o.requirement === "must").length,
       nice: facts.filter((o) => o.requirement === "nice").length,
       matched: count("matched"), gaps: count("gap"), ambiguous: count("unresolvable"),

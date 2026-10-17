@@ -81,7 +81,7 @@ def parse_event(payload: Any) -> tuple[str, str | None, dict[str, Any]]:
     if not isinstance(payload, dict) or set(payload) - {"type", "visitor", "props"}:
         raise ValueError("An event is an object with type, visitor and props.")
     kind = payload.get("type")
-    if kind not in EVENTS:
+    if not isinstance(kind, str) or kind not in EVENTS:  # a list or object would be unhashable: a 500, not a 400
         raise ValueError("Unknown event type.")
     visitor = payload.get("visitor")
     if visitor is not None and not valid_visitor(visitor):
@@ -117,7 +117,10 @@ def _day(now: datetime) -> str:
 
 
 def _expires(now: datetime) -> int:
-    return int((now + timedelta(days=RETENTION_DAYS)).timestamp())
+    # From the start of the day, not from `now`: an expiry exactly 400 days after the write would give
+    # the write's time back to the second, and with it a way to line records up with the access logs.
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return int((day_start + timedelta(days=RETENTION_DAYS)).timestamp())
 
 
 def event_record(kind: str, visitor: str | None, props: dict[str, Any], now: datetime) -> dict[str, Any]:

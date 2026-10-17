@@ -251,6 +251,19 @@ def test_an_event_outside_the_allow_list_is_a_400_and_not_stored():
     assert store.records == {}
 
 
+def test_an_event_with_a_non_string_type_is_a_400_not_a_500():
+    response = _client(MemoryStore()).post("/api/event", json={"type": []})
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Unknown event type."}
+
+
+def test_an_opted_out_browser_adds_no_skill_statistics():
+    store = MemoryStore()
+    response = analyze(_client(store), usage_opt_out="true")
+    assert response.status_code == 200
+    assert store.records == {}
+
+
 def test_an_oversized_or_non_json_event_is_refused():
     client = _client(MemoryStore())
     assert client.post("/api/event", content=b"{" + b" " * 3000 + b"}").status_code == 413

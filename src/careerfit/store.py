@@ -6,6 +6,11 @@ This is the only module that imports boto3 (tests/test_architecture.py checks th
 
 from typing import Any, Iterable, Protocol
 
+# An analysis waits for up to two writes, inside a 30 s function timeout. The SDK defaults (60 s to
+# connect, 60 s to read, several retries) could outlast it, so a stalled call is cut short: at most
+# 2 attempts of 1 s to connect and 2 s to read, about 7 s per write with the back-off between them.
+SDK_TIMEOUTS = {"connect_timeout": 1, "read_timeout": 2, "retries": {"max_attempts": 2, "mode": "standard"}}
+
 
 class Store(Protocol):
     def put(self, record: dict[str, Any]) -> None: ...
@@ -39,8 +44,10 @@ class DynamoStore:
 
     def __init__(self, table_name: str, session: Any = None) -> None:
         import boto3  # imported here, so local runs and tests without AWS never load it
+        from botocore.config import Config
 
-        self.table = (session or boto3.session.Session()).resource("dynamodb").Table(table_name)
+        session = session or boto3.session.Session()
+        self.table = session.resource("dynamodb", config=Config(**SDK_TIMEOUTS)).Table(table_name)
 
     def put(self, record: dict[str, Any]) -> None:
         self.table.put_item(Item=record)
