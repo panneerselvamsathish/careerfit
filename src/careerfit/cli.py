@@ -35,6 +35,8 @@ def _same_file(a: Path, b: Path) -> bool:
 def _same_model(requested: str, served: str) -> bool:
     """A Bedrock ID ("global.anthropic.claude-haiku-4-5-20251001-v1:0") or an alias ("claude-haiku-4-5")
     names the model the response reports as "claude-haiku-4-5-20251001"; neither is a fallback."""
+    if requested == served:  # a response with no model name records the requested ID as is
+        return True
     base = re.sub(r"-v\d+(:\d+)?$", "", requested.rsplit("anthropic.", 1)[-1])
     return re.fullmatch(re.escape(base) + r"(-\d{8})?", served) is not None
 

@@ -162,6 +162,8 @@ def test_fallback_model_is_reported_by_the_cli(tmp_path, monkeypatch, capsys):
     ("us.anthropic.claude-haiku-4-5-20251001-v1:0", "claude-haiku-4-5-20251001"),
     ("claude-haiku-4-5", "claude-haiku-4-5-20251001"),
     ("claude-opus-5-5", "claude-opus-5-5"),
+    ("global.anthropic.claude-haiku-4-5-20251001-v1:0", "global.anthropic.claude-haiku-4-5-20251001-v1:0"),
+    ("global.anthropic.claude-opus-5-5", "global.anthropic.claude-opus-5-5"),
 ])
 def test_the_requested_model_under_another_name_is_not_a_fallback(requested, served):
     assert cli._same_model(requested, served)
@@ -174,3 +176,14 @@ def test_the_requested_model_under_another_name_is_not_a_fallback(requested, ser
 ])
 def test_a_different_model_is_a_fallback(requested, served):
     assert not cli._same_model(requested, served)
+
+
+def test_a_bedrock_response_without_a_model_name_is_not_a_fallback(tmp_path, monkeypatch, capsys):
+    bedrock_id = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "make_llm", lambda env: (FakeLLM(*answers()), bedrock_id))
+    assert cli.main(["--resume", str(FIXTURES / "resume.txt"), "--jd", str(FIXTURES / "jd.txt"),
+                     "-o", str(tmp_path / "facts.json"), "--deep"]) == 0
+    facts = GapAnalysisFacts.model_validate_json((tmp_path / "facts.json").read_text(encoding="utf-8"))
+    assert facts.judge is not None and facts.judge.served_by == (bedrock_id,)
+    assert "fallback" not in capsys.readouterr().err
