@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import re
 import sys
 import unicodedata
 from collections import Counter
@@ -29,6 +30,15 @@ def _same_file(a: Path, b: Path) -> bool:
         return a.samefile(b)  # hard links
     except OSError:  # one of them doesn't exist yet
         return False
+
+
+def _same_model(requested: str, served: str) -> bool:
+    """A Bedrock ID ("global.anthropic.claude-haiku-4-5-20251001-v1:0") or an alias ("claude-haiku-4-5")
+    names the model the response reports as "claude-haiku-4-5-20251001"; neither is a fallback."""
+    if requested == served:  # a response with no model name records the requested ID as is
+        return True
+    base = re.sub(r"-v\d+(:\d+)?$", "", requested.rsplit("anthropic.", 1)[-1])
+    return re.fullmatch(re.escape(base) + r"(-\d{8})?", served) is not None
 
 
 def _path_key(path: Path) -> str:
@@ -108,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
         dismissed = len(facts.judge.dismissed_skills)
         print(f"Judge ({facts.judge.model}): {fit}, {dismissed} dismissed, {len(facts.learning_steps)} learning steps",
               file=sys.stderr)
-        others = [m for m in facts.judge.served_by if m != facts.judge.model]
+        others = [m for m in facts.judge.served_by if not _same_model(facts.judge.model, m)]
         if others:
             print(f"careerfit: judge answers were served by a fallback model: {', '.join(others)}", file=sys.stderr)
     return 0

@@ -207,7 +207,9 @@ folder to remove them.
   analysis costs nothing. Add `--fresh` to bypass the cache.
 
 Optional: `CAREERFIT_MODEL` overrides the model (default `claude-opus-5-5`, or the global
-cross-region inference profile `global.anthropic.claude-opus-5-5` on Bedrock).
+cross-region inference profile `global.anthropic.claude-opus-5-5` on Bedrock). For a cheaper run,
+`CAREERFIT_MODEL=global.anthropic.claude-haiku-4-5-20251001-v1:0` works too; Haiku 4.5 does not
+accept the `effort` setting, so the judge leaves it out for that model.
 
 ### The web app
 
