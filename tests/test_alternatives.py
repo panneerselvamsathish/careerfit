@@ -50,6 +50,10 @@ GEICO_LINE = ("Hands-on AI engineering: Strong experience with Python and modern
     ("Two or more of Python, Java, or Kubernetes", []),
     ("2+ of Python, Java, or Kubernetes", []),
     ("Any one of Python, Java, or Kubernetes", [{"python", "java", "kubernetes"}]),
+    ("At least two out of Python, Java, or Kubernetes", []),
+    ("10+ of Python, Java, or Kubernetes", []),
+    ("1 of Python, Java, or Kubernetes", [{"python", "java", "kubernetes"}]),
+    ("1 or more of Python, Java, or Kubernetes", [{"python", "java", "kubernetes"}]),
     ("4+ years of Python or Java", [{"python", "java"}]),  # a count of years, not of skills
 ])
 def test_alternative_groups(clause, groups):
@@ -170,9 +174,10 @@ def test_a_minimum_count_is_never_met_by_one_skill():
     assert observed["java"].status == observed["kubernetes"].status == SkillStatus.GAP
 
 
-@pytest.mark.parametrize("joiner", [" or ", " and "])
+@pytest.mark.parametrize("joiner", [" or ", " and ", ", "])
 def test_long_or_chains_and_repeated_mentions_stay_linear(joiner):
-    # Copilot review on #26: an unhalved parent chain and a per-mention rescan were both quadratic.
+    # Copilot review on #26: an unhalved parent chain, a per-mention rescan, and copying the comma
+    # run at every comma were each quadratic.
     import time
     from careerfit.analyze.matcher import mention_alternatives
     two = {"python": SkillEntry(aliases=(), ambiguous=False), "java": SkillEntry(aliases=(), ambiguous=False)}

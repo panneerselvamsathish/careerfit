@@ -192,8 +192,9 @@ _COMMA_JOIN = re.compile(r"\s*,\s*")
 MAX_JOIN = 60  # characters: a longer stretch between two skills is never a plain "or" or comma
 # "At least two of Python, Java, or Kubernetes" needs more than one: no single skill meets it, so a
 # sentence that asks for a count above one offers no either/or choice at all.
-_COUNTED = re.compile(r"\b(two|three|four|five|six|several|multiple|both|all|\d+\+?)(\s+or\s+more)?\s+of\b",
-                      re.IGNORECASE)
+# "One of", "1 of" and "1 or more of" are met by any single skill, so only counts above one stop it.
+_COUNTED = re.compile(r"\b(two|three|four|five|six|several|multiple|both|all|([2-9]|[1-9]\d+)\+?)"
+                      r"(\s+or\s+more)?\s+(out\s+)?of\b", re.IGNORECASE)
 Span = tuple[int, int, str]
 
 
@@ -245,7 +246,11 @@ def _choice_of(clause: str, kept: list[Span]) -> list[int]:
                 parent[root(j)] = root(i)
             run, after_or = [i], True
         elif _COMMA_JOIN.fullmatch(between):
-            run, after_or = ([i] if after_or else [*run, i]), False
+            if after_or:
+                run = [i]
+            else:
+                run.append(i)  # in place: copying the run at every comma would be quadratic
+            after_or = False
         else:
             run, after_or = [i], False
     return [root(i) for i in range(len(kept))]
