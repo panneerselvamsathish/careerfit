@@ -1,4 +1,5 @@
 import re
+from collections.abc import Iterator
 from typing import Literal
 
 from careerfit.analyze.ontology import SkillEntry
@@ -130,9 +131,8 @@ def clauses(sentence: str) -> list[str]:
 Occurrence = tuple[Literal["must", "nice"], int, Literal["found", "unclear"]]
 
 
-def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, list[Occurrence]]:
-    """Every place the JD mentions each skill, as (level, line, detection result), in document order."""
-    found: dict[str, list[Occurrence]] = {}
+def requirement_clauses(jd_text: str) -> Iterator[tuple[Level, int, str]]:
+    """Every clause of the JD that can hold a requirement, as (level, line, clause), in document order."""
     current: Literal["must", "nice"] = "must"
     counting = True  # off inside a benefits / equal-opportunity / pay section
     for line_no, raw_line in enumerate(jd_text.splitlines(), start=1):
@@ -157,9 +157,73 @@ def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> di
                     level = "nice"
                 else:
                     level = current
-                for name, result in scan(clause, ontology).items():
-                    if result != "absent":
-                        found.setdefault(name, []).append((level, line_no, result))
+                yield level, line_no, clause
+
+
+def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, list[Occurrence]]:
+    """Every place the JD mentions each skill, as (level, line, detection result), in document order."""
+    found: dict[str, list[Occurrence]] = {}
+    for level, line_no, clause in requirement_clauses(jd_text):
+        for name, result in scan(clause, ontology).items():
+            if result != "absent":
+                found.setdefault(name, []).append((level, line_no, result))
+    return found
+
+
+# Skills a clause joins with "or" are alternatives: either one meets the requirement ("OpenAI or
+# Anthropic APIs", "Python, Java, or Go"). Up to two words may sit between "or" and the next skill
+# ("software engineering or applied machine learning"). Anything else between two skills, "and"
+# included, keeps them separate requirements.
+_OR_JOIN = re.compile(r"\s*,?\s*(and/)?or\s+([\w-]+\s+){0,2}", re.IGNORECASE)
+_COMMA_JOIN = re.compile(r"\s*,\s*")
+
+
+def _mention_spans(clause: str, ontology: dict[str, SkillEntry]) -> list[tuple[int, int, str]]:
+    """Each skill mention in the clause as (start, end, skill), left to right. Of two overlapping
+    mentions the longer is kept: "SQL" inside "PL/SQL" belongs to PL/SQL."""
+    spans = [(m.start(), m.end(), name)
+             for name, entry in ontology.items() for term in (*entry.aliases, name)
+             for m in mention_pattern(term).finditer(clause)]
+    spans.sort(key=lambda span: (span[0], span[0] - span[1], span[2]))
+    kept: list[tuple[int, int, str]] = []
+    for span in spans:
+        if not kept or span[0] >= kept[-1][1]:
+            kept.append(span)
+    return kept
+
+
+def alternative_groups(clause: str, ontology: dict[str, SkillEntry]) -> list[frozenset[str]]:
+    """The groups of skills the clause offers as either/or alternatives.
+
+    A comma list ending in "or" is one group ("Python, Java, or Go"); one ending in "and" is none.
+    """
+    spans = _mention_spans(clause, ontology)
+    groups: list[frozenset[str]] = []
+    run = [spans[0][2]] if spans else []  # the comma-joined skills ending at the current one
+    for (_, end, _), (start, _, name) in zip(spans, spans[1:]):
+        between = clause[end:start]
+        if _OR_JOIN.fullmatch(between):
+            group = frozenset((*run, name))
+            if len(group) > 1:
+                groups.append(group)
+            run = [name]
+        elif _COMMA_JOIN.fullmatch(between):
+            run.append(name)
+        else:
+            run = [name]
+    return groups
+
+
+def requirement_alternatives(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, list[frozenset[str]]]:
+    """For every JD mention of each skill, counted as requirement_occurrences counts them, the other
+    skills the same clause accepts in its place: an empty set where the mention stands alone."""
+    found: dict[str, list[frozenset[str]]] = {}
+    for _level, _line, clause in requirement_clauses(jd_text):
+        groups = alternative_groups(clause, ontology)
+        for name, result in scan(clause, ontology).items():
+            if result != "absent":
+                others = frozenset().union(*(group - {name} for group in groups if name in group))
+                found.setdefault(name, []).append(others)
     return found
 
 

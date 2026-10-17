@@ -1,9 +1,13 @@
 from datetime import datetime
 from typing import Literal
 
-from careerfit.analyze.matcher import decide_status, detect, first_mention_line, mention_pattern, requirement_evidence
+from careerfit.analyze.matcher import (decide_status, detect, first_mention_line, mention_pattern,
+                                      requirement_alternatives, requirement_evidence)
 from careerfit.analyze.ontology import SkillEntry
-from careerfit.facts.schema import Coverage, GapAnalysisFacts, Provenance, SkillObservation
+from careerfit.facts.schema import Coverage, GapAnalysisFacts, Provenance, SkillObservation, SkillStatus
+
+# What an alternative can stand in for: a skill the resume doesn't show, or can't be read for.
+REPLACEABLE = (SkillStatus.GAP, SkillStatus.NOT_ASSESSED)
 
 
 def build_observations(
@@ -45,7 +49,35 @@ def build_observations(
             jd_evidence=jd_evidence,
             resume_evidence=resume_evidence,
         ))
-    return tuple(observations)
+    return apply_alternatives(tuple(observations), jd_text, ontology)
+
+
+def apply_alternatives(
+    observations: tuple[SkillObservation, ...],
+    jd_text: str,
+    ontology: dict[str, SkillEntry],
+) -> tuple[SkillObservation, ...]:
+    """A skill the resume doesn't show is no gap when the JD accepts a matched one in its place
+    ("OpenAI or Anthropic APIs" with Anthropic on the resume). Every JD mention of the skill must
+    offer a matched alternative: asked for on its own anywhere, it is still a requirement.
+
+    The evidence is the alternative's own resume line, marked as such, so the claim can be checked.
+    """
+    matched = {o.skill: o for o in observations if o.status == SkillStatus.MATCHED}
+    alternatives = requirement_alternatives(jd_text, ontology)
+    result = []
+    for o in observations:
+        mentions = alternatives.get(o.skill, [])
+        if o.status in REPLACEABLE and mentions and all(m & matched.keys() for m in mentions):
+            via = min(mentions[0] & matched.keys())
+            shown = matched[via].resume_evidence
+            assert shown is not None  # a matched observation always cites the resume
+            evidence = Provenance(source="alternative", via=via, locator=shown.locator, excerpt=shown.excerpt,
+                                  retrieved_at=shown.retrieved_at)
+            o = SkillObservation(skill=o.skill, status=SkillStatus.ALTERNATIVE_MET, requirement=o.requirement,
+                                 jd_evidence=o.jd_evidence, resume_evidence=evidence)
+        result.append(o)
+    return tuple(result)
 
 
 def without_implying_mentions(name: str, ontology: dict[str, SkillEntry], text: str) -> str:

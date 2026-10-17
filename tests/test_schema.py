@@ -120,6 +120,30 @@ def test_dismissed_skill_cannot_also_be_observed():
 def test_derived_provenance_must_name_its_via_skill():
     with pytest.raises(ValidationError, match="derived evidence must name the skill"):
         schema.Provenance(source="derived", locator="line 1", excerpt="x", retrieved_at=datetime(2026, 10, 14))
-    with pytest.raises(ValidationError, match="only derived evidence has a via skill"):
+    with pytest.raises(ValidationError, match="only derived or alternative evidence has a via skill"):
         schema.Provenance(source="resume", locator="line 1", excerpt="x", retrieved_at=datetime(2026, 10, 14),
                           via="pl/sql")
+
+
+ALTERNATIVE = schema.Provenance(source="alternative", via="anthropic api", locator="line 3", excerpt="Anthropic SDK",
+                                retrieved_at=datetime(2026, 10, 17))
+
+
+def test_alternative_evidence_must_name_the_skill_it_stands_on():
+    with pytest.raises(ValidationError, match="alternative evidence must name the skill"):
+        schema.Provenance(source="alternative", locator="line 1", excerpt="x", retrieved_at=datetime(2026, 10, 17))
+
+
+def test_alternative_met_and_alternative_evidence_go_together():
+    met = schema.SkillObservation(skill="openai", status=schema.SkillStatus.ALTERNATIVE_MET, requirement="must",
+                                  jd_evidence=JD_EVIDENCE, resume_evidence=ALTERNATIVE)
+    assert met.resume_evidence.via == "anthropic api"
+    with pytest.raises(ValidationError, match="go together"):  # the status without the evidence
+        schema.SkillObservation(skill="openai", status=schema.SkillStatus.ALTERNATIVE_MET, requirement="must",
+                                jd_evidence=JD_EVIDENCE)
+    with pytest.raises(ValidationError, match="go together"):  # the evidence under another status
+        schema.SkillObservation(skill="openai", status=schema.SkillStatus.MATCHED, requirement="must",
+                                jd_evidence=JD_EVIDENCE, resume_evidence=ALTERNATIVE)
+    with pytest.raises(ValidationError, match="confidence should not be set"):
+        schema.SkillObservation(skill="openai", status=schema.SkillStatus.ALTERNATIVE_MET, requirement="must",
+                                jd_evidence=JD_EVIDENCE, resume_evidence=ALTERNATIVE, confidence=0.9)

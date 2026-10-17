@@ -740,6 +740,13 @@ contact center:
   aliases: ["contact centre", "contact centers", "call center", "call centre", "contact center agents"]
   ambiguous: false
 
+software engineering:
+  # From the GEICO Senior JD: "software engineering or applied machine learning experience". The
+  # singular title counts ("Lead Software Engineer"); the plural ("partner with software engineers")
+  # names colleagues, not a skill.
+  aliases: ["software engineer"]
+  ambiguous: false
+
 conversational ai:
   # No "virtual assistants" or "virtual agents": both also name people, remote admin staff and
   # work-from-home contact-center agents (Copilot review on #24).

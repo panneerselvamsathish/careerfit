@@ -5,11 +5,12 @@
 const STATUS_LABEL = {
   matched: "Matched",
   partial: "Partly shown",
+  alternative_met: "Alternative met", // the JD accepts another skill, and the resume shows that one
   gap: "Gap",
   unresolvable: "Ambiguous", // never a conclusion: the keyword pass could not decide
   not_assessed: "Not assessed",
 };
-const STATUS_ORDER = ["matched", "partial", "gap", "unresolvable", "not_assessed"];
+const STATUS_ORDER = ["matched", "partial", "alternative_met", "gap", "unresolvable", "not_assessed"];
 const DECIDED = ["matched", "partial", "gap"];
 // Always shown in the summary; the other two statuses only when a result has them.
 const CORE_STATUSES = ["matched", "gap", "unresolvable"];
@@ -19,6 +20,7 @@ const FILTERS = [
   { key: "unresolvable", label: "Ambiguous", statuses: ["unresolvable"], noun: "ambiguous skills" },
   { key: "matched", label: "Matched", statuses: ["matched"], noun: "matched skills" },
   { key: "partial", label: "Partly shown", statuses: ["partial"], noun: "partly shown skills", optional: true },
+  { key: "alternative_met", label: "Alternative met", statuses: ["alternative_met"], noun: "skills met by an alternative", optional: true },
   { key: "not_assessed", label: "Not assessed", statuses: ["not_assessed"], noun: "unassessed skills", optional: true },
 ];
 const ACCEPTED_TYPES = [".pdf", ".txt"]; // the server's own rule (ingest/document.py); it still checks
@@ -436,6 +438,7 @@ function evidence(ev, doc, observation, seen, skillId) {
   meta.append(el("span", locator, "locator"));
   // Same wording as the Markdown report: say when a skill is shown through another one.
   if (ev.source === "derived") meta.append(el("span", `shown through ${ev.via}`, "via"));
+  if (ev.source === "alternative") meta.append(el("span", `the job description accepts ${ev.via} instead`, "via"));
   box.append(meta);
 
   const quote = el("p", `“${ev.excerpt}”`, "quote");

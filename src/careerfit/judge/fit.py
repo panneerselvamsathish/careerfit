@@ -36,8 +36,13 @@ def compute_fit_score(observations: tuple[SkillObservation, ...]) -> FitScore | 
     else:
         overall = must_cov if must else nice_cov
 
-    excluded = len(observations) - len(decided)
+    alternatives = sum(o.status == SkillStatus.ALTERNATIVE_MET for o in observations)
+    excluded = len(observations) - len(decided) - alternatives
     parts = [_describe("Must-have", must), _describe("Nice-to-have", nice)]
+    if alternatives:
+        one = alternatives == 1
+        parts.append(f"{alternatives} skill{'' if one else 's'} {'is' if one else 'are'} not counted: the job "
+                     f"description accepts a matched skill in {'its' if one else 'their'} place.")
     if excluded:
         parts.append(f"{excluded} skill{'s' if excluded != 1 else ''} could not be assessed and "
                      f"{'are' if excluded != 1 else 'is'} not counted.")

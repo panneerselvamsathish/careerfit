@@ -34,7 +34,7 @@ _PHONE_IN_TEXT = re.compile(
     r"|(?<![\w+])\+\d{1,3}(?:[\s.-]?\d{2,4}){2,5}(?!\w)"
 )
 
-STATUSES = ("matched", "partial", "gap", "unresolvable", "not_assessed")
+STATUSES = ("matched", "partial", "alternative_met", "gap", "unresolvable", "not_assessed")
 _COUNT = ("count", 0, 10_000)
 _MS = ("count", 0, 600_000)
 
@@ -53,7 +53,7 @@ EVENTS: dict[str, dict[str, tuple]] = {
                            "ambiguous": _COUNT, "ms": _MS, "donated": _enum("yes", "no")},
     "analysis_failed": {"status": ("count", 0, 599)},
     "download": {"kind": _enum("md", "json")},
-    "filter": {"key": _enum("all", "gap", "unresolvable", "matched", "partial", "not_assessed")},
+    "filter": {"key": _enum("all", "gap", "unresolvable", "matched", "partial", "alternative_met", "not_assessed")},
     "expand": {"kind": _enum("clamp", "repeat")},
     "waitlist_joined": {},
 }

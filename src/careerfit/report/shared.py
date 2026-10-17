@@ -8,12 +8,13 @@ from careerfit.facts.schema import Coverage, GapAnalysisFacts, Provenance, Skill
 STATUS_LABEL = {
     SkillStatus.MATCHED: "Matched",
     SkillStatus.PARTIAL: "Partly shown",
+    SkillStatus.ALTERNATIVE_MET: "Alternative met",  # the JD accepts another skill, and the resume shows it
     SkillStatus.GAP: "Gap",
     SkillStatus.UNRESOLVABLE: "Ambiguous",  # never a conclusion: see "GAP ≠ UNRESOLVABLE" in CLAUDE.md
     SkillStatus.NOT_ASSESSED: "Not assessed",
 }
-STATUS_ORDER = [SkillStatus.MATCHED, SkillStatus.PARTIAL, SkillStatus.GAP, SkillStatus.UNRESOLVABLE,
-                SkillStatus.NOT_ASSESSED]
+STATUS_ORDER = [SkillStatus.MATCHED, SkillStatus.PARTIAL, SkillStatus.ALTERNATIVE_MET, SkillStatus.GAP,
+                SkillStatus.UNRESOLVABLE, SkillStatus.NOT_ASSESSED]
 DECIDED = (SkillStatus.MATCHED, SkillStatus.PARTIAL, SkillStatus.GAP)
 LAYOUT_BLIND_SPOTS = ("layout_order", "graphics", "tables")
 # What can start HTML or inline Markdown: tags and autolinks (< >), links and images ([ ]),
@@ -45,6 +46,8 @@ def cite(evidence: Provenance | None) -> str:
         source = " (Claude)"
     elif evidence.source == "derived":
         source = f" (shown through {evidence.via})"
+    elif evidence.source == "alternative":
+        source = f" (the job description accepts {evidence.via} instead)"
     else:
         source = ""
     return cell(f'{evidence.locator}{source}: "{evidence.excerpt}"')
@@ -124,6 +127,10 @@ def provenance_section(facts: GapAnalysisFacts) -> list[str]:
     by_keywords = sum(o.confidence is None for o in decided)
     lines = ["## How this was decided", "",
              f"- {by_keywords} of {len(decided)} decided skills were settled by keyword matching, without an LLM."]
+    alternatives = [o for o in facts.skill_observations if o.status == SkillStatus.ALTERNATIVE_MET]
+    if alternatives:
+        lines.append(f"- Not counted: {names(o.skill for o in alternatives)}. The job description asks for either "
+                     "of two skills there, and the resume shows the other one.")
     if facts.judge is not None:
         by_claude = len(decided) - by_keywords
         served = names(facts.judge.served_by) or cell(facts.judge.model)

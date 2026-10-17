@@ -4,7 +4,7 @@ They don't ask whether a verdict is right; the golden cases do that. They ask wh
 result claims more than the run could actually see.
 """
 
-from careerfit.analyze.matcher import detect
+from careerfit.analyze.matcher import detect, requirement_alternatives
 from careerfit.analyze.ontology import SkillEntry
 from careerfit.facts.schema import GapAnalysisFacts, Provenance, SkillStatus
 
@@ -32,6 +32,12 @@ def check(facts: GapAnalysisFacts) -> list[str]:
                 bad.append(f"{o.skill}: partial in a keyword-only run; only the judge can grade partial matches")
             if o.confidence is not None:
                 bad.append(f"{o.skill}: confidence {o.confidence} in a keyword-only run")
+
+        if o.status == SkillStatus.ALTERNATIVE_MET:
+            # An alternative only counts if the facts themselves show it matched.
+            via = o.resume_evidence.via if o.resume_evidence else None
+            if not any(m.skill == via and m.status == SkillStatus.MATCHED for m in facts.skill_observations):
+                bad.append(f"{o.skill}: alternative_met through {via!r}, which is not matched")
 
         judged = o.resume_evidence is not None and o.resume_evidence.source == "llm_judge"
         if judged and not facts.llm_used:
@@ -74,6 +80,15 @@ def check_evidence(
                     # The matcher only lets a clear mention stand in for another skill ("go-live"
                     # never shows back-end development), so the invariant demands the same.
                     problem = f"names {evidence.via!r} only ambiguously, so it can't show this skill"
+            elif evidence.source == "alternative":
+                # The JD must really offer the choice, and the cited line must be exactly the evidence
+                # the alternative is matched on, which its own row has checked against the resume.
+                if not any(evidence.via in m for m in requirement_alternatives(jd_text, ontology).get(o.skill, [])):
+                    bad.append(f"{o.skill}: the job description never offers {evidence.via!r} in its place")
+                    continue
+                met = next((m.resume_evidence for m in facts.skill_observations if m.skill == evidence.via), None)
+                same = met is not None and (met.locator, met.excerpt) == (evidence.locator, evidence.excerpt)
+                problem = None if same else f"is not the evidence {evidence.via!r} is matched on"
             else:
                 problem = _evidence_problem(o.skill, entry, evidence, text)
             if problem:
