@@ -150,6 +150,22 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     ("intelligent automation", "Strong understanding of Generative AI, Agentic AI, intelligent automation", "found"),
     ("cloud computing", "Deep expertise in enterprise architecture, cloud platforms, distributed systems", "found"),
     ("cloud computing", "Experience with Salesforce Marketing Cloud", "absent"),
+    # from the GEICO Staff Engineer, Applied AI JD (2026-10-17)
+    ("document intelligence", "high-value enterprise workflows including automation, document intelligence, decision support", "found"),
+    ("workflow orchestration", "Strong understanding of agent architectures, workflow orchestration, retrieval-augmented generation", "found"),
+    ("ai safety", "Familiarity with AI safety practices, evaluation frameworks, monitoring", "found"),
+    ("fraud detection", "Background in document intelligence, fraud or anomaly modeling", "absent"),  # "fraud or anomaly modeling"
+    ("fraud detection", "Built fraud detection models for card payments", "found"),
+    ("anomaly detection", "Background in document intelligence, fraud or anomaly modeling", "found"),
+    ("performance optimization", "SQL performance tuning, ETL design, data modeling", "found"),
+    ("sre", "Strong competency in distributed systems, service design, performance optimization, and reliability engineering", "found"),
+    ("spring ai", "Experience deploying AI components in Java ecosystems including Spring AI, LangChain4j, or Embabel", "found"),
+    ("langchain4j", "Experience deploying AI components in Java ecosystems including Spring AI, LangChain4j, or Embabel", "found"),
+    ("embabel", "Experience deploying AI components in Java ecosystems including Spring AI, LangChain4j, or Embabel", "found"),
+    ("insurance", "Experience with insurance, financial services, or other regulated industries", "found"),
+    ("financial services", "Experience with insurance, financial services, or other regulated industries", "found"),
+    ("regulatory compliance", "Familiarity with AI safety practices, evaluation frameworks, monitoring, and regulatory compliance", "found"),
+    ("sox compliance", "AI governance, SOX controls, audit logging", "found"),
 ])
 def test_new_skills_detect_as_intended(skill, text, expected):
     from careerfit.analyze.matcher import detect
@@ -173,3 +189,7 @@ def test_implications_run_from_the_specific_skill_to_the_broad_one():
     assert SKILLS["aws"].implies == ("cloud computing",)  # AWS and Azure are cloud platforms by definition
     assert SKILLS["azure"].implies == ("cloud computing",)
     assert SKILLS["cloud computing"].implies == ()  # and the broad skill never implies a specific one
+    assert SKILLS["banking"].implies == ("financial services",)
+    assert SKILLS["sox compliance"].implies == ("regulatory compliance",)
+    assert SKILLS["spring ai"].implies == SKILLS["langchain4j"].implies == ("java",)
+    assert SKILLS["embabel"].implies == ()  # JVM, but Kotlin or Java

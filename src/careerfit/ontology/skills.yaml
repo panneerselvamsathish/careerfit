@@ -375,7 +375,7 @@ distributed tracing:
   ambiguous: false
 
 sre:
-  aliases: ["site reliability engineering", "site reliability"]
+  aliases: ["site reliability engineering", "site reliability", "reliability engineering"]
   ambiguous: false
 
 slo:
@@ -590,6 +590,7 @@ ai-assisted development:
 banking:
   aliases: ["banking industry", "retail banking", "commercial banking", "investment banking", "banking domain"]
   ambiguous: true
+  implies: [financial services]  # banking is a financial service, by definition
 
 # ---- Added 2026-10-14 from the resume side (README rule 4): the Oracle stack a JD may name,
 # which the skill list could not see. Bare "oracle" is not an alias: it is also the company. ----
@@ -653,3 +654,64 @@ intelligent automation:
 cloud computing:
   aliases: ["cloud platforms", "cloud platform", "cloud infrastructure", "cloud-native", "cloud native"]
   ambiguous: false
+
+# ---- Added 2026-10-17 from the GEICO "Staff Engineer, Applied AI" JD, now development data. Its
+# soft-skill lines (collaboration, mentoring, technical influence) are left to the LLM judge. ----
+
+document intelligence:
+  aliases: ["intelligent document processing", "document understanding"]
+  ambiguous: false
+
+workflow orchestration:
+  aliases: ["workflow orchestrator"]
+  ambiguous: false
+
+ai safety:
+  aliases: ["ai safety practices", "llm safety", "model safety"]
+  ambiguous: false
+
+fraud detection:
+  aliases: ["fraud modeling", "fraud modelling", "fraud analytics"]
+  ambiguous: false
+
+anomaly detection:
+  aliases: ["anomaly modeling", "anomaly modelling", "outlier detection"]
+  ambiguous: false
+
+performance optimization:
+  aliases: ["performance tuning", "performance optimisation", "performance engineering"]
+  ambiguous: false
+
+# Java AI frameworks. Spring AI and LangChain4j are Java libraries, so they show Java; Embabel runs
+# on the JVM (Kotlin or Java), so it implies nothing.
+spring ai:
+  aliases: ["spring-ai"]
+  ambiguous: false
+  implies: [java]
+
+langchain4j:
+  aliases: []
+  ambiguous: false
+  implies: [java]
+
+embabel:
+  aliases: []
+  ambiguous: false
+
+# Domains and compliance. "insurance" in a benefits section is cut off by stop_section.
+insurance:
+  aliases: ["insurance industry", "insurance domain", "property and casualty"]
+  ambiguous: false
+
+financial services:
+  aliases: ["financial-services", "financial services industry"]
+  ambiguous: false
+
+regulatory compliance:
+  aliases: []
+  ambiguous: false
+
+sox compliance:
+  aliases: ["sox", "sarbanes-oxley", "sarbanes oxley", "sox controls"]
+  ambiguous: false
+  implies: [regulatory compliance]  # SOX is a regulation; complying with it is regulatory compliance
