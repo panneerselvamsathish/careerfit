@@ -34,15 +34,24 @@ function showTracking() {
 function toggleTracking() {
   const store = storage();
   if (!store) return;
-  if (store.getItem(OPT_OUT_KEY) === "1") {
-    store.removeItem(OPT_OUT_KEY);
-    $("tracking-message").textContent = "Usage counts are back on.";
-  } else {
-    store.setItem(OPT_OUT_KEY, "1");
-    store.removeItem(VISITOR_KEY);
-    $("tracking-message").textContent = "Usage counts are off, and this browser's ID is deleted.";
+  const message = $("tracking-message");
+  try {
+    if (store.getItem(OPT_OUT_KEY) === "1") {
+      store.removeItem(OPT_OUT_KEY);
+      message.textContent = "Usage counts are back on.";
+    } else {
+      // The ID goes first: it frees space, and it is deleted even if saving the choice then fails.
+      store.removeItem(VISITOR_KEY);
+      store.setItem(OPT_OUT_KEY, "1");
+      message.textContent = "Usage counts are off, and this browser's ID is deleted.";
+    }
+    message.className = "waitlist-message is-ok";
+  } catch {
+    // A full or locked-down storage can refuse the write: say so rather than claim it worked.
+    message.textContent = "This browser refused to save your choice, so careerfit can't remember it. The random ID " +
+      "was deleted, but visits may still be counted without one. Clear this site's data, then try again.";
+    message.className = "waitlist-message is-error";
   }
-  $("tracking-message").className = "waitlist-message is-ok";
   showTracking();
 }
 

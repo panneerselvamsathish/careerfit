@@ -494,7 +494,8 @@ table.records thead th { font-size: 0.875rem; color: var(--muted); border-bottom
 }
 
 @media (max-width: 720px) {
-  table.records thead { display: none; }
+  /* Visually hidden, not display: none, so screen readers keep the column headers. */
+  table.records thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   table.records, table.records tbody, table.records tr, table.records th, table.records td { display: block; }
   table.records tr { padding: 10px 0; border-bottom: 1px solid var(--line); }
   table.records th, table.records td { padding: 2px 0; border: 0; }

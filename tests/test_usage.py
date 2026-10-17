@@ -205,4 +205,23 @@ def test_the_dynamodb_client_cannot_outlast_the_function_timeout():
             return type("Resource", (), {"Table": lambda self, table: table})()
 
     DynamoStore("careerfit-data", session=Session())
-    assert seen == {"name": "dynamodb", "connect": 1, "read": 2, "retries": {"max_attempts": 2, "mode": "standard"}}
+    assert seen == {"name": "dynamodb", "connect": 1, "read": 2, "retries": {"total_max_attempts": 2, "mode": "standard"}}
+
+
+@pytest.mark.parametrize("days", ["0", "-3"])
+def test_the_report_refuses_an_empty_window_before_touching_aws(days, monkeypatch, capsys):
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location("usage_report", Path(__file__).parent.parent / "scripts" / "usage_report.py")
+    report = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(report)
+
+    def no_aws(*args, **kwargs):
+        raise AssertionError("AWS was reached")
+
+    monkeypatch.setattr(report, "DynamoStore", no_aws)
+    with pytest.raises(SystemExit) as exit_info:
+        report.main(["--profile", "careerfit", "--days", days])
+    assert exit_info.value.code == 2
+    assert "--days must be at least 1" in capsys.readouterr().err

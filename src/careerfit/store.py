@@ -8,8 +8,9 @@ from typing import Any, Iterable, Protocol
 
 # An analysis waits for up to two writes, inside a 30 s function timeout. The SDK defaults (60 s to
 # connect, 60 s to read, several retries) could outlast it, so a stalled call is cut short: at most
-# 2 attempts of 1 s to connect and 2 s to read, about 7 s per write with the back-off between them.
-SDK_TIMEOUTS = {"connect_timeout": 1, "read_timeout": 2, "retries": {"max_attempts": 2, "mode": "standard"}}
+# 2 attempts in all (total_max_attempts counts the first; max_attempts would count retries only) of
+# 1 s to connect and 2 s to read, about 7 s per write with the back-off between them.
+SDK_TIMEOUTS = {"connect_timeout": 1, "read_timeout": 2, "retries": {"total_max_attempts": 2, "mode": "standard"}}
 
 
 class Store(Protocol):

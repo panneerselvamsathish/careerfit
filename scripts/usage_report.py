@@ -25,6 +25,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--days", type=int, default=30, help="how many days back, including today")
     parser.add_argument("--json", action="store_true", help="print the raw report as JSON")
     args = parser.parse_args(argv)
+    if args.days < 1:  # before touching AWS: an empty window has nothing to report
+        parser.error("--days must be at least 1")
 
     import boto3  # the report is owner tooling; only store.py and this script touch AWS
 
