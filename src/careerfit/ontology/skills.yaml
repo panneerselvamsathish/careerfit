@@ -374,8 +374,9 @@ distributed tracing:
   aliases: []
   ambiguous: false
 
+# Bare "reliability engineering" is not an alias: it also names hardware and mechanical work.
 sre:
-  aliases: ["site reliability engineering", "site reliability", "reliability engineering"]
+  aliases: ["site reliability engineering", "site reliability"]
   ambiguous: false
 
 slo:
@@ -698,10 +699,12 @@ embabel:
   aliases: []
   ambiguous: false
 
-# Domains and compliance. "insurance" in a benefits section is cut off by stop_section.
+# Domains and compliance. Bare "insurance" is ambiguous: benefits prose ("we offer health insurance")
+# can sit inside a requirements list, where no section heading cuts it off. The industry phrases
+# below are conclusive.
 insurance:
   aliases: ["insurance industry", "insurance domain", "property and casualty"]
-  ambiguous: false
+  ambiguous: true
 
 financial services:
   aliases: ["financial-services", "financial services industry"]
