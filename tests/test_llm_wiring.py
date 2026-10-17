@@ -154,3 +154,23 @@ def test_fallback_model_is_reported_by_the_cli(tmp_path, monkeypatch, capsys):
     assert facts.judge is not None
     assert facts.judge.served_by == ("claude-opus-4-8", "fake-model")
     assert "served by a fallback model: claude-opus-4-8" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(("requested", "served"), [
+    ("global.anthropic.claude-haiku-4-5-20251001-v1:0", "claude-haiku-4-5-20251001"),
+    ("global.anthropic.claude-opus-5-5", "claude-opus-5-5"),
+    ("us.anthropic.claude-haiku-4-5-20251001-v1:0", "claude-haiku-4-5-20251001"),
+    ("claude-haiku-4-5", "claude-haiku-4-5-20251001"),
+    ("claude-opus-5-5", "claude-opus-5-5"),
+])
+def test_the_requested_model_under_another_name_is_not_a_fallback(requested, served):
+    assert cli._same_model(requested, served)
+
+
+@pytest.mark.parametrize(("requested", "served"), [
+    ("global.anthropic.claude-opus-5-5", "claude-sonnet-5-5"),
+    ("claude-fable-5", "claude-fable-5-1"),
+    ("global.anthropic.claude-haiku-4-5-20251001-v1:0", "claude-haiku-5-5"),
+])
+def test_a_different_model_is_a_fallback(requested, served):
+    assert not cli._same_model(requested, served)

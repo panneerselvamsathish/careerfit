@@ -28,6 +28,8 @@ from careerfit.judge.prompts import PromptSpec, load_prompt
 
 MAX_TOKENS = 16000
 EFFORT = "medium"
+# Models that reject output_config.effort with a 400: Haiku 4.5 predates the parameter.
+NO_EFFORT_MODELS = ("claude-haiku-4-5",)
 MAX_RESOURCES = 3
 MIN_QUOTE_WORDS = 3
 
@@ -304,6 +306,11 @@ def _apply_verdict(
     return SkillObservation(**base, status=SkillStatus.UNRESOLVABLE, resume_evidence=observation.resume_evidence)
 
 
+def _output_config(model: str, schema: dict) -> dict[str, Any]:
+    effort = {} if any(name in model for name in NO_EFFORT_MODELS) else {"effort": EFFORT}
+    return {**effort, "format": {"type": "json_schema", "schema": schema}}
+
+
 def _ask(
     llm: LLM,
     *,
@@ -323,7 +330,7 @@ def _ask(
             max_tokens=MAX_TOKENS,
             system=prompt.full_system,
             messages=messages,
-            output_config={"effort": EFFORT, "format": {"type": "json_schema", "schema": schema}},
+            output_config=_output_config(model, schema),
         )
         if served_by is not None:
             # A server-side fallback can answer with a different model; record who actually did.

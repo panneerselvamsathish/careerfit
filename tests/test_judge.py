@@ -89,6 +89,23 @@ def test_only_unresolvable_skills_are_sent_to_the_judge():
     assert sorted(schema_skills(llm.calls[0])) == ["go", "react"]
 
 
+def test_effort_is_sent_to_models_that_accept_it():
+    llm = FakeLLM({"verdicts": [verdict("go", requires=False), verdict("react", requires=False)]}, plan("kubernetes"))
+    run(llm)
+    assert all(call["output_config"]["effort"] == "medium" for call in llm.calls)
+
+
+@pytest.mark.parametrize("model", ["claude-haiku-4-5", "global.anthropic.claude-haiku-4-5-20251001-v1:0"])
+def test_haiku_4_5_gets_no_effort_but_keeps_the_schema(model):
+    # Haiku 4.5 answers 400 "output_config.effort: Extra inputs are not permitted".
+    llm = FakeLLM({"verdicts": [verdict("go", requires=False), verdict("react", requires=False)]}, plan("kubernetes"))
+    judge_facts(keyword_facts(), resume_text=RESUME, jd_text=JD, llm=llm, model=model, at=AT, ontology=ONTOLOGY)
+    assert llm.calls
+    for call in llm.calls:
+        assert "effort" not in call["output_config"]
+        assert call["output_config"]["format"]["type"] == "json_schema"
+
+
 def test_matched_verdict_cites_the_quoted_resume_line():
     llm = FakeLLM({"verdicts": [verdict("go", status="matched", quote="backend services in Go", confidence=0.9),
                                 verdict("react", requires=False)]},
