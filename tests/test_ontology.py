@@ -142,6 +142,44 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     ("dlp", "Security: data-leakage prevention, secret scanning", "found"),
     ("dlp", "Data leakage prevention controls for agent tools", "found"),
     ("dlp", "Rolled out data loss prevention policies", "found"),
+    # from the CVS Health Distinguished Engineer JD (2026-10-17)
+    ("responsible ai", "Establishes responsible AI, security, compliance, and risk management practices", "found"),
+    ("ai governance", "AI governance, cybersecurity and product security review", "found"),
+    ("platform engineering", "across software engineering, enterprise architecture, digital transformation, or platform engineering", "found"),
+    ("digital transformation", "across software engineering, enterprise architecture, digital transformation, or platform engineering", "found"),
+    ("intelligent automation", "Strong understanding of Generative AI, Agentic AI, intelligent automation", "found"),
+    ("cloud computing", "Deep expertise in enterprise architecture, cloud platforms, distributed systems", "found"),
+    ("cloud computing", "Experience with Salesforce Marketing Cloud", "absent"),
+    # from the GEICO Staff Engineer, Applied AI JD (2026-10-17)
+    ("document intelligence", "high-value enterprise workflows including automation, document intelligence, decision support", "found"),
+    ("workflow orchestration", "Strong understanding of agent architectures, workflow orchestration, retrieval-augmented generation", "found"),
+    ("ai safety", "Familiarity with AI safety practices, evaluation frameworks, monitoring", "found"),
+    ("fraud detection", "Background in document intelligence, fraud or anomaly modeling", "absent"),  # "fraud or anomaly modeling"
+    ("fraud detection", "Built fraud detection models for card payments", "found"),
+    ("anomaly detection", "Background in document intelligence, fraud or anomaly modeling", "found"),
+    ("performance optimization", "SQL performance tuning, ETL design, data modeling", "found"),
+    # bare "reliability engineering" also names hardware and mechanical work (Copilot review on #24)
+    ("sre", "Strong competency in distributed systems, service design, performance optimization, and reliability engineering", "absent"),
+    ("sre", "Reliability engineering and fatigue testing of mechanical pumps", "absent"),
+    ("sre", "Site reliability engineering for the payments platform", "found"),
+    ("spring ai", "Experience deploying AI components in Java ecosystems including Spring AI, LangChain4j, or Embabel", "found"),
+    ("langchain4j", "Experience deploying AI components in Java ecosystems including Spring AI, LangChain4j, or Embabel", "found"),
+    ("embabel", "Experience deploying AI components in Java ecosystems including Spring AI, LangChain4j, or Embabel", "found"),
+    # bare "insurance" is ambiguous: benefits prose can sit inside a requirements list (Copilot review on #24)
+    ("insurance", "Experience with insurance, financial services, or other regulated industries", "unclear"),
+    ("insurance", "We offer health insurance and a 401(k).", "unclear"),
+    ("insurance", "Ten years in the insurance industry", "found"),
+    ("insurance", "Pricing models for property and casualty lines", "found"),
+    ("financial services", "Experience with insurance, financial services, or other regulated industries", "found"),
+    ("regulatory compliance", "Familiarity with AI safety practices, evaluation frameworks, monitoring, and regulatory compliance", "found"),
+    ("sox compliance", "AI governance, SOX controls, audit logging", "found"),
+    # from the GEICO Senior Engineer - Applied AI JD (2026-10-17)
+    ("langsmith", "modern AI frameworks such as LangChain, LangGraph, LangSmith, LlamaIndex, Hugging Face", "found"),
+    ("hugging face", "modern AI frameworks such as LangChain, LangGraph, LangSmith, LlamaIndex, Hugging Face", "found"),
+    ("anthropic api", "and OpenAI or Anthropic APIs", "found"),
+    ("anthropic api", "Anthropic SDK, Claude on Amazon Bedrock, Claude Code", "found"),
+    ("contact center", "core contact center experiences for sales, service and claims operations", "found"),
+    ("conversational ai", "automation, document intelligence, decision support, and intelligent assistants", "found"),
 ])
 def test_new_skills_detect_as_intended(skill, text, expected):
     from careerfit.analyze.matcher import detect
@@ -162,3 +200,10 @@ def test_implications_run_from_the_specific_skill_to_the_broad_one():
     assert set(SKILLS["pl/sql"].implies) == {"sql", "backend development"}
     assert set(SKILLS["fastapi"].implies) == {"python", "backend development"}
     assert SKILLS["sql"].implies == ()  # SQL alone does not show back-end development
+    assert SKILLS["aws"].implies == ("cloud computing",)  # AWS and Azure are cloud platforms by definition
+    assert SKILLS["azure"].implies == ("cloud computing",)
+    assert SKILLS["cloud computing"].implies == ()  # and the broad skill never implies a specific one
+    assert SKILLS["banking"].implies == ("financial services",)
+    assert SKILLS["sox compliance"].implies == ("regulatory compliance",)
+    assert SKILLS["spring ai"].implies == SKILLS["langchain4j"].implies == ("java",)
+    assert SKILLS["embabel"].implies == ()  # JVM, but Kotlin or Java

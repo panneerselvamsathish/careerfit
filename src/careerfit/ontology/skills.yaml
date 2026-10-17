@@ -17,6 +17,7 @@ kubernetes:
 aws:
   aliases: ["amazon web services"]
   ambiguous: false
+  implies: [cloud computing]  # AWS is a cloud platform, by definition
 
 java:
   aliases: []
@@ -373,6 +374,7 @@ distributed tracing:
   aliases: []
   ambiguous: false
 
+# Bare "reliability engineering" is not an alias: it also names hardware and mechanical work.
 sre:
   aliases: ["site reliability engineering", "site reliability"]
   ambiguous: false
@@ -488,6 +490,7 @@ metadata management:
 azure:
   aliases: ["microsoft azure", "azure cloud"]
   ambiguous: false
+  implies: [cloud computing]
 
 devops:
   aliases: ["dev ops"]
@@ -588,6 +591,7 @@ ai-assisted development:
 banking:
   aliases: ["banking industry", "retail banking", "commercial banking", "investment banking", "banking domain"]
   ambiguous: true
+  implies: [financial services]  # banking is a financial service, by definition
 
 # ---- Added 2026-10-14 from the resume side (README rule 4): the Oracle stack a JD may name,
 # which the skill list could not see. Bare "oracle" is not an alias: it is also the company. ----
@@ -621,4 +625,121 @@ oracle forms:
 
 weblogic:
   aliases: ["oracle weblogic", "weblogic server"]
+  ambiguous: false
+
+# ---- Added 2026-10-17 from the CVS Health "myPBM Transformation & AI strategy - Distinguished
+# Engineer" JD, now development data. Its soft-skill lines (mentoring, influence, executive
+# stakeholder management, growth mindset) are left to the LLM judge (README rule 3). ----
+
+responsible ai:
+  aliases: ["responsible artificial intelligence", "responsible use of ai"]
+  ambiguous: false
+
+ai governance:
+  aliases: ["governance of ai"]
+  ambiguous: false
+
+platform engineering:
+  aliases: ["platform engineer", "internal developer platform", "internal developer platforms"]
+  ambiguous: false
+
+digital transformation:
+  aliases: ["digital transformations"]
+  ambiguous: false
+
+intelligent automation:
+  aliases: []
+  ambiguous: false
+
+# Bare "cloud" is not an alias: product names use it ("Marketing Cloud", "Health Cloud").
+cloud computing:
+  aliases: ["cloud platforms", "cloud platform", "cloud infrastructure", "cloud-native", "cloud native"]
+  ambiguous: false
+
+# ---- Added 2026-10-17 from the GEICO "Staff Engineer, Applied AI" JD, now development data. Its
+# soft-skill lines (collaboration, mentoring, technical influence) are left to the LLM judge. ----
+
+document intelligence:
+  aliases: ["intelligent document processing", "document understanding"]
+  ambiguous: false
+
+workflow orchestration:
+  aliases: ["workflow orchestrator"]
+  ambiguous: false
+
+ai safety:
+  aliases: ["ai safety practices", "llm safety", "model safety"]
+  ambiguous: false
+
+fraud detection:
+  aliases: ["fraud modeling", "fraud modelling", "fraud analytics"]
+  ambiguous: false
+
+anomaly detection:
+  aliases: ["anomaly modeling", "anomaly modelling", "outlier detection"]
+  ambiguous: false
+
+performance optimization:
+  aliases: ["performance tuning", "performance optimisation", "performance engineering"]
+  ambiguous: false
+
+# Java AI frameworks. Spring AI and LangChain4j are Java libraries, so they show Java; Embabel runs
+# on the JVM (Kotlin or Java), so it implies nothing.
+spring ai:
+  aliases: ["spring-ai"]
+  ambiguous: false
+  implies: [java]
+
+langchain4j:
+  aliases: []
+  ambiguous: false
+  implies: [java]
+
+embabel:
+  aliases: []
+  ambiguous: false
+
+# Domains and compliance. Bare "insurance" is ambiguous: benefits prose ("we offer health insurance")
+# can sit inside a requirements list, where no section heading cuts it off. The industry phrases
+# below are conclusive.
+insurance:
+  aliases: ["insurance industry", "insurance domain", "property and casualty"]
+  ambiguous: true
+
+financial services:
+  aliases: ["financial-services", "financial services industry"]
+  ambiguous: false
+
+regulatory compliance:
+  aliases: []
+  ambiguous: false
+
+sox compliance:
+  aliases: ["sox", "sarbanes-oxley", "sarbanes oxley", "sox controls"]
+  ambiguous: false
+  implies: [regulatory compliance]  # SOX is a regulation; complying with it is regulatory compliance
+
+# ---- Added 2026-10-17 from the GEICO "Senior Engineer - Applied AI" JD (contact-center AI), now
+# development data. ----
+
+langsmith:
+  aliases: []
+  ambiguous: false
+
+hugging face:
+  aliases: ["huggingface", "hugging face transformers"]
+  ambiguous: false
+
+# The Anthropic SDK calls the same Messages API, directly or through Amazon Bedrock.
+anthropic api:
+  aliases: ["anthropic apis", "anthropic sdk", "anthropic messages api"]  # "claude api" belongs to claude
+  ambiguous: false
+
+contact center:
+  aliases: ["contact centre", "contact centers", "call center", "call centre", "contact center agents"]
+  ambiguous: false
+
+conversational ai:
+  aliases: ["intelligent assistants", "intelligent assistant", "conversational assistants", "chatbot", "chatbots",
+            "virtual agents", "virtual assistants"]
   ambiguous: false
