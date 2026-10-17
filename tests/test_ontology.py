@@ -142,6 +142,14 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     ("dlp", "Security: data-leakage prevention, secret scanning", "found"),
     ("dlp", "Data leakage prevention controls for agent tools", "found"),
     ("dlp", "Rolled out data loss prevention policies", "found"),
+    # from the CVS Health Distinguished Engineer JD (2026-10-17)
+    ("responsible ai", "Establishes responsible AI, security, compliance, and risk management practices", "found"),
+    ("ai governance", "AI governance, cybersecurity and product security review", "found"),
+    ("platform engineering", "across software engineering, enterprise architecture, digital transformation, or platform engineering", "found"),
+    ("digital transformation", "across software engineering, enterprise architecture, digital transformation, or platform engineering", "found"),
+    ("intelligent automation", "Strong understanding of Generative AI, Agentic AI, intelligent automation", "found"),
+    ("cloud computing", "Deep expertise in enterprise architecture, cloud platforms, distributed systems", "found"),
+    ("cloud computing", "Experience with Salesforce Marketing Cloud", "absent"),
 ])
 def test_new_skills_detect_as_intended(skill, text, expected):
     from careerfit.analyze.matcher import detect
@@ -162,3 +170,6 @@ def test_implications_run_from_the_specific_skill_to_the_broad_one():
     assert set(SKILLS["pl/sql"].implies) == {"sql", "backend development"}
     assert set(SKILLS["fastapi"].implies) == {"python", "backend development"}
     assert SKILLS["sql"].implies == ()  # SQL alone does not show back-end development
+    assert SKILLS["aws"].implies == ("cloud computing",)  # AWS and Azure are cloud platforms by definition
+    assert SKILLS["azure"].implies == ("cloud computing",)
+    assert SKILLS["cloud computing"].implies == ()  # and the broad skill never implies a specific one

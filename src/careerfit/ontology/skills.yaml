@@ -17,6 +17,7 @@ kubernetes:
 aws:
   aliases: ["amazon web services"]
   ambiguous: false
+  implies: [cloud computing]  # AWS is a cloud platform, by definition
 
 java:
   aliases: []
@@ -488,6 +489,7 @@ metadata management:
 azure:
   aliases: ["microsoft azure", "azure cloud"]
   ambiguous: false
+  implies: [cloud computing]
 
 devops:
   aliases: ["dev ops"]
@@ -621,4 +623,33 @@ oracle forms:
 
 weblogic:
   aliases: ["oracle weblogic", "weblogic server"]
+  ambiguous: false
+
+# ---- Added 2026-10-17 from the CVS Health "myPBM Transformation & AI strategy - Distinguished
+# Engineer" JD, now development data. Its soft-skill lines (mentoring, influence, executive
+# stakeholder management, growth mindset) are left to the LLM judge (README rule 3). ----
+
+responsible ai:
+  aliases: ["responsible artificial intelligence", "responsible use of ai"]
+  ambiguous: false
+
+ai governance:
+  aliases: ["governance of ai"]
+  ambiguous: false
+
+platform engineering:
+  aliases: ["platform engineer", "internal developer platform", "internal developer platforms"]
+  ambiguous: false
+
+digital transformation:
+  aliases: ["digital transformations"]
+  ambiguous: false
+
+intelligent automation:
+  aliases: []
+  ambiguous: false
+
+# Bare "cloud" is not an alias: product names use it ("Marketing Cloud", "Health Cloud").
+cloud computing:
+  aliases: ["cloud platforms", "cloud platform", "cloud infrastructure", "cloud-native", "cloud native"]
   ambiguous: false
