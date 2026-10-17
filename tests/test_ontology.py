@@ -173,6 +173,13 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     ("financial services", "Experience with insurance, financial services, or other regulated industries", "found"),
     ("regulatory compliance", "Familiarity with AI safety practices, evaluation frameworks, monitoring, and regulatory compliance", "found"),
     ("sox compliance", "AI governance, SOX controls, audit logging", "found"),
+    # from the GEICO Senior Engineer - Applied AI JD (2026-10-17)
+    ("langsmith", "modern AI frameworks such as LangChain, LangGraph, LangSmith, LlamaIndex, Hugging Face", "found"),
+    ("hugging face", "modern AI frameworks such as LangChain, LangGraph, LangSmith, LlamaIndex, Hugging Face", "found"),
+    ("anthropic api", "and OpenAI or Anthropic APIs", "found"),
+    ("anthropic api", "Anthropic SDK, Claude on Amazon Bedrock, Claude Code", "found"),
+    ("contact center", "core contact center experiences for sales, service and claims operations", "found"),
+    ("conversational ai", "automation, document intelligence, decision support, and intelligent assistants", "found"),
 ])
 def test_new_skills_detect_as_intended(skill, text, expected):
     from careerfit.analyze.matcher import detect

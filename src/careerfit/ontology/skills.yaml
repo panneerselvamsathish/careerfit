@@ -718,3 +718,28 @@ sox compliance:
   aliases: ["sox", "sarbanes-oxley", "sarbanes oxley", "sox controls"]
   ambiguous: false
   implies: [regulatory compliance]  # SOX is a regulation; complying with it is regulatory compliance
+
+# ---- Added 2026-10-17 from the GEICO "Senior Engineer - Applied AI" JD (contact-center AI), now
+# development data. ----
+
+langsmith:
+  aliases: []
+  ambiguous: false
+
+hugging face:
+  aliases: ["huggingface", "hugging face transformers"]
+  ambiguous: false
+
+# The Anthropic SDK calls the same Messages API, directly or through Amazon Bedrock.
+anthropic api:
+  aliases: ["anthropic apis", "anthropic sdk", "anthropic messages api"]  # "claude api" belongs to claude
+  ambiguous: false
+
+contact center:
+  aliases: ["contact centre", "contact centers", "call center", "call centre", "contact center agents"]
+  ambiguous: false
+
+conversational ai:
+  aliases: ["intelligent assistants", "intelligent assistant", "conversational assistants", "chatbot", "chatbots",
+            "virtual agents", "virtual assistants"]
+  ambiguous: false
