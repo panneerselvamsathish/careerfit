@@ -155,6 +155,19 @@ def test_the_report_counts_unique_repeat_and_active_visitors():
     ]
 
 
+def test_a_visitor_counts_on_every_day_they_did_something_not_only_page_view_days():
+    events = [
+        _event("2026-10-15", "page_view", VISITOR, path="/"),
+        _event("2026-10-16", "analysis_completed", VISITOR, skills=4),  # tab left open past midnight
+        _event("2026-10-16", "download", OTHER, kind="json"),  # page view fell outside the window
+    ]
+    report = usage.summarize(events, [], waitlist=0, donations=0)
+    assert report["daily"]["2026-10-16"]["unique_visitors"] == 2
+    assert report["daily"]["2026-10-16"]["anonymous_views"] == 0
+    assert (report["unique_visitors"], report["repeat_visitors"]) == (2, 1)
+    assert report["visitors_with_an_analysis"] == 1
+
+
 # ---- the in-memory store ----
 
 def test_memory_store_puts_queries_counts_and_deletes():

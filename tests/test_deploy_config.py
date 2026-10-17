@@ -239,6 +239,8 @@ def test_the_boundary_allows_nothing_but_those_logs_and_writes_to_the_apps_own_t
     table = statements["WriteOwnTableOnly"]
     assert set(_as_list(table["Action"])) == {"dynamodb:PutItem", "dynamodb:DeleteItem"}  # no reads, no scans
     assert table["Resource"] == "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AppStackName}-data"
+    # and no read-back through a write: ReturnValues ALL_OLD would return the item being replaced
+    assert table["Condition"] == {"StringEqualsIfExists": {"dynamodb:ReturnValues": "NONE"}}
 
 
 def test_the_table_is_retained_expires_usage_records_and_the_function_may_only_write_it():
@@ -251,7 +253,8 @@ def test_the_table_is_retained_expires_usage_records_and_the_function_may_only_w
     function = resources["WebFunction"]["Properties"]
     assert function["Environment"]["Variables"]["CAREERFIT_TABLE"] == "DataTable"
     assert function["Policies"] == [{"Statement": [{"Effect": "Allow", "Action": ["dynamodb:PutItem", "dynamodb:DeleteItem"],
-                                                    "Resource": "DataTable.Arn"}]}]
+                                                    "Resource": "DataTable.Arn",
+                                                    "Condition": {"StringEqualsIfExists": {"dynamodb:ReturnValues": "NONE"}}}]}]
 
 
 def test_cleanup_never_expires_the_running_image():

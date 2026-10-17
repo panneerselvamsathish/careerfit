@@ -109,12 +109,19 @@ Resources:
               - logs:CreateLogStream
               - logs:PutLogEvents
             Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AppStackName}-web:*
+          # Write-only means no read-back either: PutItem and DeleteItem can return the previous item
+          # (ReturnValues ALL_OLD) without GetItem. ReturnValuesOnConditionCheckFailure has no IAM
+          # condition key, so a caller holding this role who already knows a key (an email) could still
+          # learn whether that item exists through a failed condition; it can't list or scan the table.
           - Sid: WriteOwnTableOnly
             Effect: Allow
             Action:
               - dynamodb:PutItem
               - dynamodb:DeleteItem
             Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${AppStackName}-data
+            Condition:
+              StringEqualsIfExists:
+                dynamodb:ReturnValues: NONE
 
   DeployRole:
     Type: AWS::IAM::Role

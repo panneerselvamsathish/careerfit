@@ -84,8 +84,9 @@ Resources:
           # 6 MB Lambda payload limit, counted after base64: 2 MB per file keeps a request under it.
           CAREERFIT_MAX_FILE_MB: "2"
           CAREERFIT_TABLE: !Ref DataTable
-      # Write-only: the function adds records and removes waitlist addresses; it can't read the table.
-      # The permissions boundary allows these two actions on this one table and nothing else.
+      # Write-only: the function adds records and removes waitlist addresses; it can't read the table,
+      # not even the old item a write can return (ReturnValues stays NONE). The permissions boundary
+      # allows the same two actions, with the same condition, on this one table and nothing else.
       Policies:
         - Statement:
             - Effect: Allow
@@ -93,6 +94,9 @@ Resources:
                 - dynamodb:PutItem
                 - dynamodb:DeleteItem
               Resource: !GetAtt DataTable.Arn
+              Condition:
+                StringEqualsIfExists:
+                  dynamodb:ReturnValues: NONE
       # Public HTTPS endpoint. SAM adds both permissions a NONE-auth URL needs since Oct 2025
       # (lambda:InvokeFunctionUrl and lambda:InvokeFunction).
       FunctionUrlConfig:

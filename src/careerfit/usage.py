@@ -159,8 +159,9 @@ def days_back(now: datetime, days: int) -> list[str]:
 # ---- the report ----
 
 def summarize(events: Iterable[dict], skill_records: Iterable[dict], waitlist: int, donations: int) -> dict[str, Any]:
-    """Traffic, activation and skill demand from stored records. Unique and repeat counts use visitor IDs;
-    events sent without one (Global Privacy Control, Do Not Track) are counted as anonymous views."""
+    """Traffic, activation and skill demand from stored records. Unique and repeat counts use visitor IDs
+    from any event, not only page views; page views sent without one (Global Privacy Control, Do Not
+    Track) are counted as anonymous views."""
     events = list(events)
     per_day: dict[str, Counter] = defaultdict(Counter)
     days_seen: dict[str, set] = defaultdict(set)
@@ -171,10 +172,12 @@ def summarize(events: Iterable[dict], skill_records: Iterable[dict], waitlist: i
     for e in events:
         day, kind, visitor, props = e["day"], e["type"], e.get("visitor"), e.get("props") or {}
         per_day[day][kind] += 1
+        # Any identified event shows the visitor was there that day: a tab left open past midnight
+        # sends analyses and downloads without a new page view.
+        if visitor:
+            days_seen[visitor].add(day)
         if kind == "page_view":
-            if visitor:
-                days_seen[visitor].add(day)
-            else:
+            if not visitor:
                 per_day[day]["anonymous_views"] += 1
             if props.get("ref_host"):
                 referrers[props["ref_host"]] += 1
@@ -190,7 +193,7 @@ def summarize(events: Iterable[dict], skill_records: Iterable[dict], waitlist: i
         daily[day] = {"page_views": per_day[day]["page_view"], "unique_visitors": len(visitors),
                       "anonymous_views": per_day[day]["anonymous_views"],
                       "analyses": per_day[day]["analysis_completed"], "failures": per_day[day]["analysis_failed"]}
-    visitors = set(days_seen) | set(analyses)
+    visitors = set(days_seen)
     active = [v for v in visitors if analyses[v] > 0]
     skill_counts: dict[str, Counter] = defaultdict(Counter)
     total_analyses_with_stats = 0
