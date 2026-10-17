@@ -42,6 +42,9 @@ GEICO_LINE = ("Hands-on AI engineering: Strong experience with Python and modern
     ("Python or Java or Kubernetes", [{"python", "java", "kubernetes"}]),
     ("Python or Java, Kubernetes or Terraform", [{"python", "java"}, {"kubernetes", "terraform"}]),
     ("Python or equivalent and Kubernetes experience", []),
+    ("Python or equivalent on Kubernetes", []),
+    ("Python or equivalent with Kubernetes", []),
+    ("Experience with OpenAI or the Anthropic API", [{"openai", "anthropic api"}]),
 ])
 def test_alternative_groups(clause, groups):
     assert [set(g) for g in alternative_groups(clause, SKILLS)] == groups
@@ -137,9 +140,22 @@ def test_any_option_of_an_or_chain_meets_the_others(shown):
     assert honest(facts, resume, "Requirements:\n- Python or Java or Kubernetes experience") == []
 
 
-def test_or_equivalent_does_not_waive_the_next_requirement():
-    observed = by_skill(analyse("Python services", "Requirements:\n- Python or equivalent and Kubernetes experience"))
-    assert observed["kubernetes"].status == SkillStatus.GAP
+@pytest.mark.parametrize("connector", ["and", "on", "with"])
+def test_or_equivalent_does_not_waive_the_next_requirement(connector):
+    jd = f"Requirements:\n- Python or equivalent {connector} Kubernetes experience"
+    assert by_skill(analyse("Python services", jd))["kubernetes"].status == SkillStatus.GAP
+
+
+def test_a_long_run_of_spaces_between_skills_is_read_in_linear_time():
+    # Copilot review on #26: "\\s*,?\\s*" split one run of spaces two ways and backtracked
+    # quadratically (0.23 s at 4,000 spaces). Both the regex and the length guard now prevent it.
+    import time
+    from careerfit.analyze.matcher import _OR_JOIN
+    started = time.perf_counter()
+    assert _OR_JOIN.fullmatch(" " * 200_000 + "x") is None
+    assert time.perf_counter() - started < 0.1
+    assert alternative_groups("Python" + " " * 61 + "or Java", SKILLS) == []  # past MAX_JOIN: never a plain "or"
+    assert alternative_groups("Python  or  Java", SKILLS) == [{"python", "java"}]
 
 
 def test_a_nested_skill_shares_the_choice_it_sits_in():
@@ -282,29 +298,21 @@ def go_verdict(jd_line):
             "resume_quote": "", "confidence": 0.9, "reason": "not on the resume"}
 
 
-def test_an_ordinary_word_does_not_block_the_alternative_once_the_judge_has_validated_the_line():
-    # Copilot review on #26: "go onsite" is the verb; the judge validated line 3 as the Go requirement.
-    resume = "Kubernetes clusters"
-    jd = "Requirements:\n- You must go onsite twice a week\n- Go or Kubernetes experience"
-    keyword = analyse(resume, jd, ontology=GO_OR_K8S)
-    assert by_skill(keyword)["go"].status == SkillStatus.UNRESOLVABLE
-    llm = FakeLLM({"verdicts": [go_verdict(3)]})
-    judged = judge_facts(keyword, resume_text=resume, jd_text=jd, llm=llm, model="m", at=AT, ontology=GO_OR_K8S)
-    go = by_skill(judged)["go"]
-    assert (go.status, go.jd_evidence.locator, go.resume_evidence.via) == (SkillStatus.ALTERNATIVE_MET, "line 3",
-                                                                          "kubernetes")
-    assert len(llm.calls) == 1  # nothing left for a learning plan
-    assert honest(judged, resume, jd, GO_OR_K8S) == []
+GO_PLAN = {"steps": [{"skill": "go", "priority": 1, "why_it_matters": "the JD asks for it",
+                      "resources": ["go official documentation"], "estimated_weeks": 4}]}
 
 
-def test_a_standalone_line_the_judge_validated_is_still_a_gap():
+@pytest.mark.parametrize("validated_line", [2, 3])
+def test_a_bare_word_mention_is_never_waived_whichever_line_the_judge_picks(validated_line):
+    # Copilot review on #26: the judge rules on one line per skill, so a bare "Go" on another line
+    # may still be a requirement ("Go is required"). It stays one; at worst that is a false gap
+    # ("you must go onsite"), never a waived requirement.
     resume = "Kubernetes clusters"
-    jd = "Requirements:\n- Go is required\n- Go or Kubernetes experience"
-    plan = {"steps": [{"skill": "go", "priority": 1, "why_it_matters": "the JD asks for it",
-                       "resources": ["go official documentation"], "estimated_weeks": 4}]}
-    llm = FakeLLM({"verdicts": [go_verdict(2)]}, plan)
-    judged = judge_facts(analyse(resume, jd, ontology=GO_OR_K8S), resume_text=resume, jd_text=jd, llm=llm, model="m",
-                         at=AT, ontology=GO_OR_K8S)
-    assert by_skill(judged)["go"].status == SkillStatus.GAP
-    assert [step.skill for step in judged.learning_steps] == ["go"]
-    assert honest(judged, resume, jd, GO_OR_K8S) == []
+    for jd in ("Requirements:\n- Go is required\n- Go or Kubernetes experience",
+               "Requirements:\n- You must go onsite twice a week\n- Go or Kubernetes experience"):
+        llm = FakeLLM({"verdicts": [go_verdict(validated_line)]}, GO_PLAN)
+        judged = judge_facts(analyse(resume, jd, ontology=GO_OR_K8S), resume_text=resume, jd_text=jd, llm=llm,
+                             model="m", at=AT, ontology=GO_OR_K8S)
+        assert by_skill(judged)["go"].status == SkillStatus.GAP
+        assert [step.skill for step in judged.learning_steps] == ["go"]
+        assert honest(judged, resume, jd, GO_OR_K8S) == []

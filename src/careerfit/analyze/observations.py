@@ -1,9 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from collections.abc import Collection
-
-from careerfit.analyze.matcher import (Mention, decide_status, detect, first_mention_line, mention_pattern,
+from careerfit.analyze.matcher import (decide_status, detect, first_mention_line, mention_pattern,
                                       requirement_alternatives, requirement_evidence)
 from careerfit.analyze.ontology import SkillEntry
 from careerfit.facts.schema import Coverage, GapAnalysisFacts, Provenance, SkillObservation, SkillStatus
@@ -55,26 +53,14 @@ def build_observations(
     return apply_alternatives(tuple(observations), jd_text, ontology)
 
 
-def requiring_mentions(mentions: list[Mention], observation: SkillObservation, judged: bool) -> list[Mention]:
-    """The JD mentions that ask for the skill. Before judging that is every mention, an ordinary-word
-    one included ("you must go onsite"). Once the judge has validated a JD line for the skill, an
-    ambiguous mention elsewhere is no longer taken as a requirement; a clear one always is."""
-    if not judged:
-        return mentions
-    validated = observation.jd_evidence.locator
-    return [m for m in mentions if m.clear or f"line {m.line}" == validated]
-
-
 def apply_alternatives(
     observations: tuple[SkillObservation, ...],
     jd_text: str,
     ontology: dict[str, SkillEntry],
-    judged: Collection[str] = (),
 ) -> tuple[SkillObservation, ...]:
     """A skill the resume doesn't show is no gap when the JD accepts a matched one in its place
-    ("OpenAI or Anthropic APIs" with Anthropic on the resume). Every JD mention that asks for the
-    skill must offer a matched alternative: asked for on its own anywhere, it is still a requirement.
-    `judged` names the skills whose JD line the judge validated (see requiring_mentions).
+    ("OpenAI or Anthropic APIs" with Anthropic on the resume). Every JD mention of the skill must
+    offer a matched alternative: asked for on its own anywhere, it is still a requirement.
 
     The evidence is the alternative's own resume line, marked as such, so the claim can be checked.
     """
@@ -82,9 +68,9 @@ def apply_alternatives(
     alternatives = requirement_alternatives(jd_text, ontology)
     result = []
     for o in observations:
-        mentions = requiring_mentions(alternatives.get(o.skill, []), o, o.skill in judged)
-        if o.status in REPLACEABLE and mentions and all(m.others & matched.keys() for m in mentions):
-            via = min(mentions[0].others & matched.keys())
+        mentions = alternatives.get(o.skill, [])
+        if o.status in REPLACEABLE and mentions and all(m & matched.keys() for m in mentions):
+            via = min(mentions[0] & matched.keys())
             shown = matched[via].resume_evidence
             assert shown is not None  # a matched observation always cites the resume
             evidence = Provenance(source="alternative", via=via, locator=shown.locator, excerpt=shown.excerpt,

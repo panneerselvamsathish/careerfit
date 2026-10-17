@@ -112,7 +112,6 @@ def judge_facts(
             failures.append(str(e))
             verdicts = {}
         refined: list[SkillObservation] = []
-        judged: set[str] = set()  # skills whose JD line the judge validated
         for o in observations:
             verdict = verdicts.get(o.skill) if o.status == SkillStatus.UNRESOLVABLE else None
             if verdict is None:
@@ -122,10 +121,9 @@ def judge_facts(
             else:
                 refined.append(_apply_verdict(o, verdict, resume_text=resume_text, jd_text=jd_text, scanned=scanned,
                                               at=at, jd_levels=jd_candidates([o], jd_text, ontology)[o.skill]))
-                judged.add(o.skill)
         # A skill the judge just matched can be the alternative that meets an either/or gap, and a
         # skill it just called a gap can have an alternative the keyword pass already matched.
-        observations = list(apply_alternatives(tuple(refined), jd_text, ontology, judged))
+        observations = list(apply_alternatives(tuple(refined), jd_text, ontology))
 
     steps: tuple[LearningStep, ...] = ()
     gaps = [o for o in observations if o.status == SkillStatus.GAP]
