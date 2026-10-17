@@ -715,7 +715,8 @@ regulatory compliance:
   ambiguous: false
 
 sox compliance:
-  aliases: ["sox", "sarbanes-oxley", "sarbanes oxley", "sox controls"]
+  # No bare "sox": it also names the SoX audio tool and the Boston Red Sox (Copilot review on #24).
+  aliases: ["sarbanes-oxley", "sarbanes oxley", "sox controls"]
   ambiguous: false
   implies: [regulatory compliance]  # SOX is a regulation; complying with it is regulatory compliance
 
@@ -740,6 +741,7 @@ contact center:
   ambiguous: false
 
 conversational ai:
-  aliases: ["intelligent assistants", "intelligent assistant", "conversational assistants", "chatbot", "chatbots",
-            "virtual agents", "virtual assistants"]
+  # No "virtual assistants" or "virtual agents": both also name people, remote admin staff and
+  # work-from-home contact-center agents (Copilot review on #24).
+  aliases: ["intelligent assistants", "intelligent assistant", "conversational assistants", "chatbot", "chatbots"]
   ambiguous: false

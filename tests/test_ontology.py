@@ -173,6 +173,10 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     ("financial services", "Experience with insurance, financial services, or other regulated industries", "found"),
     ("regulatory compliance", "Familiarity with AI safety practices, evaluation frameworks, monitoring, and regulatory compliance", "found"),
     ("sox compliance", "AI governance, SOX controls, audit logging", "found"),
+    ("sox compliance", "Originated and led a SOX compliance initiative", "found"),
+    # bare "sox" also names an audio tool and a baseball team (Copilot review on #24)
+    ("sox compliance", "Built speech preprocessing pipelines using SoX", "absent"),
+    ("sox compliance", "Built ticketing analytics for the Boston Red Sox", "absent"),
     # from the GEICO Senior Engineer - Applied AI JD (2026-10-17)
     ("langsmith", "modern AI frameworks such as LangChain, LangGraph, LangSmith, LlamaIndex, Hugging Face", "found"),
     ("hugging face", "modern AI frameworks such as LangChain, LangGraph, LangSmith, LlamaIndex, Hugging Face", "found"),
@@ -180,6 +184,9 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     ("anthropic api", "Anthropic SDK, Claude on Amazon Bedrock, Claude Code", "found"),
     ("contact center", "core contact center experiences for sales, service and claims operations", "found"),
     ("conversational ai", "automation, document intelligence, decision support, and intelligent assistants", "found"),
+    # "virtual assistants" and "virtual agents" also name people (Copilot review on #24)
+    ("conversational ai", "Managed virtual assistants for scheduling and inbox management", "absent"),
+    ("conversational ai", "Scheduled 200 virtual agents working from home across three time zones", "absent"),
 ])
 def test_new_skills_detect_as_intended(skill, text, expected):
     from careerfit.analyze.matcher import detect
@@ -207,3 +214,19 @@ def test_implications_run_from_the_specific_skill_to_the_broad_one():
     assert SKILLS["sox compliance"].implies == ("regulatory compliance",)
     assert SKILLS["spring ai"].implies == SKILLS["langchain4j"].implies == ("java",)
     assert SKILLS["embabel"].implies == ()  # JVM, but Kotlin or Java
+
+
+def test_sox_the_tool_or_the_team_shows_no_compliance_even_through_implication():
+    from datetime import datetime
+    from careerfit.analyze.observations import build_observations
+    from careerfit.facts.schema import Coverage, SkillStatus
+    coverage = Coverage(source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=11,
+                        known_blind_spots=())
+    jd = "Requirements:\n- SOX compliance\n- Regulatory compliance"
+    def status(resume):
+        observed = build_observations(resume, coverage, jd, SKILLS, datetime(2026, 10, 17))
+        return {o.skill: o.status for o in observed}
+    unrelated = status("Built speech preprocessing pipelines using SoX\nBuilt ticketing analytics for the Boston Red Sox")
+    assert unrelated["sox compliance"] == unrelated["regulatory compliance"] == SkillStatus.GAP
+    shown = status("Originated and led a SOX compliance initiative")
+    assert shown["sox compliance"] == shown["regulatory compliance"] == SkillStatus.MATCHED
