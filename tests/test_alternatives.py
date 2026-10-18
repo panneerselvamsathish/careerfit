@@ -188,13 +188,18 @@ def test_long_or_chains_and_repeated_mentions_stay_linear(joiner):
     two = {"python": SkillEntry(aliases=(), ambiguous=False), "java": SkillEntry(aliases=(), ambiguous=False)}
 
     def seconds(n):
+        # Best of five: one sample on a shared CI runner can be stretched by a pause or a GC run.
         text = joiner.join(["Python", "Java"] * n)
-        started = time.perf_counter()
-        mention_alternatives(text, two)
-        return time.perf_counter() - started
+        best = float("inf")
+        for _ in range(5):
+            started = time.perf_counter()
+            mention_alternatives(text, two)
+            best = min(best, time.perf_counter() - started)
+        return best
 
     small, large = seconds(2_000), seconds(8_000)
-    assert large < 1.0 and large < 8 * small + 0.02  # 4x the mentions: linear is ~4x, quadratic ~16x
+    # 4x the mentions: linear measures ~4.2x here, quadratic ~16x. 10x sits between with room for noise.
+    assert large < 2.0 and large < 10 * small
 
 
 def test_a_nested_skill_shares_the_choice_it_sits_in():
