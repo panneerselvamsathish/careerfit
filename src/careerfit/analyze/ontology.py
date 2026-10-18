@@ -1,6 +1,13 @@
-from pydantic import BaseModel, model_validator, ConfigDict
-import yaml
+from collections.abc import Iterator, Mapping
+from functools import cached_property
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+import yaml
+from pydantic import BaseModel, ConfigDict, model_validator
+
+if TYPE_CHECKING:
+    from careerfit.analyze.mentions import MentionIndex
 
 class SkillEntry(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -18,7 +25,54 @@ class SkillEntry(BaseModel):
             raise ValueError("Aliases must never be empty")
         return self
 
-def load_ontology(path: Path) -> dict[str, SkillEntry]:
+class Ontology(Mapping[str, SkillEntry]):
+    """The skill list, read-only, with its mention index and reverse implications built once.
+
+    Behaves like the plain dict it wraps, so any code that takes a mapping of skills takes this too.
+    """
+
+    def __init__(self, entries: Mapping[str, SkillEntry]):
+        self._entries = dict(entries)
+
+    def __getitem__(self, name: str) -> SkillEntry:
+        return self._entries[name]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._entries)
+
+    def __len__(self) -> int:
+        return len(self._entries)
+
+    @cached_property
+    def index(self) -> "MentionIndex":
+        from careerfit.analyze.mentions import MentionIndex  # mentions imports SkillEntry from here
+        return MentionIndex.build(self)
+
+    @cached_property
+    def implied_by(self) -> dict[str, tuple[str, ...]]:
+        return implied_by_of(self._entries)
+
+
+def index_of(ontology: Mapping[str, SkillEntry]) -> "MentionIndex":
+    """The mention index: built once for a loaded Ontology, built on the spot for a plain dict."""
+    if isinstance(ontology, Ontology):
+        return ontology.index
+    from careerfit.analyze.mentions import MentionIndex
+    return MentionIndex.build(ontology)
+
+
+def implied_by_of(ontology: Mapping[str, SkillEntry]) -> dict[str, tuple[str, ...]]:
+    """For each skill, the skills that imply it, in the list's order ("sql" ← "pl/sql")."""
+    if isinstance(ontology, Ontology):
+        return ontology.implied_by  # computed once, on first use
+    reverse: dict[str, list[str]] = {}
+    for name, entry in ontology.items():
+        for implied in entry.implies:
+            reverse.setdefault(implied, []).append(name)
+    return {name: tuple(by) for name, by in reverse.items()}
+
+
+def load_ontology(path: Path) -> Ontology:
     raw_text = path.read_text(encoding="utf-8")
     data = yaml.safe_load(raw_text)
     if not isinstance(data, dict):
@@ -37,4 +91,4 @@ def load_ontology(path: Path) -> dict[str, SkillEntry]:
         unknown = [name for name in entry.implies if name not in ontology]
         if unknown:
             raise ValueError(f"{path.name}: '{skill_name}' implies unknown skill(s) {unknown}")
-    return ontology
+    return Ontology(ontology)
