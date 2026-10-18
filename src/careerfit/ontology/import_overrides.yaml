@@ -1,0 +1,13 @@
+# Hand-written corrections for scripts/import_taxonomy.py. Edit this, then regenerate
+# skills_imported.yaml; never edit the generated file itself.
+#
+# keep:        one-word names that are everyday words but really are tools in job descriptions.
+#              Kept only if the rest of the rules allow them.
+# drop:        imported names that are too generic or wrong (after cleaning, lowercase).
+# rename:      a cleaned name that should read differently: {from: to}.
+# alias_allow: extra aliases for an imported skill that the rules would reject: {skill: [aliases]}.
+
+keep: []
+drop: []
+rename: {}
+alias_allow: {}
