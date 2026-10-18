@@ -1,3 +1,4 @@
+import pytest
 from careerfit.analyze.ontology import SkillEntry
 from evals.ontology_coverage import coverage, main
 
@@ -79,3 +80,22 @@ def test_a_marker_with_unicode_dashes_is_found_by_every_caller():
     from careerfit.analyze.matcher import has_nice_marker, heading_level
     assert has_nice_marker("Kubernetes is nice\u2011to\u2011have")
     assert heading_level("Kubernetes is nice\u2013to\u2013have:") == "nice"
+
+
+@pytest.mark.parametrize("bullet", ["-", "\u2014", "\u2013", "\u2011"])
+def test_a_dash_bullet_is_a_bullet_for_the_coverage_tool_and_the_product(bullet):
+    # Copilot review on #30: "\u2014 Your journey at A&M" was a stop heading (unbulleted) while
+    # "- Your journey at A&M" was not, so the coverage tool dropped the lines after it.
+    from careerfit.analyze.matcher import requirement_levels, stop_section
+    assert stop_section(f"{bullet} Your journey at A&M") is False
+    jd = f"Requirements:\n{bullet} Your journey at A&M\n- Python"
+    assert [(n, skills) for n, _, skills in coverage(jd, ONTOLOGY).covered] == [(3, ("python",))]
+    assert requirement_levels(jd, ONTOLOGY) == {"python": "must"}
+
+
+def test_a_dash_bulleted_short_requirement_is_counted_like_a_hyphen_bulleted_one():
+    # The tool's own bullet check reads dashes as "-" too: "\u2014 AWS" is a bullet, so it counts
+    # even though it is shorter than MIN_WORDS, and the excerpt keeps the original text.
+    for bullet in ("-", "\u2014"):
+        result = coverage(f"Requirements:\n{bullet} AWS", ONTOLOGY)
+        assert [(n, line, skills) for n, line, skills in result.covered] == [(2, "AWS", ("aws",))]

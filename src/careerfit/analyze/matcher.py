@@ -126,7 +126,7 @@ def stop_section(line: str) -> bool:
     form = _heading_form(line)
     if STOP_HEADING.fullmatch(form):
         return True
-    bulleted = _LEADING_BULLET.match(line) is not None
+    bulleted = _LEADING_BULLET.match(dashes_as_hyphens(line)) is not None  # an em-dash bullet is a bullet
     return (not bulleted and len(form.split()) <= OPEN_STOP_MAX_WORDS
             and OPEN_STOP_HEADING.fullmatch(form) is not None)
 

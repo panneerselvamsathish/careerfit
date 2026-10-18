@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from careerfit.analyze.matcher import requirement_section, scan, stop_section
+from careerfit.analyze.mentions import dashes_as_hyphens
 from careerfit.analyze.ontology import SkillEntry, load_default_ontology, load_ontology
 from careerfit.ingest.document import read_document
 
@@ -43,7 +44,8 @@ class Coverage:
 
 def _stop_heading(line: str) -> bool:
     # Normalised like the matcher's headings, so "* About Us" behind a bullet still counts.
-    return stop_section(line) or ABOUT_COMPANY.fullmatch(BULLET.sub("", line).strip().rstrip(":").strip()) is not None
+    return (stop_section(line)
+            or ABOUT_COMPANY.fullmatch(BULLET.sub("", dashes_as_hyphens(line)).strip().rstrip(":").strip()) is not None)
 
 
 def coverage(jd_text: str, ontology: dict[str, SkillEntry]) -> Coverage:
@@ -61,7 +63,7 @@ def coverage(jd_text: str, ontology: dict[str, SkillEntry]) -> Coverage:
         if requirement_section(text):
             inside = True
             continue
-        bullet = BULLET.match(text)
+        bullet = BULLET.match(dashes_as_hyphens(text))  # same length: bullet.end() still indexes text
         if not bullet and text.endswith(":"):
             continue  # any other heading ("About the Role:", "Cloud:") is skipped and changes nothing
         if not inside:
