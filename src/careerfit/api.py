@@ -31,7 +31,7 @@ from starlette.concurrency import run_in_threadpool
 
 from careerfit import usage
 from careerfit.analyze.observations import build_facts
-from careerfit.analyze.ontology import load_ontology
+from careerfit.analyze.ontology import load_default_ontology, load_ontology
 from careerfit.facts.schema import Coverage
 from careerfit.ingest.document import read_document
 from careerfit.report import blind_spot_notes, render_markdown
@@ -217,7 +217,8 @@ def create_app(
 ) -> FastAPI:
     if max_file_mb < 1:
         raise ValueError(f"max_file_mb must be at least 1, got {max_file_mb}")
-    ontology = load_ontology(ontology_path)
+    # The packaged list includes the imported technology skills; a custom file (tests) is used alone.
+    ontology = load_default_ontology() if ontology_path == DEFAULT_ONTOLOGY else load_ontology(ontology_path)
     store = MemoryStore() if store is None else store
     limiter = RateLimiter(*rate_limit, clock=clock)
     limited = {

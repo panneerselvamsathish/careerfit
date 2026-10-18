@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from careerfit.analyze.matcher import requirement_section, scan, stop_section
-from careerfit.analyze.ontology import SkillEntry, load_ontology
+from careerfit.analyze.ontology import SkillEntry, load_default_ontology, load_ontology
 from careerfit.ingest.document import read_document
 
 DEFAULT_ONTOLOGY = Path(__file__).parent.parent / "src" / "careerfit" / "ontology" / "skills.yaml"
@@ -83,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--ontology", type=Path, default=DEFAULT_ONTOLOGY)
     parser.add_argument("--covered", action="store_true", help="also list the covered lines and their skills")
     args = parser.parse_args(argv)
-    ontology = load_ontology(args.ontology)
+    ontology = load_default_ontology() if args.ontology == DEFAULT_ONTOLOGY else load_ontology(args.ontology)
     print(f"skill list: {len(ontology)} skills")
     for path in args.jds:
         text, _ = read_document(path)

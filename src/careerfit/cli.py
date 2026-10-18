@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from careerfit.analyze.observations import build_facts
-from careerfit.analyze.ontology import load_ontology
+from careerfit.analyze.ontology import load_default_ontology, load_ontology
 from careerfit.ingest.document import read_document
 from careerfit.judge.scorer import judge_facts
 from careerfit.cache import CachingLLM
@@ -57,6 +57,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--perspective", choices=["candidate", "hiring_manager"], default="candidate")
     parser.add_argument("--deep", action="store_true", help="resolve ambiguous skills and plan learning with the LLM judge")
     parser.add_argument("--fresh", action="store_true", help="with --deep: ignore cached judge answers")
+    parser.add_argument("--no-imported", action="store_true",
+                        help="use only the hand-curated skill list, not the imported technology skills")
     parser.add_argument("--ontology", type=Path, default=DEFAULT_ONTOLOGY, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if args.output is not None and args.report is not None and _same_file(args.output, args.report):
@@ -71,7 +73,10 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     at = datetime.now(timezone.utc)
-    ontology = load_ontology(args.ontology)
+    if args.ontology == DEFAULT_ONTOLOGY:
+        ontology = load_default_ontology(with_imported=not args.no_imported)
+    else:  # a custom list (tests) is used alone
+        ontology = load_ontology(args.ontology)
     facts = build_facts(
         resume_text=resume_text,
         resume_coverage=resume_coverage,

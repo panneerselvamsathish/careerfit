@@ -236,3 +236,70 @@ def test_sox_the_tool_or_the_team_shows_no_compliance_even_through_implication()
     assert unrelated["sox compliance"] == unrelated["regulatory compliance"] == SkillStatus.GAP
     shown = status("Originated and led a SOX compliance initiative")
     assert shown["sox compliance"] == shown["regulatory compliance"] == SkillStatus.MATCHED
+
+
+# ---- curated + imported skill lists (A1.2) ----
+
+def _write(path, text):
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+CURATED = """
+kubernetes:
+  aliases: ["k8s"]
+  ambiguous: false
+"""
+
+
+def test_imported_skills_join_the_list_and_the_curated_file_always_wins(tmp_path):
+    from careerfit.analyze.ontology import load_ontology
+    curated = _write(tmp_path / "skills.yaml", CURATED)
+    imported = _write(tmp_path / "skills_imported.yaml", """
+rancher:
+  aliases: ["rancher kubernetes engine"]
+  ambiguous: false
+  sources: [onet]
+Kubernetes:
+  aliases: ["kube"]
+  ambiguous: false
+  sources: [esco]
+helm charts:
+  aliases: ["K8S"]
+  ambiguous: false
+  sources: [onet, esco]
+""")
+    merged = load_ontology(curated, imported=imported)
+    assert list(merged) == ["kubernetes", "rancher"]  # curated first; collisions dropped whole
+    assert merged["kubernetes"].sources == ("curated",)
+    assert merged["rancher"].sources == ("onet",)
+
+
+@pytest.mark.parametrize(("imported", "message"), [
+    ("x tool:\n  aliases: []\n  ambiguous: false\n  implies: [kubernetes]\n  sources: [onet]\n", "may not imply"),
+    ("x tool:\n  aliases: []\n  ambiguous: false\n  sources: [curated]\n", "cannot have source 'curated'"),
+    ("x tool:\n  aliases: [same]\n  ambiguous: false\n  sources: [onet]\n"
+     "y tool:\n  aliases: [Same]\n  ambiguous: false\n  sources: [esco]\n", "shares a name or alias"),
+])
+def test_bad_imported_entries_are_refused(tmp_path, imported, message):
+    from careerfit.analyze.ontology import load_ontology
+    curated = _write(tmp_path / "skills.yaml", CURATED)
+    with pytest.raises(ValueError, match=message):
+        load_ontology(curated, imported=_write(tmp_path / "skills_imported.yaml", imported))
+
+
+def test_a_non_ascii_name_or_alias_is_refused(tmp_path):
+    # The matcher folds ASCII case only, so a non-ASCII term could silently never match.
+    from careerfit.analyze.ontology import load_ontology
+    bad = _write(tmp_path / "skills.yaml", 'café tools:\n  aliases: []\n  ambiguous: false\n')
+    with pytest.raises(ValueError, match="non-ASCII"):
+        load_ontology(bad)
+
+
+def test_the_packaged_lists_load_together():
+    from careerfit.analyze.ontology import IMPORTED_SKILLS, load_default_ontology
+    assert IMPORTED_SKILLS.exists()
+    curated_only = load_default_ontology(with_imported=False)
+    merged = load_default_ontology()
+    assert list(merged)[:len(curated_only)] == list(curated_only)  # curated skills first, unchanged
+    assert all(merged[name] == curated_only[name] for name in curated_only)
