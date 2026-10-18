@@ -7,6 +7,8 @@ class SkillStatus(str, Enum):
     MATCHED = "matched"
     PARTIAL = "partial"
     GAP = "gap"
+    # The JD accepts another skill in its place ("OpenAI or Anthropic APIs") and the resume shows that one.
+    ALTERNATIVE_MET = "alternative_met"
     UNRESOLVABLE = "unresolvable"
     NOT_ASSESSED = "not_assessed"
 
@@ -16,18 +18,20 @@ class Provenance(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
-    source: Literal["resume", "jd", "derived", "llm_judge"]
+    source: Literal["resume", "jd", "derived", "alternative", "llm_judge"]
     locator: str
     excerpt: str  # the cited text itself, so a reader can check the claim without the source file
     retrieved_at: datetime
-    via: str | None = None  # source="derived": the skill named on the cited line that implies this one
+    # source="derived": the skill named on the cited line that implies this one.
+    # source="alternative": the skill on the cited line that the JD accepts in place of this one.
+    via: str | None = None
 
     @model_validator(mode="after")
     def check_via(self) -> "Provenance":
-        if self.source == "derived" and not self.via:
-            raise ValueError("derived evidence must name the skill it was derived from (via)")
-        if self.source != "derived" and self.via is not None:
-            raise ValueError("only derived evidence has a via skill")
+        if self.source in ("derived", "alternative") and not self.via:
+            raise ValueError(f"{self.source} evidence must name the skill it stands on (via)")
+        if self.source not in ("derived", "alternative") and self.via is not None:
+            raise ValueError("only derived or alternative evidence has a via skill")
         return self
 
 class SkillObservation(BaseModel):
@@ -45,6 +49,16 @@ class SkillObservation(BaseModel):
     def check_evidence(self) -> "SkillObservation":
         if self.status == SkillStatus.MATCHED and self.resume_evidence is None:
             raise ValueError("matched status requires resume_evidence")
+        return self
+
+    @model_validator(mode="after")
+    def check_alternative(self) -> "SkillObservation":
+        # An alternative stands on another skill's resume line, never on one of this skill's own.
+        alternative = self.resume_evidence is not None and self.resume_evidence.source == "alternative"
+        if (self.status == SkillStatus.ALTERNATIVE_MET) != alternative:
+            raise ValueError("alternative_met status and alternative evidence go together")
+        if self.status == SkillStatus.ALTERNATIVE_MET and self.confidence is not None:
+            raise ValueError("confidence should not be set for alternative_met status")
         return self
 
     @model_validator(mode="after")
@@ -107,7 +121,9 @@ class GapAnalysisFacts(BaseModel):
     jd_coverage: Coverage
     analyzed_at: datetime
     llm_used: bool
-    schema_version: str = "0.5.0"  # 0.5.0: Provenance.via for skills shown through another skill
+    # 0.5.0: Provenance.via for skills shown through another skill
+    # 0.6.0: alternative_met status and alternative evidence for either/or requirements
+    schema_version: str = "0.6.0"
     fit_score: FitScore | None = None
     judge: JudgeRun | None = None
     skill_observations: tuple[SkillObservation, ...]

@@ -1,4 +1,5 @@
 import re
+from collections.abc import Iterator
 from typing import Literal
 
 from careerfit.analyze.ontology import SkillEntry
@@ -130,9 +131,9 @@ def clauses(sentence: str) -> list[str]:
 Occurrence = tuple[Literal["must", "nice"], int, Literal["found", "unclear"]]
 
 
-def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, list[Occurrence]]:
-    """Every place the JD mentions each skill, as (level, line, detection result), in document order."""
-    found: dict[str, list[Occurrence]] = {}
+def requirement_sentences(jd_text: str) -> Iterator[tuple[int, str, list[tuple[Level, str]]]]:
+    """Every sentence of the JD that can hold a requirement, as (line, sentence, its clauses with their
+    levels), in document order. A sentence mixing a must and a nice marker is split into clauses."""
     current: Literal["must", "nice"] = "must"
     counting = True  # off inside a benefits / equal-opportunity / pay section
     for line_no, raw_line in enumerate(jd_text.splitlines(), start=1):
@@ -149,6 +150,7 @@ def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> di
         if not counting:
             continue
         for sentence in re.split(r"(?<=[.!?])\s+", line):
+            levelled: list[tuple[Level, str]] = []
             for clause in clauses(sentence):
                 level: Literal["must", "nice"]
                 if has_must_marker(clause):
@@ -157,9 +159,148 @@ def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> di
                     level = "nice"
                 else:
                     level = current
-                for name, result in scan(clause, ontology).items():
-                    if result != "absent":
-                        found.setdefault(name, []).append((level, line_no, result))
+                levelled.append((level, clause))
+            yield line_no, sentence, levelled
+
+
+def requirement_clauses(jd_text: str) -> Iterator[tuple[Level, int, str]]:
+    """Every clause of the JD that can hold a requirement, as (level, line, clause), in document order."""
+    for line_no, _sentence, levelled in requirement_sentences(jd_text):
+        for level, clause in levelled:
+            yield level, line_no, clause
+
+
+def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, list[Occurrence]]:
+    """Every place the JD mentions each skill, as (level, line, detection result), in document order."""
+    found: dict[str, list[Occurrence]] = {}
+    for level, line_no, clause in requirement_clauses(jd_text):
+        for name, result in scan(clause, ontology).items():
+            if result != "absent":
+                found.setdefault(name, []).append((level, line_no, result))
+    return found
+
+
+# Skills a clause joins with "or" are alternatives: any one meets the requirement ("OpenAI or
+# Anthropic APIs", "Python, Java, or Go", "Python or Java or Go"). Between "or" and the next skill
+# only up to two modifiers may sit ("software engineering or applied machine learning", "or the
+# Anthropic API"); any other word ("Python or equivalent and Kubernetes", "... on Kubernetes")
+# keeps the two separate requirements, and so does anything else between two skills.
+# The comma is grouped with its own spaces, so no run of spaces can be split two ways (backtracking).
+_OR_JOIN = re.compile(r"\s*(,\s*)?(and/)?or\s+((a|an|the|applied|modern|similar|comparable|related)\s+){0,2}",
+                      re.IGNORECASE)
+_COMMA_JOIN = re.compile(r"\s*,\s*")
+MAX_JOIN = 60  # characters: a longer stretch between two skills is never a plain "or" or comma
+# "At least two of Python, Java, or Kubernetes" needs more than one: no single skill meets it, so a
+# sentence that asks for a count above one offers no either/or choice at all.
+# "One of", "1 of" and "1 or more of" are met by any single skill, so only counts above one stop it.
+# Up to two nouns may sit before "of", "out of", "from" or "among" ("two technologies from"), but
+# never a duration: "4+ years of Python or Java" counts years, not skills.
+_COUNTED = re.compile(r"\b(two|three|four|five|six|several|multiple|both|all|([2-9]|[1-9]\d+)\+?)"
+                      r"(\s+or\s+more)?(\s+(?!(years?|yrs|months?|weeks?|days?)\b)[a-z-]+){0,2}"
+                      r"\s+(out\s+of|of|from|among)\b", re.IGNORECASE)
+Span = tuple[int, int, str]
+
+
+def _mention_spans(clause: str, ontology: dict[str, SkillEntry]) -> tuple[list[Span], list[tuple[Span, int]]]:
+    """Each skill mention in the clause as (start, end, skill), left to right, and the nested ones.
+
+    Of two overlapping mentions the longer is kept; the other is nested in it, paired with the index
+    of the kept mention it sits in: "SQL" inside "PL/SQL" is nested in PL/SQL's mention.
+    """
+    spans = sorted(((m.start(), m.end(), name)
+                    for name, entry in ontology.items() for term in (*entry.aliases, name)
+                    for m in mention_pattern(term).finditer(clause)),
+                   key=lambda span: (span[0], span[0] - span[1], span[2]))
+    kept: list[Span] = []
+    nested: list[tuple[Span, int]] = []
+    for span in spans:
+        if kept and span[0] < kept[-1][1]:
+            nested.append((span, len(kept) - 1))
+        else:
+            kept.append(span)
+    return kept, nested
+
+
+def _choice_of(clause: str, kept: list[Span]) -> list[int]:
+    """For each kept mention, an id shared by every mention in the same either/or choice.
+
+    A comma list ending in "or" is one choice ("A, B, or C"), and so is a chain of "or"s ("A or B or
+    C"); a comma after a choice starts a new list ("A or B, C or D" is two choices). A sentence that
+    asks for a count above one ("at least two of") gives every mention its own choice.
+    """
+    parent = list(range(len(kept)))
+    if _COUNTED.search(clause):
+        return parent
+
+    def root(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]  # path halving: a long "or" chain stays near-linear
+            i = parent[i]
+        return i
+
+    run = [0] if kept else []  # the comma-joined mentions ending at the current one
+    after_or = False
+    for i in range(1, len(kept)):
+        between = clause[kept[i - 1][1]:kept[i][0]]
+        if len(between) > MAX_JOIN:
+            run, after_or = [i], False
+        elif _OR_JOIN.fullmatch(between):
+            for j in run:
+                parent[root(j)] = root(i)
+            run, after_or = [i], True
+        elif _COMMA_JOIN.fullmatch(between):
+            if after_or:
+                run = [i]
+            else:
+                run.append(i)  # in place: copying the run at every comma would be quadratic
+            after_or = False
+        else:
+            run, after_or = [i], False
+    return [root(i) for i in range(len(kept))]
+
+
+def mention_alternatives(clause: str, ontology: dict[str, SkillEntry]) -> list[tuple[str, frozenset[str]]]:
+    """Every skill mention in the clause, nested ones included, with the other skills the clause
+    accepts in its place: an empty set for a mention that stands alone. A nested mention shares the
+    choice of the mention it sits in ("PL/SQL or Python" offers Python for the SQL in PL/SQL too)."""
+    kept, nested = _mention_spans(clause, ontology)
+    choice = _choice_of(clause, kept)
+    members: dict[int, set[str]] = {}  # built once: looking each choice up again per mention is quadratic
+    for span, group in zip(kept, choice):
+        members.setdefault(group, set()).add(span[2])
+
+    def others(i: int) -> frozenset[str]:
+        return frozenset(members[choice[i]] - {kept[i][2]})
+
+    return ([(span[2], others(i)) for i, span in enumerate(kept)]
+            + [(span[2], others(i) - {span[2]}) for span, i in nested])
+
+
+def alternative_groups(clause: str, ontology: dict[str, SkillEntry]) -> list[frozenset[str]]:
+    """The groups of skills the clause offers as either/or choices, in order of first mention."""
+    kept, _ = _mention_spans(clause, ontology)
+    groups: dict[int, set[str]] = {}
+    for span, choice in zip(kept, _choice_of(clause, kept)):
+        groups.setdefault(choice, set()).add(span[2])
+    return [frozenset(g) for g in groups.values() if len(g) > 1]
+
+
+def requirement_alternatives(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, list[frozenset[str]]]:
+    """Every JD mention of each skill, in the sentences requirement_occurrences reads, with the other
+    skills the JD accepts in its place. Mentions are kept apart, so "Python or Java experience and
+    Python certification" still asks for Python. Choices are read across the whole sentence, so
+    "Python, Java, or Kubernetes are required, but Terraform is preferred" keeps its list, though
+    the sentence is split into a must clause and a nice clause for the requirement levels.
+
+    Every mention counts, a bare ambiguous word included ("you must go onsite"): telling the verb
+    from the skill is the judge's call, and it rules on one line per skill, not on each mention.
+    Keeping them all can leave a false gap; dropping them could waive a real requirement."""
+    found: dict[str, list[frozenset[str]]] = {}
+    for line_no, sentence, _clauses in requirement_sentences(jd_text):
+        detected = {name for name, result in scan(sentence, ontology).items() if result != "absent"}
+        for name, others in mention_alternatives(sentence, ontology):
+            if name in detected:
+                found.setdefault(name, []).append(others)
     return found
 
 

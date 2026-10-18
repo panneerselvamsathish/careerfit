@@ -4,7 +4,7 @@ They don't ask whether a verdict is right; the golden cases do that. They ask wh
 result claims more than the run could actually see.
 """
 
-from careerfit.analyze.matcher import detect
+from careerfit.analyze.matcher import detect, requirement_alternatives
 from careerfit.analyze.ontology import SkillEntry
 from careerfit.facts.schema import GapAnalysisFacts, Provenance, SkillStatus
 
@@ -33,6 +33,12 @@ def check(facts: GapAnalysisFacts) -> list[str]:
             if o.confidence is not None:
                 bad.append(f"{o.skill}: confidence {o.confidence} in a keyword-only run")
 
+        if o.status == SkillStatus.ALTERNATIVE_MET:
+            # An alternative only counts if the facts themselves show it matched.
+            via = o.resume_evidence.via if o.resume_evidence else None
+            if not any(m.skill == via and m.status == SkillStatus.MATCHED for m in facts.skill_observations):
+                bad.append(f"{o.skill}: alternative_met through {via!r}, which is not matched")
+
         judged = o.resume_evidence is not None and o.resume_evidence.source == "llm_judge"
         if judged and not facts.llm_used:
             bad.append(f"{o.skill}: judge evidence in a keyword-only run")
@@ -50,6 +56,7 @@ def check_evidence(
 ) -> list[str]:
     """Violations that need the source texts: every cited line must really mention the skill."""
     bad: list[str] = []
+    alternatives = requirement_alternatives(jd_text, ontology)  # once per result, not once per skill
     for o in facts.skill_observations:
         entry = ontology.get(o.skill)
         if entry is None:
@@ -74,6 +81,21 @@ def check_evidence(
                     # The matcher only lets a clear mention stand in for another skill ("go-live"
                     # never shows back-end development), so the invariant demands the same.
                     problem = f"names {evidence.via!r} only ambiguously, so it can't show this skill"
+            elif evidence.source == "alternative":
+                # The JD must really offer the choice, and the cited line must be exactly the evidence
+                # the alternative is matched on, which its own row has checked against the resume.
+                mentions = alternatives.get(o.skill, [])
+                if not any(evidence.via in m for m in mentions):
+                    bad.append(f"{o.skill}: the job description never offers {evidence.via!r} in its place")
+                    continue
+                matched = {m.skill for m in facts.skill_observations if m.status == SkillStatus.MATCHED}
+                if not all(m & matched for m in mentions):
+                    # Asked for on its own somewhere: no alternative can waive that requirement.
+                    bad.append(f"{o.skill}: not every JD mention offers a matched alternative")
+                    continue
+                met = next((m.resume_evidence for m in facts.skill_observations if m.skill == evidence.via), None)
+                same = met is not None and (met.locator, met.excerpt) == (evidence.locator, evidence.excerpt)
+                problem = None if same else f"is not the evidence {evidence.via!r} is matched on"
             else:
                 problem = _evidence_problem(o.skill, entry, evidence, text)
             if problem:

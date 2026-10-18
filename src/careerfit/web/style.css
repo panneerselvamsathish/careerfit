@@ -315,7 +315,8 @@ a:hover { color: var(--teal-hover); }
   white-space: nowrap;
 }
 .status .icon { width: 14px; height: 14px; }
-.status.matched { color: var(--ok); background: var(--ok-bg); }
+.status.matched,
+.status.alternative_met { color: var(--ok); background: var(--ok-bg); }
 .status.partial,
 .status.unresolvable { color: var(--warn); background: var(--warn-bg); }
 .status.gap { color: var(--bad); background: var(--bad-bg); }

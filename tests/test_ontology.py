@@ -187,6 +187,10 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     # "virtual assistants" and "virtual agents" also name people (Copilot review on #24)
     ("conversational ai", "Managed virtual assistants for scheduling and inbox management", "absent"),
     ("conversational ai", "Scheduled 200 virtual agents working from home across three time zones", "absent"),
+    ("software engineering", "4+ years of professional software engineering or applied machine learning", "found"),
+    ("software engineering", "**Lead Software Engineer**", "found"),
+    # the plural names colleagues, not a skill the JD asks for
+    ("software engineering", "Partner with product managers and software engineers", "absent"),
 ])
 def test_new_skills_detect_as_intended(skill, text, expected):
     from careerfit.analyze.matcher import detect

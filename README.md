@@ -111,6 +111,7 @@ resume mentions the skill also cite that resume line.
 | Status | Meaning |
 |---|---|
 | `matched` | The JD asks for it and the resume clearly shows it |
+| `alternative_met` | The JD accepts either this skill or another ("OpenAI or Anthropic APIs"), and the resume shows the other one. Not a gap, and not counted in the fit score |
 | `gap` | The JD asks for it and the resume doesn't mention it |
 | `unresolvable` | A word like "Go" or "React" could be the skill or an ordinary word, so the keyword pass doesn't guess. `--deep` asks the LLM judge to settle these |
 | `not_assessed` | Part of the resume couldn't be read (for example scanned PDF pages), so a missing skill is not reported as a gap |

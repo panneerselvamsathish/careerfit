@@ -14,6 +14,7 @@ from typing import Any, Literal, Protocol, TypeVar
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from careerfit.analyze.matcher import detect, requirement_occurrences
+from careerfit.analyze.observations import apply_alternatives
 from careerfit.analyze.ontology import SkillEntry
 from careerfit.facts.schema import (
     GapAnalysisFacts,
@@ -120,7 +121,9 @@ def judge_facts(
             else:
                 refined.append(_apply_verdict(o, verdict, resume_text=resume_text, jd_text=jd_text, scanned=scanned,
                                               at=at, jd_levels=jd_candidates([o], jd_text, ontology)[o.skill]))
-        observations = refined
+        # A skill the judge just matched can be the alternative that meets an either/or gap, and a
+        # skill it just called a gap can have an alternative the keyword pass already matched.
+        observations = list(apply_alternatives(tuple(refined), jd_text, ontology))
 
     steps: tuple[LearningStep, ...] = ()
     gaps = [o for o in observations if o.status == SkillStatus.GAP]
