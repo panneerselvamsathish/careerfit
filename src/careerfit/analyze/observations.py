@@ -4,6 +4,7 @@ from typing import Literal
 
 from careerfit.analyze.matcher import (decide_status, detect, first_mention_line, mention_pattern,
                                       requirement_alternatives, requirement_evidence)
+from careerfit.analyze.mentions import dashes_as_hyphens
 from careerfit.analyze.ontology import SkillEntry, implied_by_of
 from careerfit.facts.schema import Coverage, GapAnalysisFacts, Provenance, SkillObservation, SkillStatus
 
@@ -85,7 +86,9 @@ def apply_alternatives(
 def without_implying_mentions(name: str, ontology: Mapping[str, SkillEntry], text: str) -> str:
     """The text with every mention of a skill that implies `name` blanked out, so a skill named only
     inside another's name ("SQL" in "PL/SQL") isn't taken as its own mention. Blanks keep each
-    line's length and the line breaks, so line numbers still point at the original text."""
+    line's length and the line breaks, so line numbers still point at the original text. Dashes
+    read as "-" here too, as in the matcher, so the blanking finds what the matcher finds."""
+    text = dashes_as_hyphens(text)
     for other in implied_by_of(ontology).get(name, ()):
         entry = ontology[other]
         for term in (*entry.aliases, other):

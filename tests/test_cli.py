@@ -75,3 +75,12 @@ def test_cli_reports_unreadable_input_as_a_clean_error(tmp_path, capsys):
     exit_code = main(["--resume", str(folder), "--jd", str(FIXTURES / "jd.txt")])
     assert exit_code == 2
     assert "resume.txt" in capsys.readouterr().err
+
+
+def test_no_imported_uses_only_the_curated_skill_list(tmp_path, capsys):
+    from careerfit.cli import main
+    out = tmp_path / "facts.json"
+    root = Path(__file__).parent.parent
+    assert main(["--resume", str(root / "fixtures" / "resume.txt"), "--jd", str(root / "fixtures" / "jd.txt"),
+                 "-o", str(out), "--no-imported"]) == 0
+    assert out.exists()

@@ -5,6 +5,13 @@ pipeline uses is compared on real documents (fixtures, golden cases, and the sav
 in scratch/ when present) and on seeded random texts built from the skill list's own terms with
 tricky punctuation and case.
 
+One difference is on purpose: the index reads the six Unicode dashes (U+2010 to U+2015) as "-".
+So the oracle always gets the text with its dashes already turned into "-" (same length, so every
+offset and line number still lines up), and facts are compared with the same folding applied to the
+new side's excerpts, which keep the original characters.
+
+Non-ASCII characters are written as escapes: a Kelvin sign and a capital K look the same.
+
 By default it uses the fixtures, the golden cases and 800 random texts. Before merging a matcher
 change, run the full comparison: the saved JDs and resumes in scratch/ (every resume with every JD)
 and 20,000 random texts:
@@ -20,6 +27,7 @@ from pathlib import Path
 import pytest
 
 from careerfit.analyze import matcher, observations
+from careerfit.analyze.mentions import HYPHENS
 from careerfit.analyze.ontology import SkillEntry, load_ontology
 from careerfit.facts.schema import Coverage
 from careerfit.ingest.document import read_document
@@ -76,12 +84,15 @@ def _units(text: str) -> list[str]:
 def test_scan_spans_and_alternatives_match_the_oracle_on_documents(name, text):
     for ontology, plain in ((SKILLS, PLAIN), (SYMBOLS, SYMBOLS)):
         for unit in _units(text):
-            assert matcher.scan(unit, ontology) == old_matcher.scan(unit, plain), unit
-            assert matcher._mention_spans(unit, ontology) == old_matcher._mention_spans(unit, plain), unit
-            assert matcher.mention_alternatives(unit, ontology) == old_matcher.mention_alternatives(unit, plain), unit
-        assert matcher.requirement_occurrences(text, ontology) == old_matcher.requirement_occurrences(text, plain)
-        assert matcher.requirement_alternatives(text, ontology) == old_matcher.requirement_alternatives(text, plain)
-        assert matcher.requirement_evidence(text, ontology) == old_matcher.requirement_evidence(text, plain)
+            hyphened = unit.translate(HYPHENS)
+            assert matcher.scan(unit, ontology) == old_matcher.scan(hyphened, plain), unit
+            assert matcher._mention_spans(unit, ontology) == old_matcher._mention_spans(hyphened, plain), unit
+            assert (matcher.mention_alternatives(unit, ontology)
+                    == old_matcher.mention_alternatives(hyphened, plain)), unit
+        hyphened = text.translate(HYPHENS)
+        assert matcher.requirement_occurrences(text, ontology) == old_matcher.requirement_occurrences(hyphened, plain)
+        assert matcher.requirement_alternatives(text, ontology) == old_matcher.requirement_alternatives(hyphened, plain)
+        assert matcher.requirement_evidence(text, ontology) == old_matcher.requirement_evidence(hyphened, plain)
 
 
 def _pairs() -> list[tuple[str, str, str]]:
@@ -98,8 +109,9 @@ def test_facts_match_the_oracle_on_every_resume_and_jd_pair(name, resume, jd):
     kwargs = dict(resume_text=resume, resume_coverage=TXT, resume_source="r", jd_text=jd, jd_coverage=TXT,
                   jd_source="j", at=AT, perspective="candidate")
     new = observations.build_facts(ontology=SKILLS, **kwargs)
-    old = old_observations.build_facts(ontology=PLAIN, **kwargs)
-    assert new.model_dump() == old.model_dump()
+    old = old_observations.build_facts(ontology=PLAIN, **{**kwargs, "resume_text": resume.translate(HYPHENS),
+                                                            "jd_text": jd.translate(HYPHENS)})
+    assert new.model_dump_json().translate(HYPHENS) == old.model_dump_json()
 
 
 def _random_texts(n: int, seed: int) -> list[str]:
@@ -108,7 +120,8 @@ def _random_texts(n: int, seed: int) -> list[str]:
                                                                               for t in (*e.aliases, name)]
     pieces = [p for t in terms for p in t.replace("/", " / ").replace(".", " . ").split()]
     glue = [" ", " ", " ", ", ", ". ", "; ", " or ", " and ", " and/or ", "/", ".", "-", "_", "+", "#", "(", ")",
-            "\n", "\t", "  ", "‐", "‑", "–", "—", "İ", "ı", "ſ", "K", "é", "3", "x"]
+            "\n", "\t", "  ", "\u2010", "\u2011", "\u2012", "\u2013", "\u2014", "\u2015",
+            "\u0130", "\u0131", "\u017f", "\u212a", "\u00e9", "3", "x"]
     cases = [str.lower, str.upper, str.title, lambda s: s]
     texts = []
     for _ in range(n):
@@ -125,17 +138,19 @@ RANDOM_N = 20_000 if FULL else 800
 
 def test_random_texts_match_the_oracle():
     for text in _random_texts(RANDOM_N, seed=20261018):
+        hyphened = text.translate(HYPHENS)
         for ontology, plain in ((SKILLS, PLAIN), (SYMBOLS, SYMBOLS)):
-            assert matcher.scan(text, ontology) == old_matcher.scan(text, plain), repr(text)
-            assert matcher._mention_spans(text, ontology) == old_matcher._mention_spans(text, plain), repr(text)
+            assert matcher.scan(text, ontology) == old_matcher.scan(hyphened, plain), repr(text)
+            assert matcher._mention_spans(text, ontology) == old_matcher._mention_spans(hyphened, plain), repr(text)
 
 
 def test_single_skill_detection_and_first_line_match_the_oracle():
     for text in _random_texts(1_000 if FULL else 150, seed=7) + [t for _, t in DOCS]:
         for name, entry in [*SYMBOLS.items(), *list(SKILLS.items())[:60]]:
-            assert matcher.detect(name, entry, text) == old_matcher.detect(name, entry, text), (name, repr(text))
+            hyphened = text.translate(HYPHENS)
+            assert matcher.detect(name, entry, text) == old_matcher.detect(name, entry, hyphened), (name, repr(text))
             assert (matcher.first_mention_line(name, entry, text)
-                    == old_matcher.first_mention_line(name, entry, text)), (name, repr(text))
+                    == old_matcher.first_mention_line(name, entry, hyphened)), (name, repr(text))
 
 
 @pytest.mark.parametrize(("text", "expected"), [
@@ -144,7 +159,7 @@ def test_single_skill_detection_and_first_line_match_the_oracle():
     ("asp.net and x.net", {".net"}),            # ".net" after a word character is not a mention
     ("c++ and C++11 and c+++", {"c++"}),
     ("a a a", {"a a"}),                          # its own mentions don't overlap
-    ("K8S on Kubernetes", {"k8s"}),              # the Kelvin sign folds to k, as in IGNORECASE
+    ("\u212a8S on Kubernetes", {"k8s"}),           # the Kelvin sign folds to k, as in IGNORECASE
     ("_private and x_y", {"_private"}),
 ])
 def test_tricky_boundaries_agree_with_the_oracle(text, expected):
@@ -152,3 +167,24 @@ def test_tricky_boundaries_agree_with_the_oracle(text, expected):
     assert present == expected
     assert matcher.scan(text, SYMBOLS) == old_matcher.scan(text, SYMBOLS)
     assert matcher._mention_spans(text, SYMBOLS) == old_matcher._mention_spans(text, SYMBOLS)
+
+
+DASHES = ["\u2010", "\u2011", "\u2012", "\u2013", "\u2014", "\u2015"]
+
+
+@pytest.mark.parametrize("dash", DASHES)
+def test_unicode_dashes_match_a_hyphen_and_excerpts_keep_them(dash):
+    jd = f"Requirements:\n- Built a proof{dash}of{dash}concept and the front{dash}end for it"
+    resume = f"Shipped a proof{dash}of{dash}concept"
+    facts = observations.build_facts(resume_text=resume, resume_coverage=TXT, resume_source="r", jd_text=jd,
+                                     jd_coverage=TXT, jd_source="j", ontology=SKILLS, at=AT, perspective="candidate")
+    observed = {o.skill: o for o in facts.skill_observations}
+    assert observed["proof of concept"].status.value == "matched"
+    assert observed["frontend development"].status.value == "gap"
+    assert observed["proof of concept"].jd_evidence.excerpt == f"- Built a proof{dash}of{dash}concept and the front{dash}end for it"
+    assert observed["proof of concept"].resume_evidence.excerpt == resume  # verbatim, dash and all
+
+
+def test_a_nice_to_have_heading_with_non_breaking_hyphens_opens_the_nice_section():
+    jd = "Requirements:\n- Python\nNice\u2011to\u2011have:\n- Kubernetes"
+    assert matcher.requirement_levels(jd, SKILLS) == {"python": "must", "kubernetes": "nice"}

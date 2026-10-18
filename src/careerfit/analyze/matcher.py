@@ -3,7 +3,7 @@ from collections.abc import Iterable, Iterator, Mapping
 from functools import lru_cache
 from typing import Literal
 
-from careerfit.analyze.mentions import Mention, MentionIndex, entry_index
+from careerfit.analyze.mentions import Mention, MentionIndex, dashes_as_hyphens, entry_index
 from careerfit.analyze.ontology import SkillEntry, index_of
 from careerfit.facts.schema import SkillStatus
 
@@ -19,7 +19,9 @@ def mention_pattern(term: str) -> re.Pattern[str]:
 
 
 def mentions(term: str, text: str) -> bool:
-    return mention_pattern(term).search(text) is not None
+    # Unicode dashes read as "-" here too, so a marker like "nice-to-have" typed with non-breaking
+    # hyphens is found by every caller, not only by requirement_sentences.
+    return mention_pattern(term).search(dashes_as_hyphens(text)) is not None
 
 
 def _result(alias_found: bool, entry: SkillEntry) -> DetectResult:
@@ -102,8 +104,10 @@ Level = Literal["must", "nice"]
 
 
 def _heading_form(line: str) -> str:
-    """A line as a heading would read: no leading bullet ("* You Have:"), no trailing colon."""
-    return " ".join(_LEADING_BULLET.sub("", line).strip().rstrip(":").split())
+    """A line as a heading would read: no leading bullet ("* You Have:"), no trailing colon, and
+    Unicode dashes as "-". Every caller (the matcher and evals/ontology_coverage.py) gets the same
+    answer, while each keeps its own original text for display."""
+    return " ".join(_LEADING_BULLET.sub("", dashes_as_hyphens(line)).strip().rstrip(":").split())
 
 
 def requirement_section(line: str) -> Level | None:
@@ -122,7 +126,7 @@ def stop_section(line: str) -> bool:
     form = _heading_form(line)
     if STOP_HEADING.fullmatch(form):
         return True
-    bulleted = _LEADING_BULLET.match(line) is not None
+    bulleted = _LEADING_BULLET.match(dashes_as_hyphens(line)) is not None  # an em-dash bullet is a bullet
     return (not bulleted and len(form.split()) <= OPEN_STOP_MAX_WORDS
             and OPEN_STOP_HEADING.fullmatch(form) is not None)
 
@@ -160,7 +164,11 @@ Occurrence = tuple[Literal["must", "nice"], int, Literal["found", "unclear"]]
 
 def requirement_sentences(jd_text: str) -> Iterator[tuple[int, str, list[tuple[Level, str]]]]:
     """Every sentence of the JD that can hold a requirement, as (line, sentence, its clauses with their
-    levels), in document order. A sentence mixing a must and a nice marker is split into clauses."""
+    levels), in document order. A sentence mixing a must and a nice marker is split into clauses.
+
+    Unicode dashes read as "-" (a "Nice-to-have" heading typed with non-breaking hyphens is still a
+    heading). Same length, so offsets hold; JD excerpts are cut from the original lines."""
+    jd_text = dashes_as_hyphens(jd_text)
     current: Literal["must", "nice"] = "must"
     counting = True  # off inside a benefits / equal-opportunity / pay section
     for line_no, raw_line in enumerate(jd_text.splitlines(), start=1):

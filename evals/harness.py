@@ -15,7 +15,7 @@ from pathlib import Path
 import yaml
 
 from careerfit.analyze.observations import build_facts
-from careerfit.analyze.ontology import SkillEntry, load_ontology
+from careerfit.analyze.ontology import SkillEntry, load_default_ontology, load_ontology
 from careerfit.ingest.document import read_document
 from evals import invariants
 
@@ -134,7 +134,7 @@ def main(argv: list[str] | None = None) -> int:
         # An eval run that checks nothing must not look like a pass.
         print(f"No golden cases found in {args.golden_dir}")
         return 1
-    ontology = load_ontology(ONTOLOGY_PATH)
+    ontology = load_default_ontology()  # what the product uses: curated plus imported skills
     results = [run_case(case, ontology) for case in cases]
     print(report(results))
     return 1 if gate_failed(results) else 0
