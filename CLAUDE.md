@@ -87,17 +87,22 @@ src/careerfit/
 without executing the code. This is not a convention — it is a build constraint.
 If analyze/ imports anthropic, the test fails and the PR cannot merge.
 
-### The five-status schema
+### The status schema
 
 `SkillStatus` in `facts/schema.py`:
 
 | Status | Meaning | Provenance required? |
 |---|---|---|
 | `MATCHED` | Resume clearly demonstrates this skill | Yes |
-| `PARTIAL` | Weak or indirect evidence | Optional |
+| `PARTIAL` | Weak or indirect evidence (judge only) | Optional |
+| `ALTERNATIVE_MET` | The JD accepts another skill in its place ("OpenAI or Anthropic APIs") and the resume shows that one; not counted in the fit score | Yes: the alternative's own resume line, `source="alternative"`, `via` = the matched skill |
 | `GAP` | Required by JD, absent in resume | Yes |
-| `NOT_ASSESSED` | LLM not run; no opinion | No |
+| `NOT_ASSESSED` | Part of the resume couldn't be read (scanned pages); no opinion | No |
 | `UNRESOLVABLE` | Ambiguous mapping; judge/ resolves these | No |
+
+An alternative waives a skill only when **every** JD mention of it offers a matched one; asked for
+on its own anywhere, it stays a requirement. Every mention counts, a bare ambiguous word included,
+because the judge rules on one line per skill (see "Known limit" in PR #26).
 
 `GAP ≠ UNRESOLVABLE`. A report may state GAP. A report must never state
 a conclusion from UNRESOLVABLE — it must say "ambiguous" and defer to judge/.
