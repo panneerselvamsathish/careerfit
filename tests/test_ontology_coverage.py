@@ -64,3 +64,18 @@ def test_benefits_and_perks_headings_end_counting():
 def test_bulleted_about_us_heading_ends_counting():
     jd = "Qualifications\n- Five years running production workloads on AWS\n* About Us\n- We are a Python shop with free lunches"
     assert [n for n, _, _ in coverage(jd, ONTOLOGY).covered] == [2]
+
+
+def test_a_heading_with_unicode_dashes_reopens_counting_as_in_the_product():
+    # Copilot review on #30: the product reads "Nice\u2011to\u2011have:" (non-breaking hyphens) as a
+    # heading; the coverage tool must too, or it drops the lines under it from its totals.
+    from careerfit.analyze.matcher import requirement_levels
+    jd = "Requirements:\nBenefits:\nNice\u2011to\u2011have:\n- Python"
+    assert [(n, skills) for n, _, skills in coverage(jd, ONTOLOGY).covered] == [(4, ("python",))]
+    assert requirement_levels(jd, ONTOLOGY) == {"python": "nice"}
+
+
+def test_a_marker_with_unicode_dashes_is_found_by_every_caller():
+    from careerfit.analyze.matcher import has_nice_marker, heading_level
+    assert has_nice_marker("Kubernetes is nice\u2011to\u2011have")
+    assert heading_level("Kubernetes is nice\u2013to\u2013have:") == "nice"

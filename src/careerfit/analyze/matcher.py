@@ -19,7 +19,9 @@ def mention_pattern(term: str) -> re.Pattern[str]:
 
 
 def mentions(term: str, text: str) -> bool:
-    return mention_pattern(term).search(text) is not None
+    # Unicode dashes read as "-" here too, so a marker like "nice-to-have" typed with non-breaking
+    # hyphens is found by every caller, not only by requirement_sentences.
+    return mention_pattern(term).search(dashes_as_hyphens(text)) is not None
 
 
 def _result(alias_found: bool, entry: SkillEntry) -> DetectResult:
@@ -102,8 +104,10 @@ Level = Literal["must", "nice"]
 
 
 def _heading_form(line: str) -> str:
-    """A line as a heading would read: no leading bullet ("* You Have:"), no trailing colon."""
-    return " ".join(_LEADING_BULLET.sub("", line).strip().rstrip(":").split())
+    """A line as a heading would read: no leading bullet ("* You Have:"), no trailing colon, and
+    Unicode dashes as "-". Every caller (the matcher and evals/ontology_coverage.py) gets the same
+    answer, while each keeps its own original text for display."""
+    return " ".join(_LEADING_BULLET.sub("", dashes_as_hyphens(line)).strip().rstrip(":").split())
 
 
 def requirement_section(line: str) -> Level | None:
