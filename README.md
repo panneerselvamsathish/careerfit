@@ -401,6 +401,14 @@ What the CI role can and cannot do:
 - [FastAPI](https://fastapi.tiangolo.com/) — web API
 - [Source Sans 3](https://github.com/adobe-fonts/source-sans) (SIL Open Font License) — bundled with the page, never fetched from elsewhere
 
+## Data sources
+
+The skill list is hand-written (`src/careerfit/ontology/skills.yaml`) plus technology skills imported
+from two open datasets by `scripts/import_taxonomy.py`, both modified: the **O*NET® 31.0 Database**
+(USDOL/ETA, CC BY 4.0) and the **ESCO classification of the European Commission** (v1.2.1). Statements,
+licences and the list of changes: [`src/careerfit/ontology/NOTICE.md`](src/careerfit/ontology/NOTICE.md).
+This service uses the ESCO classification of the European Commission.
+
 ## How this was built
 
 Built with [Claude Code](https://claude.com/claude-code) as a pair programmer. I own the
