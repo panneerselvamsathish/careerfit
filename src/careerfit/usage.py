@@ -216,6 +216,8 @@ def summarize(events: Iterable[dict], skill_records: Iterable[dict], waitlist: i
         "waitlist": waitlist,
         "donated_job_descriptions": donations,
         "analyses_with_skill_stats": total_analyses_with_stats,
+        # alternative_met: the JD accepted another skill the resume showed, so "requested" can be more
+        # than gap + unresolvable + matched (partial and not_assessed are counted in requested only).
         "skills": [{"skill": s, "requested": c["requested"], "gap": c["gap"], "unresolvable": c["unresolvable"],
-                    "matched": c["matched"]} for s, c in top[:25]],
+                    "matched": c["matched"], "alternative_met": c["alternative_met"]} for s, c in top[:25]],
     }

@@ -62,9 +62,11 @@ def main(argv: list[str] | None = None) -> int:
         print("utm_source             " + ", ".join(f"{s} {n}" for s, n in report["top_utm_sources"]))
     if report["skills"]:
         print(f"\nmost requested skills ({report['analyses_with_skill_stats']} analyses)")
-        print(f"{'skill':<28}{'asked':>6}{'gap':>6}{'ambig':>7}{'match':>7}")
+        print(f"{'skill':<28}{'asked':>6}{'gap':>6}{'ambig':>7}{'match':>7}{'alt':>6}")
         for row in report["skills"]:
-            print(f"{row['skill']:<28}{row['requested']:>6}{row['gap']:>6}{row['unresolvable']:>7}{row['matched']:>7}")
+            print(f"{row['skill']:<28}{row['requested']:>6}{row['gap']:>6}{row['unresolvable']:>7}{row['matched']:>7}"
+                  f"{row['alternative_met']:>6}")
+        print("alt = met by another skill the job description accepted instead (not a gap)")
     return 0
 
 

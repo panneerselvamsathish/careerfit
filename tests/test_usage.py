@@ -150,9 +150,18 @@ def test_the_report_counts_unique_repeat_and_active_visitors():
     assert report["top_utm_sources"] == [("linkedin", 1)]
     assert (report["waitlist"], report["donated_job_descriptions"], report["analyses_with_skill_stats"]) == (2, 1, 2)
     assert report["skills"] == [
-        {"skill": "python", "requested": 2, "gap": 1, "unresolvable": 0, "matched": 1},
-        {"skill": "kafka", "requested": 1, "gap": 1, "unresolvable": 0, "matched": 0},
+        {"skill": "python", "requested": 2, "gap": 1, "unresolvable": 0, "matched": 1, "alternative_met": 0},
+        {"skill": "kafka", "requested": 1, "gap": 1, "unresolvable": 0, "matched": 0, "alternative_met": 0},
     ]
+
+
+def test_skill_stats_count_alternatives_apart_from_gaps():
+    # "OpenAI or Anthropic APIs" with Anthropic on the resume: openai was asked for, but it is no gap.
+    skills = [{"skills": [["openai", "must", "alternative_met"], ["anthropic api", "must", "matched"]]},
+              {"skills": [["openai", "must", "gap"]]}]
+    openai = next(r for r in usage.summarize([], skills, waitlist=0, donations=0)["skills"] if r["skill"] == "openai")
+    assert openai == {"skill": "openai", "requested": 2, "gap": 1, "unresolvable": 0, "matched": 0,
+                      "alternative_met": 1}
 
 
 def test_a_visitor_counts_on_every_day_they_did_something_not_only_page_view_days():
