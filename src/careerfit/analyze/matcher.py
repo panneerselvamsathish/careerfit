@@ -1,37 +1,60 @@
 import re
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator, Mapping
+from functools import lru_cache
 from typing import Literal
 
-from careerfit.analyze.ontology import SkillEntry
+from careerfit.analyze.mentions import Mention, MentionIndex, entry_index
+from careerfit.analyze.ontology import SkillEntry, index_of
 from careerfit.facts.schema import SkillStatus
 
 DetectResult = Literal["found", "unclear", "absent"]
 
+
+@lru_cache(maxsize=1024)
 def mention_pattern(term: str) -> re.Pattern[str]:
-    """A whole-word, case-insensitive match for a skill name or alias ("js" never inside "Node.js")."""
+    """A whole-word, case-insensitive match for one term ("js" never inside "Node.js"). Skills are
+    found through analyze/mentions.py, which matches exactly like this; the regex is kept for the
+    section markers and for blanking out an implying skill's mentions."""
     return re.compile(rf'(?<!\w)(?<!\w\.){re.escape(term)}(?!\w)(?!\.\w)', re.IGNORECASE)
 
 
 def mentions(term: str, text: str) -> bool:
     return mention_pattern(term).search(text) is not None
 
+
+def _result(alias_found: bool, entry: SkillEntry) -> DetectResult:
+    # An alias is conclusive; the bare name of an ambiguous skill could be an ordinary word.
+    return "found" if alias_found or not entry.ambiguous else "unclear"
+
+
 def detect(name: str, entry: SkillEntry, text: str) -> DetectResult:
-    
-    for alias in entry.aliases:
-        if mentions(alias, text):
-            return "found"
-        
-    if mentions(name, text):
-        return "unclear" if entry.ambiguous else "found"
-    return "absent"
+    found = entry_index(name, entry).find(text)
+    if not found:
+        return "absent"
+    return _result(any(m.is_alias for m in found), entry)
 
-def scan(text: str, ontology: dict[str, SkillEntry]) -> dict[str, DetectResult]:
 
-    results = {}
-    
-    for name, entry in ontology.items():
-        results[name] = detect(name, entry, text)
-    return results
+def _present(found: Iterable[Mention], ontology: Mapping[str, SkillEntry], index: MentionIndex
+             ) -> dict[str, DetectResult]:
+    """Each skill with at least one mention, with its detection result, in the skill list's order."""
+    alias_found: dict[str, bool] = {}
+    for m in found:
+        alias_found[m.skill] = alias_found.get(m.skill, False) or m.is_alias
+    return {skill: _result(alias_found[skill], ontology[skill])
+            for skill in sorted(alias_found, key=index.rank.__getitem__)}
+
+
+def scan_present(text: str, ontology: Mapping[str, SkillEntry], index: MentionIndex | None = None
+                 ) -> dict[str, DetectResult]:
+    """The skills the text mentions (found or unclear), in the skill list's order. One pass."""
+    index = index if index is not None else index_of(ontology)
+    return _present(index.find(text), ontology, index)
+
+
+def scan(text: str, ontology: Mapping[str, SkillEntry]) -> dict[str, DetectResult]:
+    """Every skill in the list with its detection result, absent ones included."""
+    present = scan_present(text, ontology)
+    return {name: present.get(name, "absent") for name in ontology}
 
 NICE_TO_HAVE_MARKERS = ("nice to have", "nice-to-have", "optional", "bonus", "preferred","a plus", "preferable", "set you apart", "sets you apart")
 
@@ -170,13 +193,13 @@ def requirement_clauses(jd_text: str) -> Iterator[tuple[Level, int, str]]:
             yield level, line_no, clause
 
 
-def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, list[Occurrence]]:
+def requirement_occurrences(jd_text: str, ontology: Mapping[str, SkillEntry]) -> dict[str, list[Occurrence]]:
     """Every place the JD mentions each skill, as (level, line, detection result), in document order."""
+    index = index_of(ontology)
     found: dict[str, list[Occurrence]] = {}
     for level, line_no, clause in requirement_clauses(jd_text):
-        for name, result in scan(clause, ontology).items():
-            if result != "absent":
-                found.setdefault(name, []).append((level, line_no, result))
+        for name, result in scan_present(clause, ontology, index).items():
+            found.setdefault(name, []).append((level, line_no, result))
     return found
 
 
@@ -201,15 +224,15 @@ _COUNTED = re.compile(r"\b(two|three|four|five|six|several|multiple|both|all|([2
 Span = tuple[int, int, str]
 
 
-def _mention_spans(clause: str, ontology: dict[str, SkillEntry]) -> tuple[list[Span], list[tuple[Span, int]]]:
-    """Each skill mention in the clause as (start, end, skill), left to right, and the nested ones.
+def _mention_spans(clause: str, ontology: Mapping[str, SkillEntry]) -> tuple[list[Span], list[tuple[Span, int]]]:
+    """Each skill mention in the clause as (start, end, skill), left to right, and the nested ones."""
+    return _split_spans(index_of(ontology).find(clause))
 
-    Of two overlapping mentions the longer is kept; the other is nested in it, paired with the index
-    of the kept mention it sits in: "SQL" inside "PL/SQL" is nested in PL/SQL's mention.
-    """
-    spans = sorted(((m.start(), m.end(), name)
-                    for name, entry in ontology.items() for term in (*entry.aliases, name)
-                    for m in mention_pattern(term).finditer(clause)),
+
+def _split_spans(found: Iterable[Mention]) -> tuple[list[Span], list[tuple[Span, int]]]:
+    """Of two overlapping mentions the longer is kept; the other is nested in it, paired with the
+    index of the kept mention it sits in: "SQL" inside "PL/SQL" is nested in PL/SQL's mention."""
+    spans = sorted(((m.start, m.end, m.skill) for m in found),
                    key=lambda span: (span[0], span[0] - span[1], span[2]))
     kept: list[Span] = []
     nested: list[tuple[Span, int]] = []
@@ -259,11 +282,15 @@ def _choice_of(clause: str, kept: list[Span]) -> list[int]:
     return [root(i) for i in range(len(kept))]
 
 
-def mention_alternatives(clause: str, ontology: dict[str, SkillEntry]) -> list[tuple[str, frozenset[str]]]:
+def mention_alternatives(clause: str, ontology: Mapping[str, SkillEntry]) -> list[tuple[str, frozenset[str]]]:
     """Every skill mention in the clause, nested ones included, with the other skills the clause
     accepts in its place: an empty set for a mention that stands alone. A nested mention shares the
     choice of the mention it sits in ("PL/SQL or Python" offers Python for the SQL in PL/SQL too)."""
-    kept, nested = _mention_spans(clause, ontology)
+    return _alternatives(clause, index_of(ontology).find(clause))
+
+
+def _alternatives(clause: str, found: Iterable[Mention]) -> list[tuple[str, frozenset[str]]]:
+    kept, nested = _split_spans(found)
     choice = _choice_of(clause, kept)
     members: dict[int, set[str]] = {}  # built once: looking each choice up again per mention is quadratic
     for span, group in zip(kept, choice):
@@ -276,7 +303,7 @@ def mention_alternatives(clause: str, ontology: dict[str, SkillEntry]) -> list[t
             + [(span[2], others(i) - {span[2]}) for span, i in nested])
 
 
-def alternative_groups(clause: str, ontology: dict[str, SkillEntry]) -> list[frozenset[str]]:
+def alternative_groups(clause: str, ontology: Mapping[str, SkillEntry]) -> list[frozenset[str]]:
     """The groups of skills the clause offers as either/or choices, in order of first mention."""
     kept, _ = _mention_spans(clause, ontology)
     groups: dict[int, set[str]] = {}
@@ -285,7 +312,7 @@ def alternative_groups(clause: str, ontology: dict[str, SkillEntry]) -> list[fro
     return [frozenset(g) for g in groups.values() if len(g) > 1]
 
 
-def requirement_alternatives(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, list[frozenset[str]]]:
+def requirement_alternatives(jd_text: str, ontology: Mapping[str, SkillEntry]) -> dict[str, list[frozenset[str]]]:
     """Every JD mention of each skill, in the sentences requirement_occurrences reads, with the other
     skills the JD accepts in its place. Mentions are kept apart, so "Python or Java experience and
     Python certification" still asks for Python. Choices are read across the whole sentence, so
@@ -295,16 +322,18 @@ def requirement_alternatives(jd_text: str, ontology: dict[str, SkillEntry]) -> d
     Every mention counts, a bare ambiguous word included ("you must go onsite"): telling the verb
     from the skill is the judge's call, and it rules on one line per skill, not on each mention.
     Keeping them all can leave a false gap; dropping them could waive a real requirement."""
+    index = index_of(ontology)
     found: dict[str, list[frozenset[str]]] = {}
-    for line_no, sentence, _clauses in requirement_sentences(jd_text):
-        detected = {name for name, result in scan(sentence, ontology).items() if result != "absent"}
-        for name, others in mention_alternatives(sentence, ontology):
+    for _line_no, sentence, _clauses in requirement_sentences(jd_text):
+        mentioned = index.find(sentence)  # one pass serves both: what is mentioned, and the choices
+        detected = set(_present(mentioned, ontology, index))
+        for name, others in _alternatives(sentence, mentioned):
             if name in detected:
                 found.setdefault(name, []).append(others)
     return found
 
 
-def requirement_evidence(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, Occurrence]:
+def requirement_evidence(jd_text: str, ontology: Mapping[str, SkillEntry]) -> dict[str, Occurrence]:
     """Each JD skill's deciding occurrence: must beats nice, then a clear mention beats an unclear one."""
     best: dict[str, Occurrence] = {}
     for name, occurrences in requirement_occurrences(jd_text, ontology).items():
@@ -317,7 +346,7 @@ def requirement_evidence(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[
     return best
 
 
-def requirement_levels(jd_text: str, ontology: dict[str, SkillEntry]) -> dict[str, Literal["must", "nice"]]:
+def requirement_levels(jd_text: str, ontology: Mapping[str, SkillEntry]) -> dict[str, Literal["must", "nice"]]:
     return {name: level for name, (level, _, _) in requirement_evidence(jd_text, ontology).items()}
 
 def decide_status(

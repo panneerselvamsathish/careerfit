@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from careerfit.analyze.ontology import load_ontology
 from pathlib import Path
 import pytest
@@ -7,7 +9,7 @@ def test_real_skills_file_loads():
     SKILLS_FILE = Path(__file__).parent.parent / "src" / "careerfit" / "ontology" / "skills.yaml"
     skills = load_ontology(SKILLS_FILE)
     assert skills is not None
-    assert isinstance(skills, dict)
+    assert isinstance(skills, Mapping)  # an Ontology: read-only, with its mention index built once
     assert "k8s" in skills["kubernetes"].aliases
     assert skills["go"].ambiguous is True
 

@@ -1,9 +1,10 @@
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Literal
 
 from careerfit.analyze.matcher import (decide_status, detect, first_mention_line, mention_pattern,
                                       requirement_alternatives, requirement_evidence)
-from careerfit.analyze.ontology import SkillEntry
+from careerfit.analyze.ontology import SkillEntry, implied_by_of
 from careerfit.facts.schema import Coverage, GapAnalysisFacts, Provenance, SkillObservation, SkillStatus
 
 # What a matched alternative can stand in for: a skill the resume doesn't show, can't be read for,
@@ -15,7 +16,7 @@ def build_observations(
     resume_text: str,
     resume_coverage: Coverage,
     jd_text: str,
-    ontology: dict[str, SkillEntry],
+    ontology: Mapping[str, SkillEntry],
     at: datetime,
 ) -> tuple[SkillObservation, ...]:
     scanned = "scanned_pages" in resume_coverage.known_blind_spots
@@ -56,7 +57,7 @@ def build_observations(
 def apply_alternatives(
     observations: tuple[SkillObservation, ...],
     jd_text: str,
-    ontology: dict[str, SkillEntry],
+    ontology: Mapping[str, SkillEntry],
 ) -> tuple[SkillObservation, ...]:
     """A skill the resume doesn't show is no gap when the JD accepts a matched one in its place
     ("OpenAI or Anthropic APIs" with Anthropic on the resume). Every JD mention of the skill must
@@ -81,18 +82,18 @@ def apply_alternatives(
     return tuple(result)
 
 
-def without_implying_mentions(name: str, ontology: dict[str, SkillEntry], text: str) -> str:
+def without_implying_mentions(name: str, ontology: Mapping[str, SkillEntry], text: str) -> str:
     """The text with every mention of a skill that implies `name` blanked out, so a skill named only
     inside another's name ("SQL" in "PL/SQL") isn't taken as its own mention. Blanks keep each
     line's length and the line breaks, so line numbers still point at the original text."""
-    for other, entry in ontology.items():
-        if name in entry.implies:
-            for term in (*entry.aliases, other):
-                text = mention_pattern(term).sub(lambda m: " " * len(m.group()), text)
+    for other in implied_by_of(ontology).get(name, ()):
+        entry = ontology[other]
+        for term in (*entry.aliases, other):
+            text = mention_pattern(term).sub(lambda m: " " * len(m.group()), text)
     return text
 
 
-def implied_evidence(name: str, ontology: dict[str, SkillEntry], resume_text: str) -> tuple[str, int] | None:
+def implied_evidence(name: str, ontology: Mapping[str, SkillEntry], resume_text: str) -> tuple[str, int] | None:
     """The resume's strongest evidence for `name` through a skill that implies it, as (that skill,
     the first line naming it).
 
@@ -102,9 +103,8 @@ def implied_evidence(name: str, ontology: dict[str, SkillEntry], resume_text: st
     """
     lines = resume_text.splitlines()
     best: tuple[int, int, str] | None = None  # (-lines naming it, first line, skill) sorts best first
-    for other, entry in ontology.items():
-        if name not in entry.implies:
-            continue
+    for other in implied_by_of(ontology).get(name, ()):
+        entry = ontology[other]
         found = [i for i, line in enumerate(lines, start=1) if detect(other, entry, line) == "found"]
         if found and (best is None or (-len(found), found[0], other) < best):
             best = (-len(found), found[0], other)
@@ -119,7 +119,7 @@ def build_facts(
     jd_text: str,
     jd_coverage: Coverage,
     jd_source: str,
-    ontology: dict[str, SkillEntry],
+    ontology: Mapping[str, SkillEntry],
     at: datetime,
     perspective: Literal["candidate", "hiring_manager"],
 ) -> GapAnalysisFacts:
