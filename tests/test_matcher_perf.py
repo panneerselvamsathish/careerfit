@@ -76,3 +76,16 @@ def test_a_5000_skill_list_reads_a_long_jd_and_resume_in_time():
     assert build_seconds < 2.0, build_seconds
     assert jd_seconds < 1.5, jd_seconds
     assert facts_seconds < 3.0, facts_seconds
+
+
+def test_single_skill_detection_stops_at_the_first_conclusive_mention():
+    # Copilot review on #29: detect() needs one answer, not every mention of a skill named
+    # 100,000 times. Against the full scan, the early exit must win by a wide margin.
+    from careerfit.analyze.matcher import detect
+    from careerfit.analyze.mentions import entry_index
+    entry = SkillEntry(aliases=("k8s",), ambiguous=False)
+    text = "k8s, kubernetes " * 100_000
+    assert detect("kubernetes", entry, text) == "found"
+    early = _best_of(3, lambda: detect("kubernetes", entry, text))
+    full = _best_of(3, lambda: entry_index("kubernetes", entry).find(text))
+    assert early * 5 < full, (early, full)

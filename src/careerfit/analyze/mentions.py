@@ -21,7 +21,7 @@ word, and a term that starts with a symbol is indexed by the symbol.
 """
 
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -103,9 +103,15 @@ class MentionIndex:
 
     def find(self, text: str) -> list[Mention]:
         """Every mention in the text, ordered by start, then end."""
+        found = list(self.iter_find(text))
+        found.sort(key=lambda m: (m.start, m.end))
+        return found
+
+    def iter_find(self, text: str) -> Iterator[Mention]:
+        """Mentions as they are found, in order of start (not sorted within one start). Lazy, so a
+        caller that only needs to know whether a skill is mentioned can stop at the first one."""
         folded = fold(text)
         last_end: dict[int, int] = {}
-        found: list[Mention] = []
         for token in _TOKEN.finditer(folded):
             start = token.start()
             candidates = self._by_first.get(token.group())
@@ -116,9 +122,7 @@ class MentionIndex:
                 if (folded.startswith(term.folded, start) and _ends_clear(text, end)
                         and last_end.get(term.slot, -1) <= start):
                     last_end[term.slot] = end
-                    found.append(Mention(start, end, term.skill, term.term, term.is_alias))
-        found.sort(key=lambda m: (m.start, m.end))
-        return found
+                    yield Mention(start, end, term.skill, term.term, term.is_alias)
 
     def find_by_line(self, text: str) -> list[list[Mention]]:
         """Mentions per line of `text.splitlines()`, offsets relative to each line."""

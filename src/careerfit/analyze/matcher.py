@@ -28,10 +28,14 @@ def _result(alias_found: bool, entry: SkillEntry) -> DetectResult:
 
 
 def detect(name: str, entry: SkillEntry, text: str) -> DetectResult:
-    found = entry_index(name, entry).find(text)
-    if not found:
-        return "absent"
-    return _result(any(m.is_alias for m in found), entry)
+    """Stops at the first conclusive mention: an alias, or the name of a skill that is never an
+    ordinary word. Only an ambiguous name keeps it looking for an alias to the end."""
+    named = False
+    for mention in entry_index(name, entry).iter_find(text):
+        if mention.is_alias or not entry.ambiguous:
+            return "found"
+        named = True
+    return "unclear" if named else "absent"
 
 
 def _present(found: Iterable[Mention], ontology: Mapping[str, SkillEntry], index: MentionIndex
