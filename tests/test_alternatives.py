@@ -54,6 +54,11 @@ GEICO_LINE = ("Hands-on AI engineering: Strong experience with Python and modern
     ("10+ of Python, Java, or Kubernetes", []),
     ("1 of Python, Java, or Kubernetes", [{"python", "java", "kubernetes"}]),
     ("1 or more of Python, Java, or Kubernetes", [{"python", "java", "kubernetes"}]),
+    ("At least two from Python, Java, or Kubernetes", []),
+    ("At least two technologies from Python, Java, or Kubernetes", []),
+    ("Two among Python, Java, or Kubernetes", []),
+    ("Two or three of Python, Java, or Kubernetes", []),
+    ("Two or more years of Python or Java", [{"python", "java"}]),  # a duration, not a count of skills
     ("4+ years of Python or Java", [{"python", "java"}]),  # a count of years, not of skills
 ])
 def test_alternative_groups(clause, groups):

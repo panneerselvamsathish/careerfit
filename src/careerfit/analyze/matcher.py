@@ -193,8 +193,11 @@ MAX_JOIN = 60  # characters: a longer stretch between two skills is never a plai
 # "At least two of Python, Java, or Kubernetes" needs more than one: no single skill meets it, so a
 # sentence that asks for a count above one offers no either/or choice at all.
 # "One of", "1 of" and "1 or more of" are met by any single skill, so only counts above one stop it.
+# Up to two nouns may sit before "of", "out of", "from" or "among" ("two technologies from"), but
+# never a duration: "4+ years of Python or Java" counts years, not skills.
 _COUNTED = re.compile(r"\b(two|three|four|five|six|several|multiple|both|all|([2-9]|[1-9]\d+)\+?)"
-                      r"(\s+or\s+more)?\s+(out\s+)?of\b", re.IGNORECASE)
+                      r"(\s+or\s+more)?(\s+(?!(years?|yrs|months?|weeks?|days?)\b)[a-z-]+){0,2}"
+                      r"\s+(out\s+of|of|from|among)\b", re.IGNORECASE)
 Span = tuple[int, int, str]
 
 
