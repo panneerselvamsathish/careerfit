@@ -2,13 +2,17 @@
 
 The matcher used to run one regex per term, `(?<!\\w)(?<!\\w\\.)TERM(?!\\w)(?!\\.\\w)` with
 IGNORECASE, over every clause. That is fine at a few hundred terms and far too slow at thousands
-(regex compiles stop fitting Python's cache). This index gives exactly the same answers, which
+(regex compiles stop fitting Python's cache). This index gives the same answers, which
 tests/test_matcher_differential.py checks against the old code kept in tests/oracle/:
 
 - Case: ASCII letters fold to lowercase, and so do the four other characters Python's IGNORECASE
-  treats as ASCII letters (İ and ı match "i", ſ matches "s", the Kelvin sign K matches "k"). Each
-  character folds to exactly one character, so offsets in the folded text are offsets in the text.
-  Terms must be ASCII, so they need no more than that.
+  treats as ASCII letters (U+0130 and U+0131 match "i", U+017F matches "s", the Kelvin sign U+212A
+  matches "k"). Each character folds to exactly one character, so offsets in the folded text are
+  offsets in the text. Terms must be ASCII, so they need no more than that.
+- Dashes: the six Unicode dashes U+2010 to U+2015 (hyphen, non-breaking hyphen, figure dash, en
+  dash, em dash, horizontal bar) match "-", so "proof-of-concept" typed with non-breaking hyphens
+  is still found. Only for matching: excerpts keep the original characters. This is the one place
+  the index differs from the old regex, on purpose; the oracle comparison folds dashes first.
 - Boundaries, checked on the original text: a mention may not start right after a word character
   or after "word." ("js" is never found inside "Node.js"), and may not end right before a word
   character or before ".word". A word character is what `\\w` means: alphanumeric or "_".
@@ -18,6 +22,9 @@ Where a mention can start: a term that starts with a word character can only sta
 a run of word characters, and then that whole run is the term's first word (the next character
 must be the term's own non-word character, or a boundary). So terms are indexed by that first
 word, and a term that starts with a symbol is indexed by the symbol.
+
+Non-ASCII characters are written as escapes in this file: a Kelvin sign and a capital K look the
+same in an editor.
 """
 
 import re
@@ -27,14 +34,21 @@ from functools import lru_cache
 
 from careerfit.analyze.ontology import SkillEntry
 
+_DASHES = {chr(c): "-" for c in range(0x2010, 0x2016)}
+HYPHENS = str.maketrans(_DASHES)
 _FOLD = str.maketrans({**{chr(c): chr(c + 32) for c in range(ord("A"), ord("Z") + 1)},
-                       "İ": "i", "ı": "i", "ſ": "s", "K": "k"})
+                       "\u0130": "i", "\u0131": "i", "\u017f": "s", "\u212a": "k", **_DASHES})
 _TOKEN = re.compile(r"\w+|\W")  # a run of word characters, or one other character
 
 
 def fold(text: str) -> str:
     """The text as the matcher compares it: same length, character for character."""
     return text.translate(_FOLD)
+
+
+def dashes_as_hyphens(text: str) -> str:
+    """Unicode dashes as "-", same length: for the regexes that read sections, markers and blanking."""
+    return text.translate(HYPHENS)
 
 
 def is_word(ch: str) -> bool:
@@ -87,7 +101,7 @@ class MentionIndex:
         self._by_first: dict[str, list[_Term]] = {}
         for term in terms:
             self._by_first.setdefault(_first_word(term.folded), []).append(term)
-        self.rank = rank  # skill → position in the list, so results can keep the list's order
+        self.rank = rank  # skill -> position in the list, so results can keep the list's order
 
     @classmethod
     def build(cls, ontology: Mapping[str, SkillEntry]) -> "MentionIndex":
