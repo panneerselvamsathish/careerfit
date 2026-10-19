@@ -42,10 +42,11 @@ def load_cases(golden_dir: Path = GOLDEN_DIR) -> list[dict]:
     return [yaml.safe_load(p.read_text(encoding="utf-8")) for p in sorted(golden_dir.glob("*.yaml"))]
 
 
-def run_case(case: dict, ontology: dict[str, SkillEntry]) -> CaseResult:
+def case_facts(case: dict, ontology: dict[str, SkillEntry]):
+    """The facts careerfit produces for one golden case's resume and JD."""
     resume_text, resume_coverage = read_document(ROOT / case["resume"])
     jd_text, jd_coverage = read_document(ROOT / case["jd"])
-    facts = build_facts(
+    return build_facts(
         resume_text=resume_text,
         resume_coverage=resume_coverage,
         resume_source=case["resume"],
@@ -56,6 +57,10 @@ def run_case(case: dict, ontology: dict[str, SkillEntry]) -> CaseResult:
         at=EVAL_AT,
         perspective="candidate",
     )
+
+
+def run_case(case: dict, ontology: dict[str, SkillEntry]) -> CaseResult:
+    facts = case_facts(case, ontology)
     result = CaseResult(case["case"], case["doc_type"], case.get("held_out", False))
     actual = {o.skill: o for o in facts.skill_observations}
     expected: dict[str, dict] = case["expected"]
