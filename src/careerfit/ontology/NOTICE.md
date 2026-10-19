@@ -38,6 +38,6 @@ This service uses the ESCO classification of the European Commission.
   40 characters, names about knowledge of a topic ("concepts of telecommunications"), and anything
   already in careerfit's hand-written list.
 - **Merges.** One tool under two names becomes one skill ("hadoop" and "Apache Hadoop"; an ESCO
-  label that O*NET names too).
-- **Aliases from ESCO** are kept only when O*NET has the same term, or a person allowed them in
-  `import_overrides.yaml`.
+  label that O*NET names too; a plural of several words and its singular, "learning management
+  systems" and "LMS").
+- **Aliases from ESCO** are kept only when a person allowed them in `import_overrides.yaml`.

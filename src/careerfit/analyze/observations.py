@@ -5,7 +5,7 @@ from typing import Literal
 from careerfit.analyze.matcher import (boundary_pattern, decide_status, detect, first_mention_line,
                                       requirement_alternatives, requirement_evidence)
 from careerfit.analyze.mentions import dashes_as_hyphens
-from careerfit.analyze.ontology import SkillEntry, implied_by_of
+from careerfit.analyze.ontology import SkillEntry, implied_by_of, index_of
 from careerfit.facts.schema import Coverage, GapAnalysisFacts, Provenance, SkillObservation, SkillStatus
 
 # What a matched alternative can stand in for: a skill the resume doesn't show, can't be read for,
@@ -22,6 +22,9 @@ def build_observations(
 ) -> tuple[SkillObservation, ...]:
     scanned = "scanned_pages" in resume_coverage.known_blind_spots
     jd_lines, resume_lines = jd_text.splitlines(), resume_text.splitlines()
+    # The resume is then read one skill at a time, so negated terms go first: "non-Amazon RDS" shows
+    # no RDS. Same length and lines, so every line number still points into the original text.
+    resume_text = index_of(ontology).without_negated(resume_text)
     observations = []
     for name, (level, jd_line, jd_result) in requirement_evidence(jd_text, ontology).items():
         entry = ontology[name]

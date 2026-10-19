@@ -221,3 +221,42 @@ def test_an_allowed_alias_skips_only_the_everyday_word_check():
 def test_the_committed_import_has_no_reviewed_duplicate_of_a_curated_skill():
     for name in ("jenkins ci", "restful api", "amazon simple storage service s3", "agile development"):
         assert name not in IMPORTED, name
+
+
+def test_a_plural_name_merges_into_its_singular_name_or_alias():
+    # Copilot review on #31: "learning management systems" was its own skill next to "lms" (alias
+    # "learning management system"), so a JD asking for both demanded both, and a resume saying
+    # "LMS" got a gap on the plural.
+    esco = [{"skillType": "knowledge", "preferredLabel": "learning management systems", "altLabels": ""},
+            {"skillType": "knowledge", "preferredLabel": "computer forensics", "altLabels": ""}]
+    skills, report = _build([_row("Learning management system LMS"), _row("Computer forensic software")], esco)
+    assert "learning management systems" not in skills
+    assert skills["lms"].aliases == {"learning management system", "learning management systems"}
+    assert skills["lms"].sources == {"onet", "esco"}
+    assert "computer forensics" not in skills and skills["computer forensic"].aliases == {"computer forensics"}
+    assert "learning management systems -> lms" in report.review["merged_plural_duplicate"]
+    one_word, _ = _build([_row("Canva"), _row("Canvas LMS"), _row("Sas"), _row("Sass")], overrides={"keep": ["sass"]})
+    assert {"canva", "sass", "sas"} <= set(one_word)          # one word: another product, never merged
+
+
+def test_a_rename_onto_another_skill_keeps_the_old_name_as_an_alias():
+    skills, _ = _build([_row("Neo4j"), _row("Neo4j graph database")], overrides={"rename": {"neo4j graph database": "neo4j"}})
+    assert skills["neo4j"].aliases == {"neo4j graph database"}
+
+
+def test_the_committed_import_has_one_lms_skill():
+    assert "learning management systems" not in IMPORTED and "computer forensics" not in IMPORTED
+    assert {"learning management system", "learning management systems"} <= set(IMPORTED["lms"]["aliases"])
+
+
+def test_a_jd_asking_for_learning_management_systems_matches_a_resume_saying_lms():
+    from datetime import datetime, timezone
+    from careerfit.analyze.observations import build_facts
+    from careerfit.analyze.ontology import load_default_ontology
+    from careerfit.facts.schema import Coverage
+    txt = Coverage(source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=1, known_blind_spots=())
+    facts = build_facts(resume_text="Ran the company LMS rollout", resume_coverage=txt, resume_source="r",
+                        jd_text="Requirements:\n- Learning management systems (LMS) administration", jd_coverage=txt,
+                        jd_source="j", ontology=load_default_ontology(), at=datetime.now(timezone.utc),
+                        perspective="candidate")
+    assert [(o.skill, o.status.value) for o in facts.skill_observations] == [("lms", "matched")]

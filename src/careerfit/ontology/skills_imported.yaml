@@ -1436,13 +1436,9 @@
   ambiguous: false
   sources: [esco]
 "computer forensic":
-  aliases: []
+  aliases: ["computer forensics"]
   ambiguous: false
-  sources: [onet]
-"computer forensics":
-  aliases: []
-  ambiguous: false
-  sources: [esco]
+  sources: [onet, esco]
 "computer graphics":
   aliases: []
   ambiguous: false
@@ -3615,10 +3611,6 @@
   aliases: []
   ambiguous: false
   sources: [esco]
-"learning management systems":
-  aliases: []
-  ambiguous: false
-  sources: [esco]
 "learning technologies":
   aliases: []
   ambiguous: false
@@ -3676,9 +3668,9 @@
   ambiguous: false
   sources: [esco]
 "lms":
-  aliases: ["learning management system"]
+  aliases: ["learning management system", "learning management systems"]
   ambiguous: false
-  sources: [onet]
+  sources: [onet, esco]
 "load testing":
   aliases: []
   ambiguous: false

@@ -355,3 +355,29 @@ def test_a_negated_compound_still_masks_the_skill_inside_it():
     result = {o.skill: o.status for o in build_observations("Built non-PL/SQL tooling", coverage,
                                                             "Requirements:\n- SQL", SKILLS, datetime(2026, 10, 19))}
     assert result["sql"] == SkillStatus.GAP
+
+
+@pytest.mark.parametrize(("resume", "jd", "expected"), [
+    # Copilot review on #31: a negated term hid only its own name, so a skill inside it still
+    # matched: "non-Amazon RDS" required RDS, and "non-PL/SQL" required SQL.
+    ("PostgreSQL", "Requirements:\n- Experience with non-Amazon RDS databases", {"rds": None, "relational database": None}),
+    ("PostgreSQL", "Requirements:\n- Tuning non-PL/SQL databases", {"sql": None, "pl/sql": None}),
+    ("Migrated non-Amazon RDS stores", "Requirements:\n- RDS", {"rds": "gap"}),       # the resume side too
+    ("Ran non-Amazon RDS and RDS clusters", "Requirements:\n- RDS", {"rds": "matched"}),  # a separate mention counts
+    ("PostgreSQL", "Requirements:\n- Non-Amazon RDS or Amazon RDS", {"rds": "gap"}),
+])
+def test_nothing_inside_a_negated_term_is_a_mention(resume, jd, expected):
+    from datetime import datetime
+    from careerfit.analyze.observations import build_observations
+    from careerfit.facts.schema import Coverage
+    coverage = Coverage(source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=1,
+                        known_blind_spots=())
+    result = {o.skill: o.status.value for o in build_observations(resume, coverage, jd, SKILLS, datetime(2026, 10, 19))}
+    assert {skill: result.get(skill) for skill in expected} == expected
+
+
+def test_a_negated_span_is_blanked_to_the_same_length():
+    text = "non-Amazon RDS, and RDS\nnon-PL/SQL"
+    blanked = SKILLS.index.without_negated(text)
+    assert len(blanked) == len(text) and blanked.splitlines()[1] == "non-      "
+    assert [m.term for m in SKILLS.index.find(text)] == ["rds"]

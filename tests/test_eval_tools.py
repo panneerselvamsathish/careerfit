@@ -49,7 +49,7 @@ def test_the_sample_is_seeded_and_spreads_over_the_strata():
 
 def test_scoring_reports_precision_unlabelled_mentions_and_the_gate():
     found = match_sample.mentions("jd.txt", JD, ONTOLOGY)
-    text = match_sample.sheet(found, len(found), 1)
+    text = match_sample.sheet(found, found, 1)
     counts, unlabelled = match_sample.score(text)
     assert (counts, unlabelled) == ({}, 3)
     labels = iter(["yes", "yes", "no"])
@@ -63,9 +63,9 @@ def test_scoring_reports_precision_unlabelled_mentions_and_the_gate():
 def test_the_gate_fails_below_90_percent_or_with_unlabelled_mentions(tmp_path):
     found = match_sample.mentions("jd.txt", JD, ONTOLOGY)
     sheet = tmp_path / "sample.md"
-    sheet.write_text(match_sample.sheet(found, 3, 1).replace("label:", "label: yes", 2), encoding="utf-8")
+    sheet.write_text(match_sample.sheet(found, found, 1).replace("label:", "label: yes", 2), encoding="utf-8")
     assert match_sample.main(["--score", str(sheet)]) == 1          # one still unlabelled
-    sheet.write_text(match_sample.sheet(found, 3, 1).replace("label:", "label: yes"), encoding="utf-8")
+    sheet.write_text(match_sample.sheet(found, found, 1).replace("label:", "label: yes"), encoding="utf-8")
     assert match_sample.main(["--score", str(sheet)]) == 0
 
 
@@ -73,7 +73,7 @@ def test_a_mention_without_a_valid_label_stays_unlabelled():
     # Copilot review on #31: a missing label line, or one the parser didn't read, used to vanish,
     # so a half-labelled sheet could pass the gate.
     found = match_sample.mentions("jd.txt", JD, ONTOLOGY)
-    lines = match_sample.sheet(found, len(found), 1).splitlines()
+    lines = match_sample.sheet(found, found, 1).splitlines()
     label_rows = [i for i, line in enumerate(lines) if line == "label:"]
     assert len(label_rows) == 3
     lines[label_rows[0]] = "label: yes"
@@ -83,3 +83,33 @@ def test_a_mention_without_a_valid_label_stays_unlabelled():
     assert counts["all"] == (2, 2) and unlabelled == 1
     cut = "\n".join(lines[:label_rows[2]])            # the last mention's label cut off at the end
     assert match_sample.score(cut)[1] == 2
+
+
+def test_the_gate_weights_each_stratum_by_its_size():
+    # Copilot review on #31: the sample takes the strata in turn, so a small stratum is over-sampled,
+    # and the raw share of yes labels let it hide a large stratum's errors.
+    def header(i, source, words):
+        return [f"## {i}. skill{i} · {source} · {words}", "", "> line", ""]
+    lines = ["- population: onet · one word = 90", "- population: esco · several words = 10", ""]
+    for i in range(1, 3):                                            # big stratum: 1 of 2 right
+        lines += header(i, "onet", "one word") + [f"label: {'yes' if i == 1 else 'no'}", ""]
+    for i in range(3, 11):                                           # small stratum: 8 of 8 right
+        lines += header(i, "esco", "several words") + ["label: yes", ""]
+    text = "\n".join(lines)
+    counts, unlabelled = match_sample.score(text)
+    assert counts["all"] == (9, 10) and unlabelled == 0                 # 90% unweighted: would pass
+    weighted = match_sample.weighted_precision(counts, match_sample.populations(text))
+    assert weighted == 0.9 * 0.5 + 0.1 * 1.0                            # 55%: fails
+    assert match_sample.weighted_precision(counts, {"onet · one word": 90}) is None   # a stratum without a size
+    unsampled = {**match_sample.populations(text), "onet+esco · one word": 5}
+    assert match_sample.weighted_precision(counts, unsampled) is None   # mentions, none labelled
+
+
+def test_the_sheet_records_every_stratum_size(tmp_path):
+    found = match_sample.mentions("jd.txt", JD, ONTOLOGY)
+    text = match_sample.sheet(match_sample.sample(found, 1), found, 1)
+    assert match_sample.populations(text) == {"esco · several words": 1, "onet · one word": 1,
+                                              "onet+esco · several words": 1}
+    sheet = tmp_path / "sample.md"
+    sheet.write_text(text.replace("label:", "label: yes"), encoding="utf-8")
+    assert match_sample.main(["--score", str(sheet)]) == 1               # two strata not sampled at all

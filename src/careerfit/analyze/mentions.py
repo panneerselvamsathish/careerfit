@@ -18,7 +18,8 @@ tests/test_matcher_differential.py checks against the old code kept in tests/ora
   character or before ".word". A word character is what `\\w` means: alphanumeric or "_".
 - A term's own mentions never overlap, as with `re.finditer`.
 - Negation: a term right after "non-" ("non-relational database", "non-technical") is not a
-  mention of it. "non-X" never asks for X, and never shows X on a resume.
+  mention of it, and neither is anything inside it ("non-Amazon RDS" names no RDS, "non-PL/SQL"
+  no SQL). "non-X" never asks for X, and never shows X on a resume.
 
 Where a mention can start: a term that starts with a word character can only start at the start of
 a run of word characters, and then that whole run is the term's first word (the next character
@@ -131,19 +132,45 @@ class MentionIndex:
     def iter_find(self, text: str) -> Iterator[Mention]:
         """Mentions as they are found, in order of start (not sorted within one start). Lazy, so a
         caller that only needs to know whether a skill is mentioned can stop at the first one."""
+        for found in self._scan(text):
+            if isinstance(found, Mention):
+                yield found
+
+    def without_negated(self, text: str) -> str:
+        """The text with every negated term ("non-Amazon RDS") blanked to spaces, same length.
+
+        For code that then asks about one skill at a time: the single-skill index of "rds" can't
+        know "amazon rds" is a term, so it would find RDS inside "non-Amazon RDS"."""
+        spans = [found for found in self._scan(text) if isinstance(found, tuple)]
+        if not spans:
+            return text
+        chars = list(text)
+        for start, end in spans:
+            chars[start:end] = " " * (end - start)
+        return "".join(chars)
+
+    def _scan(self, text: str) -> Iterator[Mention | tuple[int, int]]:
+        """Mentions, and the (start, end) of the longest term at each negated start."""
         folded = fold(text)
         last_end: dict[int, int] = {}
+        negated_until = -1  # the end of the longest term negated by a "non-" so far
         for token in _TOKEN.finditer(folded):
             start = token.start()
             candidates = self._by_first.get(token.group())
-            if not candidates or not _starts_clear(text, start) or _negated(folded, text, start):
+            if not candidates or start < negated_until or not _starts_clear(text, start):
                 continue
+            negated = _negated(folded, text, start)
             for term in candidates:
                 end = start + len(term.folded)
-                if (folded.startswith(term.folded, start) and _ends_clear(text, end)
-                        and last_end.get(term.slot, -1) <= start):
+                if not (folded.startswith(term.folded, start) and _ends_clear(text, end)):
+                    continue
+                if negated:
+                    negated_until = max(negated_until, end)
+                elif last_end.get(term.slot, -1) <= start:
                     last_end[term.slot] = end
                     yield Mention(start, end, term.skill, term.term, term.is_alias)
+            if negated and negated_until > start:
+                yield start, negated_until
 
     def find_by_line(self, text: str) -> list[list[Mention]]:
         """Mentions per line of `text.splitlines()`, offsets relative to each line."""

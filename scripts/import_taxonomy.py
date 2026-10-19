@@ -227,6 +227,7 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
                 and not (len(name.split()) == 1 and everyday(name, words) and name not in keep_words))
 
     candidates = merge_vendor_duplicates(candidates, report, survives)
+    candidates = merge_plural_duplicates(candidates, report, survives)
     result: dict[str, Candidate] = {}
     used: set[str] = set()
     for name in sorted(candidates):
@@ -260,7 +261,7 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
                     continue
                 if alias in taken:
                     report.drop("alias_dropped_curated_collision", f"{final}: {alias}")
-                elif alias in used or alias in candidates:
+                elif alias in used or (alias in candidates and alias != name):  # its own old name is fine
                     report.drop("alias_dropped_imported_collision", f"{final}: {alias}")
                 elif len(alias.split()) == 1 and everyday(alias, words) and alias not in allowed:
                     report.drop("alias_dropped_everyday_word", f"{final}: {alias}")
@@ -270,12 +271,13 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
 
         if final in result:  # a rename onto another skill's name: merge, with the same alias checks
             report.counts["merged_same_name"] += 1
-            aliases = accept(c.aliases | alias_allow.get(final, set()))
+            # A rename is a reviewed synonym, so the original name stays findable as an alias.
+            aliases = accept(c.aliases | alias_allow.get(final, set()) | ({name} - {final}))
             result[final].aliases |= aliases
             result[final].sources |= c.sources
             used |= aliases
             continue
-        aliases = accept(c.aliases | alias_allow.get(final, set()))
+        aliases = accept(c.aliases | alias_allow.get(final, set()) | ({name} - {final}))
         result[final] = Candidate(final, aliases, set(c.sources))
         used |= {final, *aliases}
     # The alias loop above can't see a later name, so drop any alias that became another skill's name.
@@ -323,6 +325,29 @@ def merge_vendor_duplicates(candidates: dict[str, Candidate], report: Report, su
         target.aliases |= (source.aliases | {vendored[0]}) - {plain}
         target.sources |= source.sources
         report.counts["merged_vendor_duplicate"] += 1
+    return merged
+
+
+def merge_plural_duplicates(candidates: dict[str, Candidate], report: Report, survives) -> dict[str, Candidate]:
+    """"learning management systems" and "lms" (alias "learning management system") are one skill: a
+    plural name whose singular is another candidate's name or alias merges into that candidate, as an
+    alias. Otherwise a JD asking for the plural also demands it, and a resume saying "LMS" gets a gap.
+    Only into a skill that survives the drop rules, so the plural is never lost with it. Only names of
+    several words: one word ending in "s" is often another product ("canvas" is not "canva", "sass"
+    is not "sas")."""
+    owner = {t: c.name for c in candidates.values() for t in (c.name, *c.aliases)}
+    merged = dict(candidates)
+    for name in sorted(candidates):
+        target = owner.get(name[:-1]) if name.endswith("s") and " " in name else None
+        if target is None or target == name or target not in merged or name not in merged:
+            continue
+        if not survives(target):
+            report.drop("plural_merge_skipped_singular_dropped", f"{name} -> {target}")
+            continue
+        source = merged.pop(name)
+        merged[target].aliases |= source.aliases | {name}
+        merged[target].sources |= source.sources
+        report.drop("merged_plural_duplicate", f"{name} -> {target}")
     return merged
 
 
