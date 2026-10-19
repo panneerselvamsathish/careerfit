@@ -327,10 +327,6 @@
   aliases: []
   ambiguous: false
   sources: [onet]
-"amazon data pipeline":
-  aliases: []
-  ambiguous: false
-  sources: [onet]
 "amazon elastic compute cloud ec2":
   aliases: ["elastic compute cloud ec2"]
   ambiguous: false
@@ -419,6 +415,10 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+"apache groovy":
+  aliases: []
+  ambiguous: false
+  sources: [onet]
 "apache gump":
   aliases: []
   ambiguous: false
@@ -461,6 +461,10 @@
   sources: [onet]
 "apache solr":
   aliases: ["solr"]
+  ambiguous: false
+  sources: [onet]
+"apache spark":
+  aliases: []
   ambiguous: false
   sources: [onet]
 "apache sqoop":
@@ -2535,6 +2539,14 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+"google android":
+  aliases: []
+  ambiguous: false
+  sources: [onet]
+"google angular":
+  aliases: []
+  ambiguous: false
+  sources: [onet]
 "google classroom":
   aliases: []
   ambiguous: false
@@ -3005,10 +3017,6 @@
   sources: [onet]
 "ibm tam":
   aliases: ["ibm tivoli access management"]
-  ambiguous: false
-  sources: [onet]
-"ibm terraform":
-  aliases: []
   ambiguous: false
   sources: [onet]
 "ibm tim":
@@ -4951,10 +4959,6 @@
   aliases: ["peoplesoft financials"]
   ambiguous: false
   sources: [onet]
-"oracle pl/sql":
-  aliases: []
-  ambiguous: false
-  sources: [onet]
 "oracle rac":
   aliases: ["oracle real application cluster", "rac"]
   ambiguous: false
@@ -4999,10 +5003,6 @@
   aliases: []
   ambiguous: false
   sources: [onet, esco]
-"oracle weblogic server":
-  aliases: []
-  ambiguous: false
-  sources: [onet]
 "orcad capture":
   aliases: []
   ambiguous: false

@@ -33,7 +33,8 @@ The rules, in the order they run:
    Lua, AWK and PowerShell; "computer vision" lists Keras), so none becomes an alias unless
    import_overrides.yaml allows it. An ESCO skill merges with an O*NET one only under the same name.
 6. Anything already in skills.yaml (name or alias, any case) is not imported: a colliding name drops
-   the skill, a colliding alias drops the alias. The hand-written list always wins.
+   the skill, a colliding alias drops the alias, and a vendor form of a curated skill ("oracle
+   pl/sql", "ibm terraform") is dropped too. The hand-written list always wins.
 """
 
 import argparse
@@ -151,13 +152,18 @@ def clean_esco(label: str) -> str:
     return _norm(_PAREN.sub("", label))
 
 
-def vendor_alias(name: str, words: set[str]) -> str | None:
+def vendor_rest(name: str) -> str | None:
+    """The name without its vendor prefix ("oracle pl/sql" -> "pl/sql"), or None if it has none."""
     for vendor in VENDORS:
         if name.startswith(vendor + " "):
-            rest = name[len(vendor) + 1:]
-            if any(not everyday(token, words) for token in rest.split()) and len(rest) >= MIN_CHARS:
-                return rest
-            return None
+            return name[len(vendor) + 1:]
+    return None
+
+
+def vendor_alias(name: str, words: set[str]) -> str | None:
+    rest = vendor_rest(name)
+    if rest and any(not everyday(token, words) for token in rest.split()) and len(rest) >= MIN_CHARS:
+        return rest
     return None
 
 
@@ -214,7 +220,13 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
         target.sources.add("esco")
         target.aliases |= accepted
 
-    candidates = merge_vendor_duplicates(candidates, report)
+    def survives(name: str) -> bool:
+        """Whether a name would pass the drop rules below (used before merging a vendor form into it)."""
+        name = rename.get(name, name)
+        return (keepable(name) and name not in drop and name not in taken
+                and not (len(name.split()) == 1 and everyday(name, words) and name not in keep_words))
+
+    candidates = merge_vendor_duplicates(candidates, report, survives)
     result: dict[str, Candidate] = {}
     used: set[str] = set()
     for name in sorted(candidates):
@@ -231,6 +243,11 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
             continue
         if final in taken:
             report.drop("dropped_curated_collision", final)
+            continue
+        if (rest := vendor_rest(final)) in taken:
+            # "oracle pl/sql" is curated pl/sql under a vendor's name: as its own skill, a JD asking for
+            # "Oracle PL/SQL" would also demand it, and a resume saying "PL/SQL" would get a false gap.
+            report.drop("dropped_curated_vendor_form", f"{final}: {rest}")
             continue
         def accept(raw: set[str]) -> set[str]:
             """The aliases that pass every check; the same checks for a new entry and a merge."""
@@ -274,7 +291,7 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
     return result, report
 
 
-def merge_vendor_duplicates(candidates: dict[str, Candidate], report: Report) -> dict[str, Candidate]:
+def merge_vendor_duplicates(candidates: dict[str, Candidate], report: Report, survives) -> dict[str, Candidate]:
     """"apache hadoop" (O*NET) and "hadoop" (ESCO) are one tool: merge into the vendor-free name, with
     the vendor name as an alias. Only when one vendor alone maps to that name: "apple ios" and
     "cisco ios" are different products, so neither may claim "ios", and both keep their full names."""
@@ -292,6 +309,11 @@ def merge_vendor_duplicates(candidates: dict[str, Candidate], report: Report) ->
                 report.drop("alias_dropped_two_vendors", f"{name}: {plain}")
             continue
         if plain not in merged or vendored[0] not in merged:
+            continue
+        if not survives(plain):
+            # "apache spark" must not merge into "spark" when the everyday-word rule then drops "spark":
+            # both would be lost. The vendor form stays its own skill instead.
+            report.counts["vendor_merge_skipped_plain_dropped"] += 1
             continue
         source = merged.pop(vendored[0])
         target = merged[plain]

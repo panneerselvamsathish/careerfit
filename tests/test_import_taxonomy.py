@@ -76,15 +76,14 @@ def test_scope_categories_everyday_words_and_curated_collisions():
         _row("Development environment software"),                        # O*NET's own category label
         _row("Spark"),                                                   # everyday word
         _row("Kubernetes"),                                              # curated name
-        _row("Oracle PL/SQL"),                                           # its alias "pl/sql" is curated
+        _row("Oracle PL/SQL"),                                           # a vendor form of curated pl/sql
         _row("Database software"),                                       # "database": a modern everyday word
         _row("Ansible software"),                                        # a product named "X software"
     ])
-    assert sorted(skills) == ["ansible", "hot accounting tool", "neo4j", "oracle pl/sql"]
+    assert sorted(skills) == ["ansible", "hot accounting tool", "neo4j"]
+    assert "oracle pl/sql: pl/sql" in report.review["dropped_curated_vendor_form"]
     assert report.counts["dropped_everyday_word"] == 2  # spark, database
-    assert skills["oracle pl/sql"].aliases == set()
     assert report.counts["dropped_curated_collision"] == 1
-    assert "oracle pl/sql: pl/sql" in report.review["alias_dropped_curated_collision"]
 
 
 def test_overrides_keep_drop_and_allow():
@@ -176,3 +175,34 @@ def test_a_rename_merge_checks_the_incoming_aliases_too():
     skills, report = _build([_row("Neo4j"), _row("OldGraph (K8S)")], overrides={"rename": {"oldgraph": "neo4j"}})
     assert "k8s" not in skills["neo4j"].aliases
     assert "neo4j: k8s" in report.review["alias_dropped_curated_collision"]
+
+
+def test_a_qualified_jd_name_and_an_unqualified_resume_name_are_one_skill(tmp_path):
+    # Copilot review on #31: "oracle pl/sql" as its own skill made a JD asking for "Oracle PL/SQL"
+    # demand it too, and a resume saying "PL/SQL" then got a false gap.
+    from datetime import datetime, timezone
+    from careerfit.analyze.observations import build_facts
+    from careerfit.facts.schema import Coverage
+    skills, _ = _build([_row("Oracle PL/SQL")])
+    assert skills == {}  # pl/sql is curated (CURATED above), so its vendor form isn't imported
+    curated = tmp_path / "skills.yaml"
+    curated.write_text("pl/sql:\n  aliases: [plsql]\n  ambiguous: false\n", encoding="utf-8")
+    imported = tmp_path / "skills_imported.yaml"
+    imported.write_text(importer.render_skills(skills), encoding="utf-8")
+    txt = Coverage(source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=1, known_blind_spots=())
+    facts = build_facts(resume_text="Wrote PL/SQL packages", resume_coverage=txt, resume_source="r",
+                        jd_text="Requirements:\n- Oracle PL/SQL", jd_coverage=txt, jd_source="j",
+                        ontology=load_ontology(curated, imported=imported), at=datetime.now(timezone.utc),
+                        perspective="candidate")
+    assert [(o.skill, o.status.value) for o in facts.skill_observations] == [("pl/sql", "matched")]
+
+
+def test_a_vendor_form_is_kept_when_its_plain_name_would_be_dropped():
+    # Copilot review on #31: O*NET "Apache Spark" + ESCO "Spark" merged into "spark", which the
+    # everyday-word rule then dropped, losing the tool.
+    esco = [{"skillType": "knowledge", "preferredLabel": "Spark", "altLabels": ""}]
+    skills, report = _build([_row("Apache Spark")], esco)
+    assert "apache spark" in skills and "spark" not in skills
+    assert report.counts["vendor_merge_skipped_plain_dropped"] == 1
+    kept, _ = _build([_row("Apache Spark")], esco, {"keep": ["spark"]})   # unless overrides keep "spark"
+    assert "spark" in kept and "apache spark" in kept["spark"].aliases
