@@ -308,3 +308,21 @@ def test_the_packaged_lists_load_together():
     merged = load_default_ontology()
     assert list(merged)[:len(curated_only)] == list(curated_only)  # curated skills first, unchanged
     assert all(merged[name] == curated_only[name] for name in curated_only)
+
+
+@pytest.mark.parametrize(("text", "expected"), [
+    # Copilot review on #31: "non-relational" asks for the opposite; the hyphen is a word boundary,
+    # so without the negation rule it was a mention of relational database.
+    ("Experience with non-relational databases (MongoDB, Cassandra)", "absent"),
+    ("Designed a non-relational database for events", "absent"),
+    ("Non‑relational database tuning", "absent"),                 # a non-breaking hyphen too
+    ("Relational databases and non-relational stores", "found"),       # the plain mention counts
+])
+def test_a_skill_right_after_non_is_not_a_mention(text, expected):
+    from careerfit.analyze.matcher import detect
+    assert detect("relational database", SKILLS["relational database"], text) == expected
+
+
+def test_non_negates_markers_too():
+    from careerfit.analyze.matcher import has_must_marker
+    assert has_must_marker("Kubernetes is required") and not has_must_marker("a non-required extra")

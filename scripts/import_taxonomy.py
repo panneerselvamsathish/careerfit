@@ -232,23 +232,30 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
         if final in taken:
             report.drop("dropped_curated_collision", final)
             continue
-        if final in result:  # a rename onto another skill's name; an alias clash is cleared below
+        def accept(raw: set[str]) -> set[str]:
+            """The aliases that pass every check; the same checks for a new entry and a merge."""
+            accepted = set()
+            for alias in raw:
+                if alias == final or not keepable(alias):
+                    continue
+                if alias in taken:
+                    report.drop("alias_dropped_curated_collision", f"{final}: {alias}")
+                elif alias in used or alias in candidates:
+                    report.drop("alias_dropped_imported_collision", f"{final}: {alias}")
+                elif len(alias.split()) == 1 and everyday(alias, words):
+                    report.drop("alias_dropped_everyday_word", f"{final}: {alias}")
+                else:
+                    accepted.add(alias)
+            return accepted
+
+        if final in result:  # a rename onto another skill's name: merge, with the same alias checks
             report.counts["merged_same_name"] += 1
-            result[final].aliases |= c.aliases
+            aliases = accept(c.aliases)
+            result[final].aliases |= aliases
             result[final].sources |= c.sources
+            used |= aliases
             continue
-        aliases = set()
-        for alias in c.aliases | alias_allow.get(final, set()):
-            if alias == final or not keepable(alias):
-                continue
-            if alias in taken:
-                report.drop("alias_dropped_curated_collision", f"{final}: {alias}")
-            elif alias in used or alias in candidates:
-                report.drop("alias_dropped_imported_collision", f"{final}: {alias}")
-            elif len(alias.split()) == 1 and everyday(alias, words):
-                report.drop("alias_dropped_everyday_word", f"{final}: {alias}")
-            else:
-                aliases.add(alias)
+        aliases = accept(c.aliases | alias_allow.get(final, set()))
         result[final] = Candidate(final, aliases, set(c.sources))
         used |= {final, *aliases}
     # The alias loop above can't see a later name, so drop any alias that became another skill's name.

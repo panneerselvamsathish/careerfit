@@ -15,7 +15,8 @@ def mention_pattern(term: str) -> re.Pattern[str]:
     """A whole-word, case-insensitive match for one term ("js" never inside "Node.js"). Skills are
     found through analyze/mentions.py, which matches exactly like this; the regex is kept for the
     section markers and for blanking out an implying skill's mentions."""
-    return re.compile(rf'(?<!\w)(?<!\w\.){re.escape(term)}(?!\w)(?!\.\w)', re.IGNORECASE)
+    # (?<!(?<!\w)non-): "non-required" is no must marker, as "non-relational" is no relational database.
+    return re.compile(rf'(?<!\w)(?<!\w\.)(?<!(?<!\w)non-){re.escape(term)}(?!\w)(?!\.\w)', re.IGNORECASE)
 
 
 def mentions(term: str, text: str) -> bool:

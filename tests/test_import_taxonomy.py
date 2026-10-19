@@ -168,3 +168,11 @@ def test_generated_entries_are_lowercase_ascii_without_implications():
 def test_the_manifest_counts_match_the_generated_file():
     assert MANIFEST["counts"]["imported_skills"] == len(IMPORTED)
     assert MANIFEST["counts"]["imported_aliases"] == sum(len(e["aliases"]) for e in IMPORTED.values())
+
+
+def test_a_rename_merge_checks_the_incoming_aliases_too():
+    # Copilot review on #31: renaming OldGraph (K8S) onto neo4j copied the curated alias k8s
+    # unchecked, and load_ontology() then dropped the whole imported neo4j entry.
+    skills, report = _build([_row("Neo4j"), _row("OldGraph (K8S)")], overrides={"rename": {"oldgraph": "neo4j"}})
+    assert "k8s" not in skills["neo4j"].aliases
+    assert "neo4j: k8s" in report.review["alias_dropped_curated_collision"]

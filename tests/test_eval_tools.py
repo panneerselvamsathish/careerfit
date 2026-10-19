@@ -67,3 +67,19 @@ def test_the_gate_fails_below_90_percent_or_with_unlabelled_mentions(tmp_path):
     assert match_sample.main(["--score", str(sheet)]) == 1          # one still unlabelled
     sheet.write_text(match_sample.sheet(found, 3, 1).replace("label:", "label: yes"), encoding="utf-8")
     assert match_sample.main(["--score", str(sheet)]) == 0
+
+
+def test_a_mention_without_a_valid_label_stays_unlabelled():
+    # Copilot review on #31: a missing label line, or one the parser didn't read, used to vanish,
+    # so a half-labelled sheet could pass the gate.
+    found = match_sample.mentions("jd.txt", JD, ONTOLOGY)
+    lines = match_sample.sheet(found, len(found), 1).splitlines()
+    label_rows = [i for i, line in enumerate(lines) if line == "label:"]
+    assert len(label_rows) == 3
+    lines[label_rows[0]] = "label: yes"
+    lines[label_rows[1]] = ""                          # no label line at all
+    lines[label_rows[2]] = "label: yes  # checked"     # a trailing comment is fine
+    counts, unlabelled = match_sample.score("\n".join(lines))
+    assert counts["all"] == (2, 2) and unlabelled == 1
+    cut = "\n".join(lines[:label_rows[2]])            # the last mention's label cut off at the end
+    assert match_sample.score(cut)[1] == 2

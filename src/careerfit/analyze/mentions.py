@@ -17,6 +17,8 @@ tests/test_matcher_differential.py checks against the old code kept in tests/ora
   or after "word." ("js" is never found inside "Node.js"), and may not end right before a word
   character or before ".word". A word character is what `\\w` means: alphanumeric or "_".
 - A term's own mentions never overlap, as with `re.finditer`.
+- Negation: a term right after "non-" ("non-relational database", "non-technical") is not a
+  mention of it. "non-X" never asks for X, and never shows X on a resume.
 
 Where a mention can start: a term that starts with a word character can only start at the start of
 a run of word characters, and then that whole run is the term's first word (the next character
@@ -88,6 +90,11 @@ def _starts_clear(text: str, i: int) -> bool:
     return not (i > 1 and text[i - 1] == "." and is_word(text[i - 2]))
 
 
+def _negated(folded: str, text: str, i: int) -> bool:
+    """True when the mention at i follows a "non-" that starts a word ("non-relational")."""
+    return i >= 4 and folded[i - 4:i] == "non-" and (i == 4 or not is_word(text[i - 5]))
+
+
 def _ends_clear(text: str, j: int) -> bool:
     if j < len(text) and is_word(text[j]):
         return False
@@ -129,7 +136,7 @@ class MentionIndex:
         for token in _TOKEN.finditer(folded):
             start = token.start()
             candidates = self._by_first.get(token.group())
-            if not candidates or not _starts_clear(text, start):
+            if not candidates or not _starts_clear(text, start) or _negated(folded, text, start):
                 continue
             for term in candidates:
                 end = start + len(term.folded)

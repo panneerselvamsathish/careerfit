@@ -29,7 +29,7 @@ from careerfit.ingest.document import read_document
 GATE = 0.90
 SEED = 20261019
 _HEADER = re.compile(r"^## \d+\. (?P<skill>.+?) · (?P<source>[a-z+]+) · (?P<words>one word|several words)$")
-_LABEL = re.compile(r"^label:\s*(?P<label>\S*)\s*$", re.IGNORECASE)
+_LABEL = re.compile(r"^label:\s*(?P<label>[^\s#]*)\s*(#.*)?$", re.IGNORECASE)  # "label: yes  # checked" is fine
 
 
 @dataclass(frozen=True)
@@ -86,21 +86,24 @@ def sheet(picked: list[Sample], total: int, jds: int) -> str:
 
 
 def score(text: str) -> tuple[dict[str, tuple[int, int]], int]:
-    """(yes, labelled) per stratum and overall ("all"), and how many mentions are still unlabelled."""
+    """(yes, labelled) per stratum and overall ("all"), and how many mentions are still unlabelled.
+
+    Every mention counts as unlabelled until a valid yes or no follows its header: a missing or
+    malformed label line can never make an incomplete sheet pass."""
     counts: dict[str, list[int]] = defaultdict(lambda: [0, 0])
     unlabelled = 0
     stratum = None
     for line in text.splitlines():
         if header := _HEADER.match(line.strip()):
+            unlabelled += 1  # until its label is read
             stratum = f"{header['source']} · {header['words']}"
         elif stratum and (label := _LABEL.match(line.strip())):
             value = label["label"].lower()
             if value in ("yes", "no"):
+                unlabelled -= 1
                 for key in (stratum, "all"):
                     counts[key][0] += value == "yes"
                     counts[key][1] += 1
-            else:
-                unlabelled += 1
             stratum = None
     return {k: (yes, n) for k, (yes, n) in counts.items()}, unlabelled
 
