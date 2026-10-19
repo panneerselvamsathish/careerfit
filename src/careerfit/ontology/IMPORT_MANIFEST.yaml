@@ -27,7 +27,7 @@ counts:
   dropped_shape: 100
   esco_alias_not_reviewed: 2045
   esco_not_knowledge: 745
-  imported_aliases: 233
+  imported_aliases: 232
   imported_skills: 1786
   merged_plural_duplicate: 2
   merged_vendor_duplicate: 4

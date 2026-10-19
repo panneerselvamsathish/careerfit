@@ -319,8 +319,12 @@ def test_ssis_is_one_skill_under_both_names():
     # two skills, so a resume saying "SSIS" got a false gap on the expanded name.
     assert "microsoft ssis" not in IMPORTED
     assert {"microsoft ssis", "ssis"} <= set(IMPORTED["sql server integration services"]["aliases"])
-    assert _facts("Built SSIS packages", "SQL Server Integration Services (SSIS)")[
-        "sql server integration services"] == "matched"
+    # The SQL Server and SQL inside the expanded name are part of it, not requirements of their own
+    # (Copilot review on #31: they were false gaps), unless the JD names them on their own too.
+    assert _facts("Built SSIS packages", "SQL Server Integration Services (SSIS)") == {
+        "sql server integration services": "matched"}
+    assert _facts("Built SSIS packages", "SQL Server and SQL Server Integration Services") == {
+        "sql server": "gap", "sql server integration services": "matched"}
 
 
 def test_a_vendor_product_stays_apart_from_the_discipline_in_the_committed_import():
@@ -340,3 +344,32 @@ def test_a_vendor_product_stays_apart_from_the_discipline_in_the_committed_impor
 ])
 def test_relational_engines_meet_a_relational_database_requirement(resume, jd, skill, status):
     assert _facts(resume, jd)[skill] == status
+
+
+@pytest.mark.parametrize("overrides", [
+    {},                                                         # the automatic vendor merge
+    {"rename": {"apache hadoop": "hadoop"}},                    # a reviewed rename onto the same name
+])
+def test_an_allowance_keyed_by_a_source_name_survives_merges_and_renames(overrides):
+    # Copilot review on #31: alias_allow was looked up under the final name only, so an allowance for
+    # "apache hadoop" was lost when it merged into "hadoop", with its everyday-word exemption.
+    words = WORDS | {"framework"}
+    esco = [{"skillType": "knowledge", "preferredLabel": "Hadoop", "altLabels": ""}]
+    allow = {"alias_allow": {"apache hadoop": ["hadoop framework", "framework"], "neo4j": ["k8s"]}}
+    skills, _ = importer.build([_row("Apache Hadoop"), _row("Neo4j")], esco, CURATED, words, {**overrides, **allow})
+    assert skills["hadoop"].aliases == {"apache hadoop", "hadoop framework", "framework"}
+    assert skills["neo4j"].aliases == set()                     # the collision checks still apply
+
+
+def test_an_allowance_survives_a_plural_merge():
+    esco = [{"skillType": "knowledge", "preferredLabel": "learning management systems", "altLabels": ""}]
+    skills, _ = _build([_row("Learning management system LMS")], esco,
+                       {"alias_allow": {"learning management systems": ["lms platforms"]}})
+    assert "lms platforms" in skills["lms"].aliases
+
+
+def test_workspace_is_an_everyday_word_and_no_alias():
+    # Copilot review on #31: "Configured a local development workspace" met a JD asking for Google Workspace.
+    assert importer.everyday("workspace", set()) and importer.everyday("workspaces", set())
+    assert importer.vendor_alias("google workspace", set()) is None
+    assert "workspace" not in IMPORTED["google workspace"]["aliases"]

@@ -174,8 +174,11 @@ def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> di
     """Every place the JD mentions each skill, as (level, line, detection result), in document order."""
     found: dict[str, list[Occurrence]] = {}
     for level, line_no, clause in requirement_clauses(jd_text):
+        # Updated with the product (Copilot review on #31): a skill named only inside another
+        # skill's name ("SQL Server" in "SQL Server Integration Services") asks for nothing alone.
+        own = {skill for _start, _end, skill in _mention_spans(clause, ontology)[0]}
         for name, result in scan(clause, ontology).items():
-            if result != "absent":
+            if result != "absent" and name in own:
                 found.setdefault(name, []).append((level, line_no, result))
     return found
 
@@ -300,7 +303,8 @@ def requirement_alternatives(jd_text: str, ontology: dict[str, SkillEntry]) -> d
     found: dict[str, list[frozenset[str]]] = {}
     for line_no, sentence, _clauses in requirement_sentences(jd_text):
         detected = {name for name, result in scan(sentence, ontology).items() if result != "absent"}
-        for name, others in mention_alternatives(sentence, ontology):
+        own = len(_mention_spans(sentence, ontology)[0])  # updated with the product, as above
+        for name, others in mention_alternatives(sentence, ontology)[:own]:
             if name in detected:
                 found.setdefault(name, []).append(others)
     return found

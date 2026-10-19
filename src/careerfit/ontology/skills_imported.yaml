@@ -2576,7 +2576,7 @@
   ambiguous: false
   sources: [onet]
 "google workspace":
-  aliases: ["workspace"]
+  aliases: []
   ambiguous: false
   sources: [onet]
 "gps":

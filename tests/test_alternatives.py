@@ -209,13 +209,16 @@ def test_long_or_chains_and_repeated_mentions_stay_linear(joiner):
         pytest.fail(f"not linear: 4x the mentions took {', '.join(f'{r:.1f}x' for r in ratios)} the time")
 
 
-def test_a_nested_skill_shares_the_choice_it_sits_in():
+def test_a_nested_skill_is_part_of_the_skill_it_sits_in():
+    # Copilot review on #31: the SQL in "PL/SQL" used to be a requirement of its own (sharing PL/SQL's
+    # choice); now it is part of PL/SQL, as "SQL Server" is part of "SQL Server Integration Services".
     resume, jd = "Python services", "Requirements:\n- PL/SQL or Python"
     facts = analyse(resume, jd)
     observed = by_skill(facts)
-    assert observed["pl/sql"].status == observed["sql"].status == SkillStatus.ALTERNATIVE_MET  # SQL in "PL/SQL"
-    assert observed["sql"].resume_evidence.via == "python"
+    assert observed["pl/sql"].status == SkillStatus.ALTERNATIVE_MET and "sql" not in observed
     assert honest(facts, resume, jd) == []
+    both = by_skill(analyse(resume, "Requirements:\n- PL/SQL or Python, and SQL"))
+    assert both["sql"].status == SkillStatus.GAP                         # asked for on its own too
 
 
 def test_the_same_skill_asked_for_alone_in_the_same_clause_is_still_a_gap():

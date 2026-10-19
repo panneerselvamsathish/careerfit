@@ -68,7 +68,7 @@ MODERN_EVERYDAY = frozenset("""
     antivirus app apps backup blog chatbot cybersecurity dashboard database desktop digitization ebook
     ecommerce email encryption firewall firmware freeware groupware internet intranet laptop malware
     middleware multimedia online podcast smartphone software spreadsheet spyware webinar webmail website
-    wiki wifi workflow workstation
+    wiki wifi workflow workspace workstation
 """.split()) | frozenset("""
     api crm cms dms edw erp gis hcm hris iam ide jdbc mdm odbc plm scm sdk sso tim
 """.split())  # generic acronyms (and a first name): "sap erp" must not match every "ERP experience"
@@ -83,6 +83,13 @@ class Candidate:
     name: str
     aliases: set[str] = field(default_factory=set)
     sources: set[str] = field(default_factory=set)
+    allowed: set[str] = field(default_factory=set)  # aliases a person allowed: exempt from the everyday check
+
+    def absorb(self, other: "Candidate", *extra: str) -> None:
+        """Merge another candidate (and the extra terms) into this one, as aliases."""
+        self.aliases |= (other.aliases | set(extra)) - {self.name}
+        self.sources |= other.sources
+        self.allowed |= other.allowed
 
 
 @dataclass
@@ -227,6 +234,10 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
 
     # A person's corrections first, on the names as the sources give them: an automatic merge would
     # otherwise turn a name into another skill's alias before its drop or rename could apply.
+    for name, allowed in alias_allow.items():  # keyed by a source name: they travel with it through merges
+        if name in candidates:
+            candidates[name].aliases |= allowed
+            candidates[name].allowed |= allowed
     candidates = apply_overrides(candidates, rename, drop, report)
     candidates = merge_vendor_duplicates(candidates, report, survives, words)
     candidates = merge_plural_duplicates(candidates, report, survives)
@@ -253,7 +264,7 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
             """The aliases that pass every check; the same checks for a new entry and a merge. An alias a
             person allowed in import_overrides.yaml skips only the everyday-word check, never the collision
             checks: "tomcat" for apache tomcat is a reviewed synonym, even though "tomcat" is a word."""
-            allowed = alias_allow.get(final, set())
+            allowed = c.allowed | alias_allow.get(final, set())
             accepted = set()
             for alias in raw:
                 if alias == final or not keepable(alias):
@@ -268,7 +279,7 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
                     accepted.add(alias)
             return accepted
 
-        aliases = accept(c.aliases | alias_allow.get(final, set()))
+        aliases = accept(c.aliases | alias_allow.get(final, set()))  # also under the final name
         result[final] = Candidate(final, aliases, set(c.sources))
         used |= {final, *aliases}
     # The alias loop above can't see a later name, so drop any alias that became another skill's name.
@@ -300,9 +311,7 @@ def apply_overrides(candidates: dict[str, Candidate], rename: dict[str, str], dr
             continue
         if final != name:
             report.drop("renamed_by_override", f"{name} -> {final}")
-        target = result.setdefault(final, Candidate(final))
-        target.aliases |= (c.aliases | {name}) - {final}
-        target.sources |= c.sources
+        result.setdefault(final, Candidate(final)).absorb(c, name)
     return result
 
 
@@ -339,8 +348,7 @@ def merge_vendor_duplicates(candidates: dict[str, Candidate], report: Report, su
             continue
         source = merged.pop(vendored[0])
         target = merged[plain]
-        target.aliases |= (source.aliases | {vendored[0]}) - {plain}
-        target.sources |= source.sources
+        target.absorb(source, vendored[0])
         report.drop("merged_vendor_duplicate", f"{vendored[0]} -> {plain}")
     return merged
 
@@ -362,8 +370,7 @@ def merge_plural_duplicates(candidates: dict[str, Candidate], report: Report, su
             report.drop("plural_merge_skipped_singular_dropped", f"{name} -> {target}")
             continue
         source = merged.pop(name)
-        merged[target].aliases |= source.aliases | {name}
-        merged[target].sources |= source.sources
+        merged[target].absorb(source, name)
         report.drop("merged_plural_duplicate", f"{name} -> {target}")
     return merged
 

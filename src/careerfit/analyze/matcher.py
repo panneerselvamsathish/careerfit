@@ -214,12 +214,19 @@ def requirement_clauses(jd_text: str) -> Iterator[tuple[Level, int, str]]:
 
 
 def requirement_occurrences(jd_text: str, ontology: Mapping[str, SkillEntry]) -> dict[str, list[Occurrence]]:
-    """Every place the JD mentions each skill, as (level, line, detection result), in document order."""
+    """Every place the JD mentions each skill, as (level, line, detection result), in document order.
+
+    A skill named only inside another skill's name is part of that one, not a requirement of its
+    own: "SQL Server Integration Services" asks for SSIS, as "SSIS" does, not for SQL Server too.
+    Named on its own anywhere in the clause ("SQL Server and SSIS"), it is asked for."""
     index = index_of(ontology)
     found: dict[str, list[Occurrence]] = {}
     for level, line_no, clause in requirement_clauses(jd_text):
-        for name, result in scan_present(clause, ontology, index).items():
-            found.setdefault(name, []).append((level, line_no, result))
+        mentioned = index.find(clause)
+        own = {skill for _start, _end, skill in _split_spans(mentioned)[0]}
+        for name, result in _present(mentioned, ontology, index).items():
+            if name in own:
+                found.setdefault(name, []).append((level, line_no, result))
     return found
 
 
@@ -347,7 +354,8 @@ def requirement_alternatives(jd_text: str, ontology: Mapping[str, SkillEntry]) -
     for _line_no, sentence, _clauses in requirement_sentences(jd_text):
         mentioned = index.find(sentence)  # one pass serves both: what is mentioned, and the choices
         detected = set(_present(mentioned, ontology, index))
-        for name, others in _alternatives(sentence, mentioned):
+        own = len(_split_spans(mentioned)[0])  # nested mentions come last, and ask for nothing alone
+        for name, others in _alternatives(sentence, mentioned)[:own]:
             if name in detected:
                 found.setdefault(name, []).append(others)
     return found
