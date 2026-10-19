@@ -17,17 +17,16 @@ sources:
     path: /usr/share/dict/words
     sha256: be41ad97963bf8dabedd5871d5d691596175269d540956b0f9965a885c2bbab9
 counts:
-  alias_dropped_curated_collision: 3
-  alias_dropped_imported_collision: 1
+  alias_dropped_curated_collision: 4
   alias_dropped_two_vendors: 10
-  dropped_curated_collision: 29
+  dropped_curated_collision: 31
   dropped_esco_abstract: 12
   dropped_everyday_word: 138
   dropped_shape: 100
   esco_alias_not_reviewed: 2045
   esco_not_knowledge: 745
-  imported_aliases: 235
-  imported_skills: 1805
+  imported_aliases: 234
+  imported_skills: 1803
   merged_vendor_duplicate: 15
   onet_distinct_examples: 8753
   onet_not_in_scope: 7130
@@ -36,7 +35,6 @@ review:
   - 'ibm terraform: terraform'
   - 'oracle pl/sql: pl/sql'
   - 'oracle weblogic server: weblogic server'
-  alias_dropped_imported_collision:
   - 'rdms: relational database management system'
   alias_dropped_two_vendors:
   - 'adobe analytics: analytics'
@@ -96,6 +94,7 @@ review:
   - 'react native: react'
   - 'react redux: react'
   - 'redgate sql server: sql'
+  - 'relational database management: relational database'
   - 'rest assured: rest'
   - 'restful api: restful'
   - 'sentryone sql sentry: sql'
@@ -142,6 +141,8 @@ review:
   - oracle weblogic
   - postgresql
   - redis
+  - relational database
+  - relational database management system
   - saml
   - sql
   - vector database

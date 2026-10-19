@@ -5583,15 +5583,7 @@
   aliases: []
   ambiguous: false
   sources: [onet]
-"relational database":
-  aliases: ["oracle relational database"]
-  ambiguous: false
-  sources: [onet, esco]
 "relational database management":
-  aliases: []
-  ambiguous: false
-  sources: [onet]
-"relational database management system":
   aliases: []
   ambiguous: false
   sources: [onet]

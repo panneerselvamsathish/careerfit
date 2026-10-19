@@ -11,6 +11,7 @@ EXPECTED = {
     "kubernetes": (SkillStatus.GAP, "must"),
     "terraform": (SkillStatus.GAP, "must"),
     "postgresql": (SkillStatus.MATCHED, "must"),
+    "relational database": (SkillStatus.MATCHED, "must"),  # "PostgreSQL or another relational database": through PostgreSQL
     "rest": (SkillStatus.MATCHED, "must"),
     "go": (SkillStatus.UNRESOLVABLE, "nice"),
     "kafka": (SkillStatus.GAP, "nice"),

@@ -55,7 +55,7 @@ terraform:
 postgresql:
   aliases: ["postgres"]
   ambiguous: false
-  implies: [sql]
+  implies: [sql, relational database]
 
 sql:
   aliases: []
@@ -248,9 +248,18 @@ dynamodb:
 aurora:
   aliases: ["amazon aurora", "aurora rds", "aurora postgresql", "aurora mysql"]
   ambiguous: true
+  implies: [relational database]
 
 rds:
   aliases: ["amazon rds"]
+  ambiguous: false
+  implies: [relational database]
+
+# "PostgreSQL or another relational database": the JD asks for the kind of database, so each product
+# that is one by definition (postgresql, oracle database, aurora, rds) implies it.
+relational database:
+  aliases: ["relational databases", "rdbms", "relational database management system",
+            "relational database management systems"]
   ambiguous: false
 
 s3:
@@ -603,7 +612,7 @@ pl/sql:
 oracle database:
   aliases: ["oracle db", "oracle rdbms", "oracle 11g", "oracle 12c", "oracle 19c", "oracle 21c", "oracle 23ai"]
   ambiguous: false
-  implies: [sql]
+  implies: [sql, relational database]
 
 informix:
   aliases: ["ibm informix"]

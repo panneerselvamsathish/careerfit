@@ -175,6 +175,8 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     ("financial services", "Experience with insurance, financial services, or other regulated industries", "found"),
     ("regulatory compliance", "Familiarity with AI safety practices, evaluation frameworks, monitoring, and regulatory compliance", "found"),
     ("sox compliance", "AI governance, SOX controls, audit logging", "found"),
+    ("relational database", "PostgreSQL or another relational database", "found"),
+    ("relational database", "Experience with an RDBMS such as Oracle", "found"),
     ("sox compliance", "Originated and led a SOX compliance initiative", "found"),
     # bare "sox" also names an audio tool and a baseball team (Copilot review on #24)
     ("sox compliance", "Built speech preprocessing pipelines using SoX", "absent"),
@@ -211,6 +213,9 @@ def test_load_ontology_rejects_bad_implications(tmp_path):
 
 def test_implications_run_from_the_specific_skill_to_the_broad_one():
     assert set(SKILLS["pl/sql"].implies) == {"sql", "backend development"}
+    # each is a relational database by definition, so "or another relational database" is met by it
+    for product in ("postgresql", "oracle database", "aurora", "rds"):
+        assert "relational database" in SKILLS[product].implies, product
     assert set(SKILLS["fastapi"].implies) == {"python", "backend development"}
     assert SKILLS["sql"].implies == ()  # SQL alone does not show back-end development
     assert SKILLS["aws"].implies == ("cloud computing",)  # AWS and Azure are cloud platforms by definition
