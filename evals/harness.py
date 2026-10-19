@@ -42,6 +42,11 @@ def load_cases(golden_dir: Path = GOLDEN_DIR) -> list[dict]:
     return [yaml.safe_load(p.read_text(encoding="utf-8")) for p in sorted(golden_dir.glob("*.yaml"))]
 
 
+def case_documents(case: dict) -> tuple[str, str]:
+    """A golden case's resume and JD text, as careerfit reads them."""
+    return read_document(ROOT / case["resume"])[0], read_document(ROOT / case["jd"])[0]
+
+
 def case_facts(case: dict, ontology: dict[str, SkillEntry]):
     """The facts careerfit produces for one golden case's resume and JD."""
     resume_text, resume_coverage = read_document(ROOT / case["resume"])
@@ -87,6 +92,7 @@ def run_case(case: dict, ontology: dict[str, SkillEntry]) -> CaseResult:
         if skill not in expected and skill not in not_observed:
             result.failed.append(f"{skill}: reported but not labelled in the golden file")
 
+    resume_text, jd_text = case_documents(case)
     result.violations = invariants.check(facts) + invariants.check_evidence(facts, resume_text, jd_text, ontology)
     return result
 
