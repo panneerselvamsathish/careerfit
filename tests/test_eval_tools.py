@@ -1,6 +1,8 @@
 """evals/ontology_diff.py and evals/match_sample.py: label stubs never carry careerfit's verdict, and
 the precision sample covers only imported skills and scores honestly."""
 
+from fractions import Fraction
+
 from careerfit.analyze.ontology import Ontology, SkillEntry, load_default_ontology
 from evals import match_sample, ontology_diff
 from evals.harness import case_facts
@@ -99,7 +101,7 @@ def test_the_gate_weights_each_stratum_by_its_size():
     counts, unlabelled = match_sample.score(text)
     assert counts["all"] == (9, 10) and unlabelled == 0                 # 90% unweighted: would pass
     weighted = match_sample.weighted_precision(counts, match_sample.populations(text))
-    assert weighted == 0.9 * 0.5 + 0.1 * 1.0                            # 55%: fails
+    assert weighted == Fraction(9, 10) * Fraction(1, 2) + Fraction(1, 10)   # 55%: fails
     assert match_sample.weighted_precision(counts, {"onet · one word": 90}) is None   # a stratum without a size
     unsampled = {**match_sample.populations(text), "onet+esco · one word": 5}
     assert match_sample.weighted_precision(counts, unsampled) is None   # mentions, none labelled
@@ -113,3 +115,19 @@ def test_the_sheet_records_every_stratum_size(tmp_path):
     sheet = tmp_path / "sample.md"
     sheet.write_text(text.replace("label:", "label: yes"), encoding="utf-8")
     assert match_sample.main(["--score", str(sheet)]) == 1               # two strata not sampled at all
+
+
+def test_exactly_90_percent_passes_the_gate(tmp_path):
+    # Copilot review on #31: in floats, strata of 30 and 60 at 9/10 each summed to 0.8999999999999999,
+    # printed as 90% and failed.
+    lines = ["- population: onet · one word = 30", "- population: esco · one word = 60", ""]
+    for i in range(1, 21):
+        source = "onet" if i <= 10 else "esco"
+        lines += [f"## {i}. skill{i} · {source} · one word", "", "> line", "",
+                  f"label: {'no' if i in (1, 11) else 'yes'}", ""]
+    text = "\n".join(lines)
+    counts, _ = match_sample.score(text)
+    assert match_sample.weighted_precision(counts, match_sample.populations(text)) == match_sample.GATE
+    sheet = tmp_path / "sample.md"
+    sheet.write_text(text, encoding="utf-8")
+    assert match_sample.main(["--score", str(sheet)]) == 0

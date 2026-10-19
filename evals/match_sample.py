@@ -22,6 +22,7 @@ import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
+from fractions import Fraction
 from datetime import date
 from pathlib import Path
 
@@ -29,7 +30,7 @@ from careerfit.analyze.matcher import requirement_sentences
 from careerfit.analyze.ontology import Ontology, load_default_ontology
 from careerfit.ingest.document import read_document
 
-GATE = 0.90
+GATE = Fraction(9, 10)  # exact, so a sheet at exactly 90% passes
 SEED = 20261019
 _HEADER = re.compile(r"^## \d+\. (?P<skill>.+?) · (?P<source>[a-z+]+) · (?P<words>one word|several words)$")
 _LABEL = re.compile(r"^label:\s*(?P<label>[^\s#]*)\s*(#.*)?$", re.IGNORECASE)  # "label: yes  # checked" is fine
@@ -126,16 +127,19 @@ def populations(text: str) -> dict[str, int]:
     return {m["stratum"]: int(m["n"]) for line in text.splitlines() if (m := _POPULATION.match(line.strip()))}
 
 
-def weighted_precision(counts: dict[str, tuple[int, int]], population: dict[str, int]) -> float | None:
+def weighted_precision(counts: dict[str, tuple[int, int]], population: dict[str, int]) -> Fraction | None:
     """Each stratum's precision times its share of all the mentions. None when that can't be known:
-    a stratum with mentions but none labelled, or labels in a stratum the sheet gives no size for."""
+    a stratum with mentions but none labelled, or labels in a stratum the sheet gives no size for.
+
+    Exact: in floats, strata of 30 and 60 at 9/10 each sum to 0.8999999999999999 and fail the gate."""
     total = sum(population.values())
     strata = {k for k in counts if k != "all"}
     if not total or not strata <= set(population):
         return None
     if any(n and counts.get(key, (0, 0))[1] == 0 for key, n in population.items()):
         return None
-    return sum(n / total * counts[key][0] / counts[key][1] for key, n in population.items() if n)
+    return sum((Fraction(n * counts[key][0], total * counts[key][1]) for key, n in population.items() if n),
+               Fraction(0))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -155,9 +159,9 @@ def main(argv: list[str] | None = None) -> int:
             size = "" if key == "all" else f" of {population.get(key, '?')}"
             print(f"{key:<26} {yes}/{n}{size} = {yes / n:.0%}" if n else f"{key:<26} none labelled")
         weighted = weighted_precision(counts, population)
-        print(f"weighted by stratum size: {'unknown' if weighted is None else f'{weighted:.0%}'}")
+        print(f"weighted by stratum size: {'unknown' if weighted is None else f'{float(weighted):.0%}'}")
         passed = unlabelled == 0 and weighted is not None and weighted >= GATE
-        print(f"{unlabelled} unlabelled. Gate {GATE:.0%}: {'PASS' if passed else 'FAIL'}")
+        print(f"{unlabelled} unlabelled. Gate {float(GATE):.0%}: {'PASS' if passed else 'FAIL'}")
         return 0 if passed else 1
 
     if not args.jds:
