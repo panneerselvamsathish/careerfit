@@ -6,13 +6,18 @@ held_out: true
 resume: evals/golden/cases/data_engineer/resume.txt
 jd: evals/golden/cases/data_engineer/jd.txt
 labelled_by: claude, reviewed by sathish
-labelled_at: 2026-10-10
+labelled_at: 2026-10-19
+# data pipelines, s3 and amazon redshift added 2026-10-19 when the skill list grew (relational database curated, the O*NET/ESCO
+# import in PR #31): proposed by claude from the documents, confirmed by sathish.
 
 expected:
   python:    {status: matched,      requirement: must}   # duties and Requirements
   sql:       {status: matched,      requirement: must}
   kafka:     {status: gap,          requirement: must}   # owning Kafka topics is a core duty
   aws:       {status: matched,      requirement: must}
+  data pipelines: {status: matched, requirement: must}   # duty line 4; resume line 6 "batch pipelines ... load 4 TB a day"
+  s3:        {status: gap,          requirement: must}   # named under Requirements; the resume never says S3
+  amazon redshift: {status: matched, requirement: must}  # resume line 6 "into Redshift on AWS"
   docker:    {status: matched,      requirement: must}
   terraform: {status: gap,          requirement: nice}   # under "Preferred qualifications:"
   go:        {status: unresolvable, requirement: nice}   # "Experience with Go" could be the verb

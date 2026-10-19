@@ -6,12 +6,15 @@ held_out: false
 resume: fixtures/resume.txt
 jd: fixtures/jd.txt
 labelled_by: sathish
-labelled_at: 2026-10-14
+labelled_at: 2026-10-19
+# relational database added 2026-10-19 when the skill list grew (relational database curated, the O*NET/ESCO
+# import in PR #31): proposed by claude from the documents, confirmed by sathish.
 # First labelled 2026-10-10. backend development was added 2026-10-14 when the skill joined
 # skills.yaml (PR #15), and sathish confirmed it the same day: matched, must-have.
 
 expected:
   backend development: {status: matched, requirement: must}   # "Backend Engineer" title in both documents
+  relational database: {status: matched, requirement: must}   # "PostgreSQL or another relational database"; resume line 13 PostgreSQL
   python:     {status: matched,      requirement: must}
   aws:        {status: matched,      requirement: must}
   kubernetes: {status: gap,          requirement: must}

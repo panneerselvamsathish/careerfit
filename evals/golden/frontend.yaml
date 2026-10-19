@@ -6,9 +6,12 @@ held_out: true
 resume: evals/golden/cases/frontend/resume.txt
 jd: evals/golden/cases/frontend/jd.txt
 labelled_by: claude, reviewed by sathish
-labelled_at: 2026-10-10
+labelled_at: 2026-10-19
+# frontend development added 2026-10-19 when the skill list grew (relational database curated, the O*NET/ESCO
+# import in PR #31): proposed by claude from the documents, confirmed by sathish.
 
 expected:
+  frontend development: {status: matched, requirement: must}   # title in both documents; resume shows React.js work
   javascript: {status: matched, requirement: must}
   react:      {status: matched, requirement: must}   # "React.js" in both is an unambiguous alias
   rest:       {status: matched, requirement: must}   # JD "REST APIs", resume "RESTful"
