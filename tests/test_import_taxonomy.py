@@ -19,6 +19,8 @@ WORDS = {"word", "team", "cloud", "platform", "spark", "chef", "shiny", "switch"
 @pytest.mark.parametrize(("example", "name", "aliases"), [
     ("Learning management system LMS", "lms", {"learning management system"}),       # spelled out at the end
     ("Amazon Web Services AWS CloudFormation", "aws cloudformation", set()),          # spelled out in the middle
+    # Copilot review on #31: the alias keeps the qualifiers, never a bare "enterprise edition".
+    ("Oracle Java Enterprise Edition EE", "oracle java ee", {"oracle java enterprise edition"}),
     ("Adobe Experience Manager (AEM)", "adobe experience manager", {"aem"}),           # parenthetical acronym
     ("EpicCare Electronic Medical Records (EMR) software", "epiccare electronic medical records", {"emr"}),
     ("Database design software", "database design", set()),
@@ -47,6 +49,7 @@ def test_everyday_words_include_their_inflected_forms(token, expected):
     ("microsoft word", None),                     # would match "word" in any JD
     ("microsoft teams", None),                    # "teams" is "team", inflected
     ("google cloud platform", None),              # every word is everyday
+    ("sap erp", None),                            # a generic acronym names a kind of system, not SAP's
 ])
 def test_a_vendor_prefix_adds_the_rest_as_an_alias_only_if_it_is_distinctive(name, alias):
     assert importer.vendor_alias(name, WORDS) == alias
@@ -91,19 +94,32 @@ def test_overrides_keep_drop_and_allow():
     assert skills["spark"].aliases == {"apache spark engine"}
 
 
-def test_esco_aliases_need_o_net_to_agree_and_abstract_concepts_are_dropped():
+def test_esco_aliases_need_a_person_to_allow_them_and_abstract_concepts_are_dropped():
+    # Copilot review on #31: ESCO lists related technologies as alternative labels ("computer
+    # programming": Lua, AWK, PowerShell). Accepting them because O*NET has the term made distinct
+    # tools interchangeable and swallowed their own entries.
     esco = [
-        {"skillType": "knowledge", "preferredLabel": "Neo4j (graph database)", "altLabels": "neo4j graph | Neo Prog"},
+        {"skillType": "knowledge", "preferredLabel": "computer programming", "altLabels": "Lua | AWK | coding"},
+        {"skillType": "knowledge", "preferredLabel": "Neo4j (graph database)", "altLabels": "Neo4j graph"},
         {"skillType": "knowledge", "preferredLabel": "concepts of telecommunications", "altLabels": ""},
         {"skillType": "skill/competence", "preferredLabel": "use Neo4j", "altLabels": ""},
     ]
-    skills, report = _build([_row("Neo4j graph")], esco)
-    # O*NET names "neo4j graph" too: one tool, so the two merge under ESCO's name.
-    assert "neo4j graph" not in skills
-    assert (skills["neo4j"].aliases, skills["neo4j"].sources) == ({"neo4j graph"}, {"onet", "esco"})
-    assert "neo prog" not in {a for s in skills.values() for a in s.aliases}  # O*NET doesn't have it
+    skills, report = _build([_row("Lua"), _row("AWK"), _row("Neo4j")], esco)
+    assert skills["computer programming"].aliases == set()
+    assert {"lua", "awk"} <= set(skills)                                   # still their own skills
+    assert skills["neo4j"].sources == {"onet", "esco"}                     # same name: one skill
+    assert "computer programming: lua" in report.review["esco_alias_not_reviewed"]
     assert "concepts of telecommunications" not in skills
     assert report.counts["esco_not_knowledge"] == 1
+    allowed, _ = _build([_row("Neo4j")], esco, {"alias_allow": {"neo4j": ["neo4j graph"]}})
+    assert allowed["neo4j"].aliases == {"neo4j graph"}
+
+
+def test_a_rename_onto_an_existing_alias_does_not_crash_and_the_names_win():
+    # Copilot review on #31: renaming to another skill's alias raised KeyError.
+    skills, _ = _build([_row("Adobe Photoshop"), _row("OldPhotoshop")], overrides={"rename": {"oldphotoshop": "photoshop"}})
+    assert {"adobe photoshop", "photoshop"} <= set(skills)
+    assert "photoshop" not in skills["adobe photoshop"].aliases  # an alias never doubles as another skill's name
 
 
 def test_a_vendor_duplicate_merges_into_the_plain_name_unless_two_vendors_claim_it():

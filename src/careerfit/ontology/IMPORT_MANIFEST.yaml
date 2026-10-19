@@ -18,42 +18,26 @@ sources:
     sha256: be41ad97963bf8dabedd5871d5d691596175269d540956b0f9965a885c2bbab9
 counts:
   alias_dropped_curated_collision: 3
-  alias_dropped_everyday_word: 4
-  alias_dropped_imported_collision: 10
+  alias_dropped_imported_collision: 1
   alias_dropped_two_vendors: 10
-  dropped_curated_collision: 28
+  dropped_curated_collision: 29
   dropped_esco_abstract: 12
-  dropped_everyday_word: 128
+  dropped_everyday_word: 138
   dropped_shape: 100
-  esco_alias_rejected: 1979
+  esco_alias_not_reviewed: 2045
   esco_not_knowledge: 745
-  imported_aliases: 276
-  imported_skills: 1777
-  merged_esco_alias_onet_name: 44
-  merged_vendor_duplicate: 11
+  imported_aliases: 235
+  imported_skills: 1805
+  merged_vendor_duplicate: 15
   onet_distinct_examples: 8753
   onet_not_in_scope: 7130
 review:
   alias_dropped_curated_collision:
-  - 'database management systems: sql'
   - 'ibm terraform: terraform'
   - 'oracle pl/sql: pl/sql'
-  alias_dropped_everyday_word:
-  - 'computer programming: bash'
-  - 'electronic communication: email'
-  - 'sap data services: sap'
-  - 'tools for ict test automation: selenium'
+  - 'oracle weblogic server: weblogic server'
   alias_dropped_imported_collision:
-  - 'computer programming: actionscript'
-  - 'computer programming: coldfusion'
-  - 'microsoft dns server: dns server'
-  - 'microsoft powershell: powershell'
-  - 'optical character recognition software: ocr'
-  - 'oracle peoplesoft: peoplesoft'
   - 'rdms: relational database management system'
-  - 'search engine optimisation: search engine optimization'
-  - 'style sheet languages: cascading style sheets'
-  - 'style sheet languages: css'
   alias_dropped_two_vendors:
   - 'adobe analytics: analytics'
   - 'adobe director: director'
@@ -81,32 +65,37 @@ review:
   - 'event-driven state-machines programming: event-driven'
   - 'ext js: js'
   - 'ibm qradar siem: siem'
+  - 'ibm resource access control facility: access control'
   - 'ibm terraform: terraform'
   - 'information security strategy: information security'
   - 'java ee: java'
-  - 'java message service: java'
   - 'javascript framework: javascript'
   - 'javascript object notation json: javascript'
+  - 'jenkins ci: jenkins'
+  - 'micosoft sql server analysis services: sql'
   - 'microservices architecture: microservices'
   - 'microsoft azure data factory: azure, microsoft azure'
   - 'microsoft azure devops services: azure, devops, microsoft azure'
   - 'microsoft azure sentinel: azure, microsoft azure'
+  - 'microsoft sql server reporting services: sql'
   - 'microsoft sql server: sql'
   - 'node.js: js'
   - 'nortonlifelock cybersecurity: cybersecurity'
   - 'openai chatgpt: openai'
   - 'oracle java ee: java'
+  - 'oracle java enterprise edition: java'
+  - 'oracle java message service: java'
   - 'oracle pl/sql: pl/sql, sql'
   - 'oracle sql developer: sql'
   - 'oracle sql loader: sql'
   - 'oracle sql plus: sql'
+  - 'oracle weblogic server: oracle weblogic, weblogic, weblogic server'
   - 'qradar siem: siem'
   - 'qualys cloud platform: cloud platform'
   - 'quest sql optimizer for oracle: sql'
   - 'react native: react'
   - 'react redux: react'
   - 'redgate sql server: sql'
-  - 'resource access control facility: access control'
   - 'rest assured: rest'
   - 'restful api: restful'
   - 'sentryone sql sentry: sql'
@@ -115,9 +104,7 @@ review:
   - 'sql developer: sql'
   - 'sql loader: sql'
   - 'sql plus: sql'
-  - 'sql server analysis services: sql'
   - 'sql server integration services: sql'
-  - 'sql server reporting services: sql'
   - 'sql server: sql'
   - 'sun microsystems java persistence api: java'
   - 'sun microsystems java servlet api: java'
@@ -156,6 +143,7 @@ review:
   - postgresql
   - redis
   - saml
+  - sql
   - vector database
   dropped_esco_abstract:
   - blockchain applications security principles
@@ -173,6 +161,7 @@ review:
   dropped_everyday_word:
   - absorb
   - algae
+  - algorithmic
   - algorithms
   - android
   - angular
@@ -182,6 +171,7 @@ review:
   - assembly
   - attask
   - aws
+  - bash
   - basic
   - blackberry
   - blackboard
@@ -193,6 +183,7 @@ review:
   - chef
   - cisco
   - clipper
+  - cms
   - compilers
   - connectivity
   - cybernetics
@@ -206,6 +197,7 @@ review:
   - drupal
   - eclipse
   - electronics
+  - email
   - encryption
   - ethereal
   - filemaker
@@ -216,12 +208,15 @@ review:
   - frostbite
   - gams
   - gimp
+  - gis
+  - git
   - grails
   - graphics
   - groovy
   - honeypot
   - hyperspace
   - ice
+  - ide
   - ids
   - imps
   - inscribe
@@ -267,13 +262,16 @@ review:
   - sam
   - san
   - sand
+  - sap
   - sas
   - sass
   - scala
   - scheduling
   - scheme
+  - scm
   - scratch
   - seesaw
+  - selenium
   - sensors
   - shiny
   - simulation
@@ -400,12 +398,13 @@ review:
   - waikato environment for knowledge analysis weka
   - wise solutions wise for windows installer
   - xythos enterprise document management suite
-  esco_alias_rejected:
+  esco_alias_not_reviewed:
   - '3d body scanning technologies: 3d body scan'
   - '3d body scanning technologies: 3d body scan technologies'
   - '3d body scanning technologies: technologies for 3d body scanning'
   - '3d body scanning technologies: technologies for body scanning'
   - '3d modelling: 3d designing'
+  - '3d modelling: 3d graphics'
   - '3d modelling: 3d modeling'
   - '3d modelling: 3d rendering'
   - '3d modelling: 3d representation'
@@ -419,6 +418,7 @@ review:
   - 'abbyy finereader: abbyy finereader pdf software'
   - 'abbyy finereader: ocr software'
   - 'absorb: absorb'
+  - 'adobe creative suite: adobe creative cloud'
   - 'adobe illustrator: adobe illustrator cc'
   - 'adobe photoshop lightroom: adobe photoshop lightroom for 2d raster generation'
   - 'adobe photoshop lightroom: adobe photoshop lightroom for 2d raster graphics generation'
@@ -472,6 +472,7 @@ review:
   - 'alarm systems: office security alarm systems'
   - 'alarm systems: security alarm systems'
   - 'algorithms: algorithm'
+  - 'algorithms: algorithmic'
   - 'algorithms: formulae'
   - 'algorithms: formulas'
   - 'android: android'
@@ -481,6 +482,7 @@ review:
   - 'angular: programming paradigms in angular'
   - 'angular: testing in angular'
   - 'ansible: ansible automation tool'
+  - 'apache maven: maven'
   - 'apache tomcat: tomcat'
   - 'apl: apl programming paradigms'
   - 'application usability: software usability'
@@ -774,13 +776,20 @@ review:
   - 'computer history: computers history'
   - 'computer history: history of computers'
   - 'computer history: informatics history'
+  - 'computer programming: actionscript'
+  - 'computer programming: ada'
   - 'computer programming: algol'
   - 'computer programming: angularjs'
   - 'computer programming: applescript'
   - 'computer programming: aspectj'
+  - 'computer programming: awk'
+  - 'computer programming: bash'
   - 'computer programming: bcpl'
   - 'computer programming: biztalk'
+  - 'computer programming: c shell'
+  - 'computer programming: caml'
   - 'computer programming: ceylon'
+  - 'computer programming: coldfusion'
   - 'computer programming: comal'
   - 'computer programming: ct'
   - 'computer programming: curl'
@@ -794,11 +803,13 @@ review:
   - 'computer programming: gosu'
   - 'computer programming: hack'
   - 'computer programming: hypertalk'
+  - 'computer programming: idl'
   - 'computer programming: intercal'
   - 'computer programming: io'
   - 'computer programming: knockoutjs'
   - 'computer programming: korn-shell'
   - 'computer programming: labview'
+  - 'computer programming: lua'
   - 'computer programming: msvc++'
   - 'computer programming: object pascal'
   - 'computer programming: ocaml'
@@ -806,6 +817,7 @@ review:
   - 'computer programming: opencv'
   - 'computer programming: pl/i'
   - 'computer programming: postscript'
+  - 'computer programming: powershell'
   - 'computer programming: rebol'
   - 'computer programming: rexx'
   - 'computer programming: seed7'
@@ -832,9 +844,12 @@ review:
   - 'computer technology: technology in computing'
   - 'computer technology: technology of computers'
   - 'computer vision: cuda'
+  - 'computer vision: keras'
   - 'computer vision: matlab'
+  - 'computer vision: ocr'
   - 'computer vision: opencv'
   - 'computer vision: simplecv'
+  - 'computer vision: tensorflow'
   - 'computerised feeding systems: computer controlled feeding systems'
   - 'computerised feeding systems: computer controlled systems of feeding'
   - 'computerised feeding systems: computerized feeding systems'
@@ -880,6 +895,7 @@ review:
   - 'cryengine: cryengine'
   - 'cryptocurrency: crypto'
   - 'cryptocurrency: digital currency'
+  - 'css: cascading style sheets'
   - 'cutting technologies: cutting automation'
   - 'cutting technologies: cutting machinery'
   - 'cutting technologies: cutting mechanisation'
@@ -910,6 +926,7 @@ review:
   - 'data engineering: data engineering methods'
   - 'data extraction, transformation and loading tools: adeptia integration server'
   - 'data extraction, transformation and loading tools: centerprise data integrator'
+  - 'data extraction, transformation and loading tools: cloveretl'
   - 'data extraction, transformation and loading tools: cognos data manager'
   - 'data extraction, transformation and loading tools: data migrator'
   - 'data extraction, transformation and loading tools: elixir repertoire for data etl'
@@ -976,6 +993,7 @@ review:
   - 'database management systems: objectivity db'
   - 'database management systems: oracle 8i'
   - 'database management systems: oracle lite'
+  - 'database management systems: peoplesoft'
   - 'database management systems: pervasive.sql 2000'
   - 'database management systems: pervasive.sql workgroup'
   - 'database management systems: poet object server suite'
@@ -986,6 +1004,7 @@ review:
   - 'database management systems: r:base'
   - 'database management systems: raima database manager'
   - 'database management systems: rdb'
+  - 'database management systems: sql'
   - 'database management systems: sqlbase'
   - 'database management systems: supra'
   - 'database management systems: sybase'
@@ -1003,12 +1022,14 @@ review:
   - 'database quality standards: quality standard for databases'
   - 'database quality standards: quality standards for databases'
   - 'database: non-relational database'
+  - 'database: relational database'
   - 'database: types of databases'
   - 'db2: db2 connect'
   - 'db2: db2 database software'
   - 'db2: db2 for i'
   - 'db2: db2 for z/os'
   - 'db2: db2 on cloud'
+  - 'db2: ibm db2'
   - 'db2: ibm db2 database software'
   - 'decentralised identifiers: dids'
   - 'decentralized application frameworks: decentralized applications on blockchain infrastructure'
@@ -1098,11 +1119,14 @@ review:
   - 'distributed computing: cluster computing'
   - 'distributed computing: grid computing'
   - 'distributed computing: parallel computing'
+  - 'distributed directory information services: active directory'
   - 'distributed directory information services: directory service'
   - 'distributed directory information services: install directory services'
   - 'distributed ledger technologies consensus protocols: consensus protocols of distributed ledger technologies'
   - 'distributed ledger technologies vulnerabilities: security in distributed ledger technology'
   - 'distributed ledger technology: principles of distributed ledger technology'
+  - 'domain name service: dns'
+  - 'domain name service: dns server'
   - 'domotic systems: intelligent home systems'
   - 'domotic systems: residential intelligent building installations'
   - 'domotic systems: smart home systems'
@@ -1136,6 +1160,7 @@ review:
   - 'e-tailoring: online tailoring'
   - 'e-tailoring: remote tailoring'
   - 'eclipse: eclipse'
+  - 'eclipse: eclipse ide'
   - 'eclipse: knowledge of eclipse'
   - 'edmodo: edmodo e-learning platform'
   - 'edmodo: edmodo education platform'
@@ -1154,6 +1179,7 @@ review:
   - 'electronic communication: electronic conversation'
   - 'electronic communication: electronic information'
   - 'electronic communication: electronic mail services'
+  - 'electronic communication: email'
   - 'electronic communication: email services'
   - 'electronic locks: electric locking devices'
   - 'electronic locks: electronic lock'
@@ -1197,6 +1223,7 @@ review:
   - 'file-based workflow: file-based workflows'
   - 'filemaker: filemaker'
   - 'filemaker: filemaker go'
+  - 'filemaker: filemaker pro'
   - 'firmware: built-in software'
   - 'firmware: firmware program'
   - 'firmware: kinds of firmware'
@@ -1219,12 +1246,16 @@ review:
   - 'gdpr: general data protection regulation'
   - 'gdpr: knowledge of gdpr'
   - 'geographic information systems: geospatial technologies'
+  - 'geographic information systems: gis'
   - 'geographic information systems: global positioning systems'
+  - 'geographic information systems: gps'
   - 'geographic information systems: remote sensing'
   - 'geographic information systems: rs'
+  - 'gimp: gimp'
   - 'gimp: gimp for digital editing'
   - 'gimp: gimp for graphics composition'
   - 'gimp: gimp software'
+  - 'gimp: gnu image manipulation program'
   - 'global navigation satellite system performance parameters: global navigation satellite system'
   - 'global navigation satellite system performance parameters: gnss performance parameters'
   - 'global navigation satellite system performance parameters: performance criteria for global navigation satellite
@@ -1322,6 +1353,7 @@ review:
   - 'groovy: groovy programming language'
   - 'groovy: groovy software techniques'
   - 'grovo: grovo e-learning platform'
+  - 'hadoop: apache hadoop'
   - 'hardware architectures: pc hardware architecture'
   - 'hardware components: components for hardware systems'
   - 'hardware components: components of hardware'
@@ -1539,6 +1571,7 @@ review:
   - 'integrated development environment software: codelite'
   - 'integrated development environment software: dev-c++'
   - 'integrated development environment software: dialogblocks'
+  - 'integrated development environment software: ide'
   - 'integrated development environment software: mingw developer studio'
   - 'integrated development environment software: netbeans'
   - 'integrated development environment software: philasmicos entwickler studio'
@@ -1563,6 +1596,7 @@ review:
   - 'ios: iphone os'
   - 'ios: iphoneos'
   - 'iterative development: iterative development methodology'
+  - 'java: java'
   - 'java: java 2'
   - 'java: java 2 enterprise edition'
   - 'javascript: client-side javascript'
@@ -1572,6 +1606,7 @@ review:
   - 'javascript: mocha'
   - 'javascript: server-side javascript'
   - 'jenkins: jenkins'
+  - 'jenkins: jenkins ci'
   - 'jenkins: jenkins continuous integration server'
   - 'john the ripper: john the ripper'
   - 'joomla: joomla software'
@@ -1609,6 +1644,7 @@ review:
   - 'learning management systems: itworx clg'
   - 'learning management systems: joomlalms'
   - 'learning management systems: latitude learning llc'
+  - 'learning management systems: lms'
   - 'learning management systems: meridian knowledge solutions'
   - 'learning management systems: ning'
   - 'learning management systems: olat'
@@ -1824,6 +1860,7 @@ review:
   - 'network standards: network codes'
   - 'network standards: network guidelines'
   - 'network standards: network protocols'
+  - 'nexpose: rapid7 nexpose'
   - 'nosql: nosql database management system'
   - 'nosql: nosql non-relational database'
   - 'nosql: not only sql database management system'
@@ -1831,6 +1868,7 @@ review:
   - 'object-oriented modelling: knowledge of object-oriented modelling'
   - 'object-oriented modelling: object-oriented modeling'
   - 'object-oriented modelling: object-oriented paradigm'
+  - 'objective-c: objective c'
   - 'objectstore: ignite objectstore'
   - "objectstore: ignite\u2019s objectstore standard edition"
   - 'objectstore: objectstore standard edition'
@@ -1890,8 +1928,10 @@ review:
   - 'optical character recognition software: leadtools'
   - 'optical character recognition software: mathocr'
   - 'optical character recognition software: meocr'
+  - 'optical character recognition software: microsoft office document imaging'
   - 'optical character recognition software: microsoft office onenote 2007'
   - 'optical character recognition software: nicomsoft ocr sdk'
+  - 'optical character recognition software: ocr'
   - 'optical character recognition software: ocrad'
   - 'optical character recognition software: ocrfeeder'
   - 'optical character recognition software: ocropus'
@@ -1906,6 +1946,7 @@ review:
   - 'oracle relational database: oracle rdb'
   - 'oracle relational database: rdb'
   - 'oracle warehouse builder: owb'
+  - 'oracle weblogic: oracle weblogic server'
   - 'outsourcing model: obs'
   - 'owasp zap: owasp zed'
   - 'owasp zap: owasp zed attack proxy'
@@ -1914,6 +1955,7 @@ review:
   - 'particle animation: particle based animation'
   - 'particle animation: particle simulation software'
   - 'particle animation: particles movement simulation'
+  - 'pascal: pascal'
   - 'pay-per-click: cost-per-click'
   - 'pay-per-click: cpc'
   - 'pay-per-click: disseminate corporate information'
@@ -1930,7 +1972,9 @@ review:
   - 'penetration testing tool: hobgoblin'
   - 'penetration testing tool: i.c.u.mvs'
   - 'penetration testing tool: ip360 vulnerability management system'
+  - 'penetration testing tool: metasploit'
   - 'penetration testing tool: nfsbug'
+  - 'penetration testing tool: nmap'
   - 'penetration testing tool: ntcrack'
   - 'penetration testing tool: ntellect'
   - 'penetration testing tool: output of a penetration test'
@@ -1948,6 +1992,7 @@ review:
   - 'penetration testing tool: vam'
   - 'penetration testing tool: webinspect'
   - 'pentaho data integration: pdi'
+  - 'pentaho data integration: pentaho kettle'
   - 'perl: ponie'
   - 'perl: practical extraction and report language'
   - 'php: hypertext preprocessor'
@@ -2020,12 +2065,16 @@ review:
   - 'projection equipment: projection gear'
   - 'projection equipment: projection instruments'
   - 'projection equipment: projections equipment'
+  - 'prolog: prolog'
+  - 'property management software: pms'
   - 'property management software: property operations software'
   - 'property management software: real estate management software'
   - 'prototyping development: prototyping methodology'
   - 'proxy servers: nginx web server'
   - 'publishing strategy: publishing content'
   - 'publishing strategy: publishing content in output media'
+  - 'puppet: puppet'
+  - 'python: python'
   - 'python: python 3k'
   - 'qlikview expressor: qv expressor'
   - 'qlikview expressor: qve'
@@ -2102,11 +2151,14 @@ review:
   - 'roofing drones: typology of r.o.a.'
   - 'roofing drones: typology of remotely operated aircraft'
   - 'roofing drones: typology of roofing drones'
+  - 'ruby: ruby'
   - 'sakai: sakai project'
   - 'salt: salt'
   - 'samurai web testing framework: owasp samurai wtf'
   - 'samurai web testing framework: samuraiwtf'
+  - 'sap data services: sap'
   - 'sap data services: sap analytics cloud'
+  - 'sap r3: sap erp'
   - 'sap r3: sap erp 6.0: enhancement packages'
   - 'sap r3: sap r/1'
   - 'sap r3: sap r/2'
@@ -2131,6 +2183,7 @@ review:
   - 'screen reader: assistive technology for reading'
   - 'screen reader: text-to-speech software'
   - 'search engine optimisation: search engine marketing'
+  - 'search engine optimisation: search engine optimization'
   - 'search engine optimisation: search marketing'
   - 'search engine optimisation: sem'
   - 'search engines: google search'
@@ -2159,6 +2212,7 @@ review:
   - 'signal processing: dsp'
   - 'sketchbook pro: autodesk sketchbook pro'
   - 'sketchbook pro: sketchbook'
+  - 'smalltalk: smalltalk'
   - 'smalltalk: smalltalk programming system'
   - 'smart city features: advanced mobility functionalities creation for smart cities'
   - 'smart city features: advanced mobility functionalities for smart cities'
@@ -2210,6 +2264,8 @@ review:
   - 'speech recognition: speech identification'
   - 'spiral development: spiral development methodology'
   - 'sql server integration services: microsoft sql server integration services'
+  - 'sql server integration services: microsoft ssis'
+  - 'sql server integration services: ssis'
   - 'sql server: ms sql server'
   - 'sql: informix 4gl/sql'
   - 'sql: sequel'
@@ -2223,11 +2279,14 @@ review:
   - 'statistical analysis system software: statistical analysis system application'
   - 'statistical analysis system software: statistical analysis system operating system'
   - 'statistical analysis system software: statistical analysis system programme'
+  - 'style sheet languages: cascading style sheets'
+  - 'style sheet languages: css'
   - 'style sheet languages: document style semantics and specification language'
   - 'style sheet languages: extensible stylesheet language'
   - 'style sheet languages: formatted output specification instance'
   - 'style sheet languages: smil timesheets'
   - 'supercomputing: supercomputing techniques'
+  - 'swift: swift'
   - 'swift: swift algorithms'
   - 'swift: swift programming paradigms'
   - 'swift: swift software development principles'
@@ -2262,11 +2321,13 @@ review:
   - 'teradata database: teradata integrated data warehouse'
   - 'thc hydra: hydra'
   - 'thc hydra: hydra parallelized network login tool'
+  - 'tools for ict test automation: selenium'
   - 'tools for ict test automation: test automation tools'
   - 'tools for ict test automation: tools for test automation'
   - 'tools for software configuration management: bcfg2'
   - 'tools for software configuration management: cdist'
   - 'tools for software configuration management: cfengine'
+  - 'tools for software configuration management: git'
   - 'tools for software configuration management: isconf'
   - 'tools for software configuration management: local configuration system'
   - 'tools for software configuration management: nixos'
@@ -2276,6 +2337,7 @@ review:
   - 'tools for software configuration management: pikt'
   - 'tools for software configuration management: quattor'
   - 'tools for software configuration management: radmind'
+  - 'tools for software configuration management: revision control'
   - 'tools for software configuration management: rudder'
   - 'tools for software configuration management: rundeck'
   - 'tools for software configuration management: smartfrog'
@@ -2307,6 +2369,8 @@ review:
   - 'triplestore: rdf store'
   - 'typescript: typescript programming language'
   - 'unified modelling language: standard modelling language'
+  - 'unified modelling language: uml'
+  - 'unified modelling language: unified modeling language'
   - 'unity: unity'
   - 'unity: unity 4'
   - 'unity: unity 5'

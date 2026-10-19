@@ -29,8 +29,9 @@ The rules, in the order they run:
    Modern everyday words the 1934 word list lacks ("database", "workflow") count too.
    An ESCO name about knowledge of a topic ("concepts of telecommunications", "levels of software
    testing") is dropped too: a JD never names it as a tool.
-5. ESCO alternative labels are noisy ("Py3K", "monitor product data"), so one becomes an alias only
-   if O*NET has the same term, or import_overrides.yaml allows it.
+5. ESCO alternative labels mix synonyms with related technologies ("computer programming" lists
+   Lua, AWK and PowerShell; "computer vision" lists Keras), so none becomes an alias unless
+   import_overrides.yaml allows it. An ESCO skill merges with an O*NET one only under the same name.
 6. Anything already in skills.yaml (name or alias, any case) is not imported: a colliding name drops
    the skill, a colliding alias drops the alias. The hand-written list always wins.
 """
@@ -67,7 +68,9 @@ MODERN_EVERYDAY = frozenset("""
     ecommerce email encryption firewall firmware freeware groupware internet intranet laptop malware
     middleware multimedia online podcast smartphone software spreadsheet spyware webinar webmail website
     wiki wifi workflow workstation
-""".split())
+""".split()) | frozenset("""
+    api crm cms dms edw erp gis hcm hris iam ide jdbc mdm odbc plm scm sdk sso tim
+""".split())  # generic acronyms (and a first name): "sap erp" must not match every "ERP experience"
 # ESCO names that describe knowledge about a topic, not a tool or technology a JD would name.
 _ABSTRACT = re.compile(r"(concepts|principles|levels|types|methods|techniques|fundamentals|characteristics|"
                        r"features|functionalities|aspects|theory|theories) (of|for|in)\b|"
@@ -133,8 +136,8 @@ def clean_onet(example: str) -> tuple[str, set[str]]:
         # what job descriptions write. At the end, the spelled-out phrase is the skill too, so an alias.
         n = len(word)
         if i >= n and _ACRONYM.fullmatch(word) and "".join(w[0] for w in words[i - n:i]).upper() == word:
-            if i == len(words) - 1:
-                aliases.add(_norm(" ".join(words[i - n:i])))
+            if i == len(words) - 1:  # the whole phrase, qualifiers included: "oracle java enterprise edition"
+                aliases.add(_norm(" ".join(words[:i])))
             words = words[:i - n] + words[i:]
             break
     return _norm(" ".join(words)), aliases
@@ -192,7 +195,6 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
             aliases.add(alias)
         candidates.setdefault(name, Candidate(name)).aliases.update(aliases)
         candidates[name].sources.add("onet")
-    onet_terms = {t for c in candidates.values() for t in (c.name, *c.aliases)}
 
     for row in esco_rows:
         if row.get("skillType") != "knowledge":
@@ -203,19 +205,14 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
             report.drop("dropped_esco_abstract", name)
             continue
         labels = {clean_esco(a) for a in re.split(r"\n| \| ", row.get("altLabels") or "") if a.strip()}
-        accepted = {a for a in labels if (a in onet_terms and len(a.split()) <= 4) or a in alias_allow.get(name, set())}
+        # ESCO's alternative labels mix synonyms with related technologies ("computer programming" lists
+        # Lua, AWK and PowerShell), so none is an alias until a person allows it in import_overrides.yaml.
+        accepted = labels & alias_allow.get(name, set())
         for rejected in sorted(labels - accepted):
-            report.drop("esco_alias_rejected", f"{name}: {rejected}")
-        target = candidates.setdefault(name, Candidate(name))
+            report.drop("esco_alias_not_reviewed", f"{name}: {rejected}")
+        target = candidates.setdefault(name, Candidate(name))  # the same name as an O*NET skill: one skill
         target.sources.add("esco")
-        for alias in sorted(accepted):
-            # ESCO's alias is an O*NET skill's own name: one tool under two names, so merge them.
-            if alias != name and alias in candidates:
-                same = candidates.pop(alias)
-                target.aliases |= same.aliases
-                target.sources |= same.sources
-                report.counts["merged_esco_alias_onet_name"] += 1
-            target.aliases.add(alias)
+        target.aliases |= accepted
 
     candidates = merge_vendor_duplicates(candidates, report)
     result: dict[str, Candidate] = {}
@@ -235,7 +232,7 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
         if final in taken:
             report.drop("dropped_curated_collision", final)
             continue
-        if final in used:
+        if final in result:  # a rename onto another skill's name; an alias clash is cleared below
             report.counts["merged_same_name"] += 1
             result[final].aliases |= c.aliases
             result[final].sources |= c.sources
