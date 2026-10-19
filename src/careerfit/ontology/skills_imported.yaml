@@ -239,14 +239,6 @@
   aliases: []
   ambiguous: false
   sources: [onet]
-"agile development":
-  aliases: []
-  ambiguous: false
-  sources: [esco]
-"agile project management":
-  aliases: []
-  ambiguous: false
-  sources: [esco]
 "agronomic modeling":
   aliases: []
   ambiguous: false
@@ -333,10 +325,6 @@
   sources: [onet]
 "amazon redshift":
   aliases: ["redshift"]
-  ambiguous: false
-  sources: [onet]
-"amazon simple storage service s3":
-  aliases: ["simple storage service s3"]
   ambiguous: false
   sources: [onet]
 "amkai amkaicharts":
@@ -3459,10 +3447,6 @@
   aliases: []
   ambiguous: false
   sources: [onet]
-"javascript framework":
-  aliases: []
-  ambiguous: false
-  sources: [onet, esco]
 "javascript object notation json":
   aliases: []
   ambiguous: false
@@ -3472,10 +3456,6 @@
   ambiguous: false
   sources: [onet]
 "jekyll":
-  aliases: []
-  ambiguous: false
-  sources: [onet]
-"jenkins ci":
   aliases: []
   ambiguous: false
   sources: [onet]
@@ -3967,10 +3947,6 @@
   aliases: []
   ambiguous: false
   sources: [esco]
-"microservices architecture":
-  aliases: []
-  ambiguous: false
-  sources: [onet]
 "microsoft .net framework":
   aliases: [".net framework"]
   ambiguous: false
@@ -5583,10 +5559,6 @@
   aliases: []
   ambiguous: false
   sources: [onet]
-"relational database management":
-  aliases: []
-  ambiguous: false
-  sources: [onet]
 "remote access":
   aliases: []
   ambiguous: false
@@ -5624,10 +5596,6 @@
   ambiguous: false
   sources: [onet]
 "rest assured":
-  aliases: []
-  ambiguous: false
-  sources: [onet]
-"restful api":
   aliases: []
   ambiguous: false
   sources: [onet]
@@ -5995,10 +5963,6 @@
   aliases: []
   ambiguous: false
   sources: [onet]
-"single sign-on sso":
-  aliases: []
-  ambiguous: false
-  sources: [onet]
 "sisense prism":
   aliases: []
   ambiguous: false
@@ -6348,10 +6312,6 @@
   ambiguous: false
   sources: [esco]
 "stylite egroupware":
-  aliases: []
-  ambiguous: false
-  sources: [onet]
-"sun microsystems java":
   aliases: []
   ambiguous: false
   sources: [onet]
@@ -6979,10 +6939,6 @@
   aliases: []
   ambiguous: false
   sources: [onet]
-"waterfall development":
-  aliases: []
-  ambiguous: false
-  sources: [esco]
 "watir":
   aliases: []
   ambiguous: false

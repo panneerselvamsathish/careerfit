@@ -326,3 +326,32 @@ def test_a_skill_right_after_non_is_not_a_mention(text, expected):
 def test_non_negates_markers_too():
     from careerfit.analyze.matcher import has_must_marker
     assert has_must_marker("Kubernetes is required") and not has_must_marker("a non-required extra")
+
+
+def test_non_relational_in_either_document_is_no_relational_database():
+    # Copilot review on #31: both documents, singular and plural.
+    from datetime import datetime
+    from careerfit.analyze.observations import build_observations
+    from careerfit.facts.schema import Coverage, SkillStatus
+    coverage = Coverage(source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=1,
+                        known_blind_spots=())
+    def observed(resume, jd):
+        return {o.skill: o.status for o in build_observations(resume, coverage, jd, SKILLS, datetime(2026, 10, 19))}
+    assert "relational database" not in observed("MongoDB", "Requirements:\n- Experience with non-relational databases")
+    assert "relational database" not in observed("MongoDB", "Requirements:\n- A non-relational database background")
+    assert observed("Designed non-relational database schemas", "Requirements:\n- Relational database design")[
+        "relational database"] == SkillStatus.GAP
+    assert observed("Tuned non-relational databases", "Requirements:\n- Relational databases")[
+        "relational database"] == SkillStatus.GAP
+
+
+def test_a_negated_compound_still_masks_the_skill_inside_it():
+    # Copilot review on #31: "non-PL/SQL" names no PL/SQL, and its "SQL" must not count as SQL either.
+    from datetime import datetime
+    from careerfit.analyze.observations import build_observations
+    from careerfit.facts.schema import Coverage, SkillStatus
+    coverage = Coverage(source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=1,
+                        known_blind_spots=())
+    result = {o.skill: o.status for o in build_observations("Built non-PL/SQL tooling", coverage,
+                                                            "Requirements:\n- SQL", SKILLS, datetime(2026, 10, 19))}
+    assert result["sql"] == SkillStatus.GAP

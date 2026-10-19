@@ -8,6 +8,21 @@
 # alias_allow: extra aliases for an imported skill that the rules would reject: {skill: [aliases]}.
 
 keep: []
-drop: []
+# Reviewed 2026-10-19 (Copilot review on #31, confirmed by sathish): imported names that are a curated skill
+# in other words. As their own skills, a JD saying "Jenkins CI" would also demand "jenkins ci", and a
+# resume saying "Jenkins" would get a false gap. "javascript framework" is generic, not a tool.
+drop:
+  - agile development
+  - agile project management
+  - amazon simple storage service s3
+  - javascript framework
+  - jenkins ci
+  - microservices architecture
+  - relational database management
+  - restful api
+  - simple storage service s3
+  - single sign-on sso
+  - sun microsystems java
+  - waterfall development
 rename: {}
 alias_allow: {}

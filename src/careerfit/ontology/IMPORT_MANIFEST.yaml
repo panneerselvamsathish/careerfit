@@ -19,6 +19,7 @@ sources:
 counts:
   alias_dropped_curated_collision: 1
   alias_dropped_two_vendors: 10
+  dropped_by_override: 11
   dropped_curated_collision: 31
   dropped_curated_vendor_form: 6
   dropped_esco_abstract: 12
@@ -26,8 +27,8 @@ counts:
   dropped_shape: 100
   esco_alias_not_reviewed: 2045
   esco_not_knowledge: 745
-  imported_aliases: 234
-  imported_skills: 1803
+  imported_aliases: 233
+  imported_skills: 1792
   merged_vendor_duplicate: 9
   onet_distinct_examples: 8753
   onet_not_in_scope: 7130
@@ -48,9 +49,6 @@ review:
   - 'teradata database: database'
   contains_a_curated_term:
   - 'adeptia etl suite: etl'
-  - 'agile development: agile'
-  - 'agile project management: agile'
-  - 'amazon simple storage service s3: s3'
   - 'aurora helioscope: aurora'
   - 'azure devops services: azure, devops'
   - 'backbone.js: js'
@@ -64,11 +62,8 @@ review:
   - 'ibm resource access control facility: access control'
   - 'information security strategy: information security'
   - 'java ee: java'
-  - 'javascript framework: javascript'
   - 'javascript object notation json: javascript'
-  - 'jenkins ci: jenkins'
   - 'micosoft sql server analysis services: sql'
-  - 'microservices architecture: microservices'
   - 'microsoft azure data factory: azure, microsoft azure'
   - 'microsoft azure devops services: azure, devops, microsoft azure'
   - 'microsoft azure sentinel: azure, microsoft azure'
@@ -89,12 +84,8 @@ review:
   - 'react native: react'
   - 'react redux: react'
   - 'redgate sql server: sql'
-  - 'relational database management: relational database'
   - 'rest assured: rest'
-  - 'restful api: restful'
   - 'sentryone sql sentry: sql'
-  - 'simple storage service s3: s3'
-  - 'single sign-on sso: single sign-on, sso'
   - 'sql developer: sql'
   - 'sql loader: sql'
   - 'sql plus: sql'
@@ -102,13 +93,23 @@ review:
   - 'sql server: sql'
   - 'sun microsystems java persistence api: java'
   - 'sun microsystems java servlet api: java'
-  - 'sun microsystems java: java'
   - 'transact-sql: sql'
   - 'vue.js: js'
-  - 'waterfall development: waterfall'
   - 'websense data loss prevention: data loss prevention'
   - 'xerces2 java parser: java'
   - 'yourkit java profiler: java'
+  dropped_by_override:
+  - agile development
+  - agile project management
+  - amazon simple storage service s3
+  - javascript framework
+  - jenkins ci
+  - microservices architecture
+  - relational database management
+  - restful api
+  - single sign-on sso
+  - sun microsystems java
+  - waterfall development
   dropped_curated_collision:
   - amazon dynamodb
   - amazon ecs

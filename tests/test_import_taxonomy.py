@@ -206,3 +206,18 @@ def test_a_vendor_form_is_kept_when_its_plain_name_would_be_dropped():
     assert report.counts["vendor_merge_skipped_plain_dropped"] == 1
     kept, _ = _build([_row("Apache Spark")], esco, {"keep": ["spark"]})   # unless overrides keep "spark"
     assert "spark" in kept and "apache spark" in kept["spark"].aliases
+
+
+def test_an_allowed_alias_skips_only_the_everyday_word_check():
+    # Copilot review on #31: alias_allow couldn't restore a reviewed synonym that is a word ("tomcat").
+    words = WORDS | {"tomcat"}                                         # "tomcat" is an everyday word here
+    rows, overrides = [_row("Apache Tomcat")], {"alias_allow": {"apache tomcat": ["tomcat", "k8s"]}}
+    plain, _ = importer.build(rows, [], CURATED, words, {})
+    assert plain["apache tomcat"].aliases == set()                     # without the override: rejected
+    skills, _ = importer.build(rows, [], CURATED, words, overrides)
+    assert skills["apache tomcat"].aliases == {"tomcat"}   # k8s is curated: the collision check still applies
+
+
+def test_the_committed_import_has_no_reviewed_duplicate_of_a_curated_skill():
+    for name in ("jenkins ci", "restful api", "amazon simple storage service s3", "agile development"):
+        assert name not in IMPORTED, name

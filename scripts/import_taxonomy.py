@@ -250,7 +250,10 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
             report.drop("dropped_curated_vendor_form", f"{final}: {rest}")
             continue
         def accept(raw: set[str]) -> set[str]:
-            """The aliases that pass every check; the same checks for a new entry and a merge."""
+            """The aliases that pass every check; the same checks for a new entry and a merge. An alias a
+            person allowed in import_overrides.yaml skips only the everyday-word check, never the collision
+            checks: "tomcat" for apache tomcat is a reviewed synonym, even though "tomcat" is a word."""
+            allowed = alias_allow.get(final, set())
             accepted = set()
             for alias in raw:
                 if alias == final or not keepable(alias):
@@ -259,7 +262,7 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
                     report.drop("alias_dropped_curated_collision", f"{final}: {alias}")
                 elif alias in used or alias in candidates:
                     report.drop("alias_dropped_imported_collision", f"{final}: {alias}")
-                elif len(alias.split()) == 1 and everyday(alias, words):
+                elif len(alias.split()) == 1 and everyday(alias, words) and alias not in allowed:
                     report.drop("alias_dropped_everyday_word", f"{final}: {alias}")
                 else:
                     accepted.add(alias)
@@ -267,7 +270,7 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
 
         if final in result:  # a rename onto another skill's name: merge, with the same alias checks
             report.counts["merged_same_name"] += 1
-            aliases = accept(c.aliases)
+            aliases = accept(c.aliases | alias_allow.get(final, set()))
             result[final].aliases |= aliases
             result[final].sources |= c.sources
             used |= aliases

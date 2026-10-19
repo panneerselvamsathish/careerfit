@@ -19,6 +19,13 @@ def mention_pattern(term: str) -> re.Pattern[str]:
     return re.compile(rf'(?<!\w)(?<!\w\.)(?<!(?<!\w)non-){re.escape(term)}(?!\w)(?!\.\w)', re.IGNORECASE)
 
 
+@lru_cache(maxsize=1024)
+def boundary_pattern(term: str) -> re.Pattern[str]:
+    """The term on word boundaries only, without the "non-" rule: for masking a compound's text
+    ("non-PL/SQL" still hides its "SQL"), never for deciding whether a skill is mentioned."""
+    return re.compile(rf'(?<!\w)(?<!\w\.){re.escape(term)}(?!\w)(?!\.\w)', re.IGNORECASE)
+
+
 def mentions(term: str, text: str) -> bool:
     # Unicode dashes read as "-" here too, so a marker like "nice-to-have" typed with non-breaking
     # hyphens is found by every caller, not only by requirement_sentences.

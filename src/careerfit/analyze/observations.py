@@ -2,7 +2,7 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Literal
 
-from careerfit.analyze.matcher import (decide_status, detect, first_mention_line, mention_pattern,
+from careerfit.analyze.matcher import (boundary_pattern, decide_status, detect, first_mention_line,
                                       requirement_alternatives, requirement_evidence)
 from careerfit.analyze.mentions import dashes_as_hyphens
 from careerfit.analyze.ontology import SkillEntry, implied_by_of
@@ -92,7 +92,8 @@ def without_implying_mentions(name: str, ontology: Mapping[str, SkillEntry], tex
     for other in implied_by_of(ontology).get(name, ()):
         entry = ontology[other]
         for term in (*entry.aliases, other):
-            text = mention_pattern(term).sub(lambda m: " " * len(m.group()), text)
+            # Boundaries only: "non-PL/SQL" names no PL/SQL, but its "SQL" is still part of the compound.
+            text = boundary_pattern(term).sub(lambda m: " " * len(m.group()), text)
     return text
 
 
