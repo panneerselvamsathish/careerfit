@@ -152,6 +152,35 @@ everyday-meaning words stay ambiguous. Keep real JDs out of the repo (`scratch/`
 unless they are labelled held-out cases in `evals/golden/`. A JD used to grow the list can't also
 measure it.
 
+#### Imported technology skills
+
+Next to the hand-written list, `skills_imported.yaml` holds technology skills generated from two open
+datasets (O*NET® 31.0 and ESCO v1.2.1; see [Data sources](#data-sources)). The hand-written list
+always wins: an imported entry whose name or alias is already in `skills.yaml` is ignored. The
+import runs offline, never in CI, from downloads kept in gitignored folders:
+
+```bash
+uv run python scripts/import_taxonomy.py --download --esco "scratch/ESCO dataset - v1.2.1 - classification - en - csv"
+```
+
+Never edit the generated file. Put corrections (an everyday word that really is a tool, a wrong
+name, an ESCO alias you checked is a true synonym) in `src/careerfit/ontology/import_overrides.yaml`
+and regenerate. `IMPORT_MANIFEST.yaml` records what every rule kept and dropped, for review.
+`careerfit --no-imported` runs with the hand-written list only.
+
+After the list changes, two tools keep the evals honest:
+
+```bash
+uv run python -m evals.ontology_diff                                     # golden cases' new, unlabelled skills
+uv run python -m evals.match_sample path/to/*.txt --out scratch/match_sample.md
+uv run python -m evals.match_sample --score scratch/match_sample.md      # precision of imported matches
+```
+
+`ontology_diff` prints label stubs with the lines careerfit cited, and leaves the status as `?`:
+golden cases are labelled from the documents, never copied from careerfit's output.
+`match_sample` draws a seeded sample of imported-skill mentions for a person to mark yes or no;
+an import merges only at 90% precision or more.
+
 ### Checking quality: the evals
 
 ```bash
