@@ -24,5 +24,12 @@ drop:
   - single sign-on sso
   - sun microsystems java
   - waterfall development
-rename: {}
+# Proposed 2026-10-19 by claude after the Copilot review on #31, not yet confirmed by sathish: one tool
+# under two names. As two skills, a JD asking for "SQL Server Integration Services (SSIS)" demanded
+# both, and a resume saying "SSIS" got a false gap. Active Directory and Visual Basic are products
+# whose vendor-free names are everyday words, so the automatic vendor merge leaves them apart.
+rename:
+  microsoft active directory: active directory
+  microsoft ssis: sql server integration services
+  microsoft visual basic: visual basic
 alias_allow: {}

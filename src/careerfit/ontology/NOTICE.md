@@ -39,5 +39,8 @@ This service uses the ESCO classification of the European Commission.
   already in careerfit's hand-written list.
 - **Merges.** One tool under two names becomes one skill ("hadoop" and "Apache Hadoop"; an ESCO
   label that O*NET names too; a plural of several words and its singular, "learning management
-  systems" and "LMS").
+  systems" and "LMS"). A vendor's product stays apart from the discipline its other words name
+  ("SAP Business Intelligence" is not "business intelligence") unless a person merged them.
+- **Corrections** in `import_overrides.yaml` (drops, renames, allowed aliases) apply to the names
+  as the sources give them, before any automatic merge.
 - **Aliases from ESCO** are kept only when a person allowed them in `import_overrides.yaml`.

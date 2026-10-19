@@ -222,20 +222,19 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
 
     def survives(name: str) -> bool:
         """Whether a name would pass the drop rules below (used before merging a vendor form into it)."""
-        name = rename.get(name, name)
-        return (keepable(name) and name not in drop and name not in taken
+        return (keepable(name) and name not in taken
                 and not (len(name.split()) == 1 and everyday(name, words) and name not in keep_words))
 
-    candidates = merge_vendor_duplicates(candidates, report, survives)
+    # A person's corrections first, on the names as the sources give them: an automatic merge would
+    # otherwise turn a name into another skill's alias before its drop or rename could apply.
+    candidates = apply_overrides(candidates, rename, drop, report)
+    candidates = merge_vendor_duplicates(candidates, report, survives, words)
     candidates = merge_plural_duplicates(candidates, report, survives)
     result: dict[str, Candidate] = {}
     used: set[str] = set()
     for name in sorted(candidates):
         c = candidates[name]
-        final = rename.get(name, name)
-        if final in drop:
-            report.drop("dropped_by_override", final)
-            continue
+        final = name
         if not keepable(final):
             report.drop("dropped_shape", final)
             continue
@@ -261,7 +260,7 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
                     continue
                 if alias in taken:
                     report.drop("alias_dropped_curated_collision", f"{final}: {alias}")
-                elif alias in used or (alias in candidates and alias != name):  # its own old name is fine
+                elif alias in used:  # one taken by another skill already; names are settled after the loop
                     report.drop("alias_dropped_imported_collision", f"{final}: {alias}")
                 elif len(alias.split()) == 1 and everyday(alias, words) and alias not in allowed:
                     report.drop("alias_dropped_everyday_word", f"{final}: {alias}")
@@ -269,15 +268,7 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
                     accepted.add(alias)
             return accepted
 
-        if final in result:  # a rename onto another skill's name: merge, with the same alias checks
-            report.counts["merged_same_name"] += 1
-            # A rename is a reviewed synonym, so the original name stays findable as an alias.
-            aliases = accept(c.aliases | alias_allow.get(final, set()) | ({name} - {final}))
-            result[final].aliases |= aliases
-            result[final].sources |= c.sources
-            used |= aliases
-            continue
-        aliases = accept(c.aliases | alias_allow.get(final, set()) | ({name} - {final}))
+        aliases = accept(c.aliases | alias_allow.get(final, set()))
         result[final] = Candidate(final, aliases, set(c.sources))
         used |= {final, *aliases}
     # The alias loop above can't see a later name, so drop any alias that became another skill's name.
@@ -296,10 +287,33 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
     return result, report
 
 
-def merge_vendor_duplicates(candidates: dict[str, Candidate], report: Report, survives) -> dict[str, Candidate]:
+def apply_overrides(candidates: dict[str, Candidate], rename: dict[str, str], drop: set[str],
+                    report: Report) -> dict[str, Candidate]:
+    """Drops and renames from import_overrides.yaml. A rename is a reviewed synonym, so the old name
+    stays findable as an alias; a rename onto another skill's name merges the two."""
+    result: dict[str, Candidate] = {}
+    for name in sorted(candidates):
+        c = candidates[name]
+        final = rename.get(name, name)
+        if name in drop or final in drop:
+            report.drop("dropped_by_override", name)
+            continue
+        if final != name:
+            report.drop("renamed_by_override", f"{name} -> {final}")
+        target = result.setdefault(final, Candidate(final))
+        target.aliases |= (c.aliases | {name}) - {final}
+        target.sources |= c.sources
+    return result
+
+
+def merge_vendor_duplicates(candidates: dict[str, Candidate], report: Report, survives,
+                            words: set[str]) -> dict[str, Candidate]:
     """"apache hadoop" (O*NET) and "hadoop" (ESCO) are one tool: merge into the vendor-free name, with
     the vendor name as an alias. Only when one vendor alone maps to that name: "apple ios" and
-    "cisco ios" are different products, so neither may claim "ios", and both keep their full names."""
+    "cisco ios" are different products, so neither may claim "ios", and both keep their full names.
+    And only when the vendor-free name is distinctive: "sap business intelligence" is SAP's product,
+    "business intelligence" the discipline, so a resume naming the discipline must not meet a JD
+    asking for the product."""
     claims: dict[str, list[str]] = defaultdict(list)
     for name, c in candidates.items():
         for vendor in VENDORS:
@@ -320,11 +334,14 @@ def merge_vendor_duplicates(candidates: dict[str, Candidate], report: Report, su
             # both would be lost. The vendor form stays its own skill instead.
             report.counts["vendor_merge_skipped_plain_dropped"] += 1
             continue
+        if len(plain.split()) > 1 and all(everyday(token, words) for token in plain.split()):
+            report.drop("vendor_merge_skipped_generic_plain", f"{vendored[0]} -> {plain}")
+            continue
         source = merged.pop(vendored[0])
         target = merged[plain]
         target.aliases |= (source.aliases | {vendored[0]}) - {plain}
         target.sources |= source.sources
-        report.counts["merged_vendor_duplicate"] += 1
+        report.drop("merged_vendor_duplicate", f"{vendored[0]} -> {plain}")
     return merged
 
 

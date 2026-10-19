@@ -186,7 +186,9 @@ def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> di
 # Anthropic API"); any other word ("Python or equivalent and Kubernetes", "... on Kubernetes")
 # keeps the two separate requirements, and so does anything else between two skills.
 # The comma is grouped with its own spaces, so no run of spaces can be split two ways (backtracking).
-_OR_JOIN = re.compile(r"\s*(,\s*)?(and/)?or\s+((a|an|the|applied|modern|similar|comparable|related)\s+){0,2}",
+# Updated with the product (Copilot review on #31, "MySQL or another relational database"): which
+# words may join alternatives is not the index's business, so the oracle follows it.
+_OR_JOIN = re.compile(r"\s*(,\s*)?(and/)?or\s+((a|an|the|another|other|any|applied|modern|similar|comparable|related)\s+){0,2}",
                       re.IGNORECASE)
 _COMMA_JOIN = re.compile(r"\s*,\s*")
 MAX_JOIN = 60  # characters: a longer stretch between two skills is never a plain "or" or comma

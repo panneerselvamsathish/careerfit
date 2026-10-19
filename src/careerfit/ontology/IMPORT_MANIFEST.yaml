@@ -20,21 +20,23 @@ counts:
   alias_dropped_curated_collision: 1
   alias_dropped_two_vendors: 10
   dropped_by_override: 11
-  dropped_curated_collision: 31
+  dropped_curated_collision: 37
   dropped_curated_vendor_form: 6
   dropped_esco_abstract: 12
   dropped_everyday_word: 138
   dropped_shape: 100
   esco_alias_not_reviewed: 2045
   esco_not_knowledge: 745
-  imported_aliases: 235
-  imported_skills: 1790
+  imported_aliases: 233
+  imported_skills: 1786
   merged_plural_duplicate: 2
-  merged_vendor_duplicate: 9
+  merged_vendor_duplicate: 4
   onet_distinct_examples: 8753
   onet_not_in_scope: 7130
   plural_merge_skipped_singular_dropped: 1
-  vendor_merge_skipped_plain_dropped: 6
+  renamed_by_override: 3
+  vendor_merge_skipped_generic_plain: 1
+  vendor_merge_skipped_plain_dropped: 8
 review:
   alias_dropped_curated_collision:
   - 'rdms: relational database management system'
@@ -65,12 +67,11 @@ review:
   - 'information security strategy: information security'
   - 'java ee: java'
   - 'javascript object notation json: javascript'
-  - 'micosoft sql server analysis services: sql'
+  - 'micosoft sql server analysis services: sql, sql server'
   - 'microsoft azure data factory: azure, microsoft azure'
   - 'microsoft azure devops services: azure, devops, microsoft azure'
   - 'microsoft azure sentinel: azure, microsoft azure'
-  - 'microsoft sql server reporting services: sql'
-  - 'microsoft sql server: sql'
+  - 'microsoft sql server reporting services: microsoft sql server, sql, sql server'
   - 'node.js: js'
   - 'nortonlifelock cybersecurity: cybersecurity'
   - 'openai chatgpt: openai'
@@ -85,14 +86,13 @@ review:
   - 'quest sql optimizer for oracle: sql'
   - 'react native: react'
   - 'react redux: react'
-  - 'redgate sql server: sql'
+  - 'redgate sql server: sql, sql server'
   - 'rest assured: rest'
   - 'sentryone sql sentry: sql'
   - 'sql developer: sql'
   - 'sql loader: sql'
   - 'sql plus: sql'
-  - 'sql server integration services: sql'
-  - 'sql server: sql'
+  - 'sql server integration services: sql, sql server'
   - 'sun microsystems java persistence api: java'
   - 'sun microsystems java servlet api: java'
   - 'transact-sql: sql'
@@ -124,17 +124,22 @@ review:
   - cyber security
   - data modeling
   - data models
+  - db2
   - devops
   - django
   - elasticsearch
   - hugging face
+  - ibm db2
   - ibm informix
   - java
   - javascript
   - kubernetes
   - langchain
   - machine learning
+  - mariadb
   - microsoft azure
+  - microsoft sql server
+  - mysql
   - oracle database
   - oracle weblogic
   - postgresql
@@ -143,6 +148,7 @@ review:
   - relational database management system
   - saml
   - sql
+  - sql server
   - vector database
   dropped_curated_vendor_form:
   - 'amazon data pipeline: data pipeline'
@@ -2456,5 +2462,16 @@ review:
   merged_plural_duplicate:
   - computer forensics -> computer forensic
   - learning management systems -> lms
+  merged_vendor_duplicate:
+  - apache hadoop -> hadoop
+  - microsoft asp.net -> asp.net
+  - oracle taleo -> taleo
+  - symantec veritas netbackup -> veritas netbackup
   plural_merge_skipped_singular_dropped:
   - geographic information systems -> gis
+  renamed_by_override:
+  - microsoft active directory -> active directory
+  - microsoft ssis -> sql server integration services
+  - microsoft visual basic -> visual basic
+  vendor_merge_skipped_generic_plain:
+  - sap business intelligence -> business intelligence

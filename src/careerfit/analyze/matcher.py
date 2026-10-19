@@ -226,10 +226,10 @@ def requirement_occurrences(jd_text: str, ontology: Mapping[str, SkillEntry]) ->
 # Skills a clause joins with "or" are alternatives: any one meets the requirement ("OpenAI or
 # Anthropic APIs", "Python, Java, or Go", "Python or Java or Go"). Between "or" and the next skill
 # only up to two modifiers may sit ("software engineering or applied machine learning", "or the
-# Anthropic API"); any other word ("Python or equivalent and Kubernetes", "... on Kubernetes")
+# Anthropic API", "MySQL or another relational database", "or any other"); any other word ("Python or equivalent and Kubernetes", "... on Kubernetes")
 # keeps the two separate requirements, and so does anything else between two skills.
 # The comma is grouped with its own spaces, so no run of spaces can be split two ways (backtracking).
-_OR_JOIN = re.compile(r"\s*(,\s*)?(and/)?or\s+((a|an|the|applied|modern|similar|comparable|related)\s+){0,2}",
+_OR_JOIN = re.compile(r"\s*(,\s*)?(and/)?or\s+((a|an|the|another|other|any|applied|modern|similar|comparable|related)\s+){0,2}",
                       re.IGNORECASE)
 _COMMA_JOIN = re.compile(r"\s*,\s*")
 MAX_JOIN = 60  # characters: a longer stretch between two skills is never a plain "or" or comma

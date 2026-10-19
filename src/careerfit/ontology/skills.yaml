@@ -57,6 +57,27 @@ postgresql:
   ambiguous: false
   implies: [sql, relational database]
 
+# Relational engines, so "MySQL or another relational database" is met by MySQL (Copilot review on #31).
+mysql:
+  aliases: []
+  ambiguous: false
+  implies: [sql, relational database]
+
+mariadb:
+  aliases: []
+  ambiguous: false
+  implies: [sql, relational database]
+
+sql server:
+  aliases: ["microsoft sql server", "mssql"]
+  ambiguous: false
+  implies: [sql, relational database]
+
+db2:
+  aliases: ["ibm db2"]
+  ambiguous: false
+  implies: [sql, relational database]
+
 sql:
   aliases: []
   ambiguous: false

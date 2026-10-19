@@ -115,10 +115,11 @@ def test_esco_aliases_need_a_person_to_allow_them_and_abstract_concepts_are_drop
 
 
 def test_a_rename_onto_an_existing_alias_does_not_crash_and_the_names_win():
-    # Copilot review on #31: renaming to another skill's alias raised KeyError.
+    # Copilot review on #31: renaming to another skill's alias raised KeyError. Renames now apply
+    # first, so "photoshop" is a name when the vendor merge runs, and Adobe Photoshop joins it.
     skills, _ = _build([_row("Adobe Photoshop"), _row("OldPhotoshop")], overrides={"rename": {"oldphotoshop": "photoshop"}})
-    assert {"adobe photoshop", "photoshop"} <= set(skills)
-    assert "photoshop" not in skills["adobe photoshop"].aliases  # an alias never doubles as another skill's name
+    assert set(skills) == {"photoshop"}
+    assert skills["photoshop"].aliases == {"adobe photoshop", "oldphotoshop"}
 
 
 def test_a_vendor_duplicate_merges_into_the_plain_name_unless_two_vendors_claim_it():
@@ -260,3 +261,82 @@ def test_a_jd_asking_for_learning_management_systems_matches_a_resume_saying_lms
                         jd_source="j", ontology=load_default_ontology(), at=datetime.now(timezone.utc),
                         perspective="candidate")
     assert [(o.skill, o.status.value) for o in facts.skill_observations] == [("lms", "matched")]
+
+
+def test_overrides_apply_to_source_names_before_the_automatic_merges():
+    # Copilot review on #31: the merges ran first, so a drop or rename of a merged source name never
+    # took effect ("apache hadoop" stayed an alias; "hadoop engine" was never produced).
+    esco = [{"skillType": "knowledge", "preferredLabel": "Hadoop", "altLabels": ""},
+            {"skillType": "knowledge", "preferredLabel": "learning management systems", "altLabels": ""}]
+    rows = [_row("Apache Hadoop"), _row("Learning management system LMS")]
+    dropped, _ = _build(rows, esco, {"drop": ["apache hadoop"]})
+    assert dropped["hadoop"].aliases == set() and "apache hadoop" not in dropped
+    renamed, _ = _build(rows, esco, {"rename": {"apache hadoop": "hadoop engine"}})
+    assert renamed["hadoop engine"].aliases == {"apache hadoop"} and renamed["hadoop"].aliases == set()
+    plural, _ = _build(rows, esco, {"rename": {"learning management systems": "lms suites"}})
+    assert plural["lms suites"].aliases == {"learning management systems"}
+    assert plural["lms"].aliases == {"learning management system"}
+
+
+def test_an_allowed_alias_survives_a_candidate_that_is_dropped_later():
+    # Copilot review on #31: "spark" was rejected as an alias of apache spark because a "spark"
+    # candidate existed, although the everyday-word rule then dropped it.
+    esco = [{"skillType": "knowledge", "preferredLabel": "Spark", "altLabels": ""}]
+    skills, _ = _build([_row("Apache Spark")], esco, {"alias_allow": {"apache spark": ["spark"]}})
+    assert "spark" not in skills and skills["apache spark"].aliases == {"spark"}
+    kept, report = _build([_row("Apache Spark"), _row("Neo4j")], esco,
+                          {"keep": ["spark"], "alias_allow": {"neo4j": ["spark"]}})
+    assert "spark" in kept and "spark" not in kept["neo4j"].aliases        # a real name still wins
+
+
+def test_a_vendor_product_does_not_merge_into_a_generic_discipline():
+    # Copilot review on #31: "sap business intelligence" became an alias of "business intelligence",
+    # so a resume naming the discipline met a JD asking for SAP's product.
+    words = WORDS | {"business", "intelligence"}
+    esco = [{"skillType": "knowledge", "preferredLabel": "business intelligence", "altLabels": ""},
+            {"skillType": "knowledge", "preferredLabel": "Hadoop", "altLabels": ""}]
+    skills, report = importer.build([_row("SAP Business Intelligence"), _row("Apache Hadoop")], esco, CURATED, words, {})
+    assert {"sap business intelligence", "business intelligence"} <= set(skills)
+    assert skills["business intelligence"].aliases == set() and skills["sap business intelligence"].aliases == set()
+    assert "apache hadoop" in skills["hadoop"].aliases                   # a distinctive name still merges
+    assert "sap business intelligence -> business intelligence" in report.review["vendor_merge_skipped_generic_plain"]
+
+
+def _facts(resume, jd):
+    from datetime import datetime, timezone
+    from careerfit.analyze.observations import build_facts
+    from careerfit.analyze.ontology import load_default_ontology
+    from careerfit.facts.schema import Coverage
+    txt = Coverage(source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=1, known_blind_spots=())
+    facts = build_facts(resume_text=resume, resume_coverage=txt, resume_source="r", jd_text=f"Requirements:\n- {jd}",
+                        jd_coverage=txt, jd_source="j", ontology=load_default_ontology(), at=datetime.now(timezone.utc),
+                        perspective="candidate")
+    return {o.skill: o.status.value for o in facts.skill_observations}
+
+
+def test_ssis_is_one_skill_under_both_names():
+    # Copilot review on #31: "microsoft ssis" (alias ssis) and "sql server integration services" were
+    # two skills, so a resume saying "SSIS" got a false gap on the expanded name.
+    assert "microsoft ssis" not in IMPORTED
+    assert {"microsoft ssis", "ssis"} <= set(IMPORTED["sql server integration services"]["aliases"])
+    assert _facts("Built SSIS packages", "SQL Server Integration Services (SSIS)")[
+        "sql server integration services"] == "matched"
+
+
+def test_a_vendor_product_stays_apart_from_the_discipline_in_the_committed_import():
+    assert "sap business intelligence" in IMPORTED
+    assert "sap business intelligence" not in IMPORTED["business intelligence"]["aliases"]
+    assert _facts("Business intelligence dashboards", "SAP Business Intelligence")["sap business intelligence"] == "gap"
+    assert "microsoft active directory" in IMPORTED["active directory"]["aliases"]   # reviewed renames
+    assert "microsoft visual basic" in IMPORTED["visual basic"]["aliases"]
+
+
+@pytest.mark.parametrize(("resume", "jd", "skill", "status"), [
+    # Copilot review on #31: MySQL implied nothing, and "or another" didn't join an alternative.
+    ("MySQL", "MySQL or another relational database", "relational database", "matched"),
+    ("MySQL", "PostgreSQL or another relational database", "postgresql", "alternative_met"),
+    ("SQL Server and DB2", "Relational databases", "relational database", "matched"),
+    ("MariaDB", "PostgreSQL or any other relational database", "postgresql", "alternative_met"),
+])
+def test_relational_engines_meet_a_relational_database_requirement(resume, jd, skill, status):
+    assert _facts(resume, jd)[skill] == status

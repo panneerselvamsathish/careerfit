@@ -1012,7 +1012,7 @@
   ambiguous: false
   sources: [esco]
 "business intelligence":
-  aliases: ["sap business intelligence"]
+  aliases: []
   ambiguous: false
   sources: [onet, esco]
 "business intelligence system":
@@ -1747,10 +1747,6 @@
   aliases: []
   ambiguous: false
   sources: [onet]
-"db2":
-  aliases: ["ibm db2"]
-  ambiguous: false
-  sources: [onet, esco]
 "dbase":
   aliases: []
   ambiguous: false
@@ -3775,10 +3771,6 @@
   aliases: []
   ambiguous: false
   sources: [onet]
-"mariadb":
-  aliases: []
-  ambiguous: false
-  sources: [onet]
 "maritime telecommunications":
   aliases: []
   ambiguous: false
@@ -4115,10 +4107,6 @@
   aliases: ["silverlight"]
   ambiguous: false
   sources: [onet]
-"microsoft ssis":
-  aliases: ["ssis"]
-  ambiguous: false
-  sources: [onet]
 "microsoft ssrs":
   aliases: ["microsoft sql server reporting services", "ssrs"]
   ambiguous: false
@@ -4367,10 +4355,6 @@
   aliases: []
   ambiguous: false
   sources: [onet]
-"mysql":
-  aliases: []
-  ambiguous: false
-  sources: [onet, esco]
 "n1ql":
   aliases: []
   ambiguous: false
@@ -5703,6 +5687,10 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+"sap business intelligence":
+  aliases: []
+  ambiguous: false
+  sources: [onet]
 "sap business objects":
   aliases: []
   ambiguous: false
@@ -6187,14 +6175,10 @@
   aliases: []
   ambiguous: false
   sources: [onet]
-"sql server":
-  aliases: ["microsoft sql server"]
+"sql server integration services":
+  aliases: ["microsoft ssis", "ssis"]
   ambiguous: false
   sources: [onet, esco]
-"sql server integration services":
-  aliases: []
-  ambiguous: false
-  sources: [esco]
 "sqr":
   aliases: ["structured query report"]
   ambiguous: false
