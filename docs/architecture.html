@@ -31,14 +31,15 @@ flowchart TB
     RD["read_document()<br/>pdf.py · text.py"]
   end
 
-  ONT[("ontology/skills.yaml<br/>115 skills · aliases · ambiguous flag")]
+  ONT[("ontology/<br/>skills.yaml: 177 hand-written skills (always win)<br/>skills_imported.yaml: 1,784 from O*NET® + ESCO<br/>aliases · ambiguous flag · implies")]
 
   subgraph Analyze["analyze/: pure functions, no LLM, network or clock"]
-    MATCH["matcher<br/>whole-word detection · must/nice level"]
+    IDX["mentions.py: MentionIndex<br/>one pass, every term · dashes fold to '-'<br/>nothing inside 'non-X' · longer name wins"]
+    MATCH["matcher<br/>requirement lines · must/nice level<br/>either/or choices (alternative_met)"]
     BUILD["build_facts()"]
   end
 
-  FACTS[["facts/: GapAnalysisFacts<br/>Pydantic contract · 5 statuses<br/>every claim carries Provenance + excerpt"]]
+  FACTS[["facts/: GapAnalysisFacts (schema 0.6.0)<br/>Pydantic contract · 6 statuses<br/>every claim carries Provenance + excerpt"]]
 
   subgraph Judge["judge/: the only package that calls an LLM, CLI --deep only"]
     RS["resolve_skills()<br/>only UNRESOLVABLE skills"]
@@ -60,7 +61,8 @@ flowchart TB
   CLI --> RD
   API --> RD
   RD -->|"text + Coverage"| MATCH
-  ONT --> MATCH
+  ONT --> IDX
+  IDX --> MATCH
   MATCH --> BUILD --> FACTS
   FACTS -->|"--deep"| RS
   RS --> PL --> FIT --> JUDGED
@@ -76,7 +78,7 @@ flowchart TB
   classDef pure fill:#ecfdf3,stroke:#12b76a,color:#1f2933;
   classDef contract fill:#eff8ff,stroke:#2e90fa,color:#1f2933;
   class RS,PL,ASK,CLAUDE llm;
-  class MATCH,BUILD,FIT,REP pure;
+  class IDX,MATCH,BUILD,FIT,REP pure;
   class FACTS,JUDGED contract;
 </pre>
 </div>
