@@ -190,7 +190,7 @@ def test_output_and_report_cannot_be_two_names_for_one_existing_file(tmp_path, c
 def test_cli_writes_the_report(tmp_path, capsys):
     out = tmp_path / "report.md"
     assert main(["--resume", str(FIXTURES / "resume.txt"), "--jd", str(FIXTURES / "jd.txt"), "--report", str(out)]) == 0
-    assert out.read_text(encoding="utf-8").startswith("# Your resume against this job")
+    assert out.read_text(encoding="utf-8").startswith("# Your fit for this job")
     assert f"Wrote {out}:" in capsys.readouterr().err
 
 

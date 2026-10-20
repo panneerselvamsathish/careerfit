@@ -7,7 +7,7 @@ from careerfit.report.shared import (STATUS_LABEL, blind_spots, by_requirement, 
 
 def render(facts: GapAnalysisFacts) -> str:
     must, nice = by_requirement(facts, "must"), by_requirement(facts, "nice")
-    lines = header(facts, "Your resume against this job")
+    lines = header(facts, "Your fit for this job")
     lines += ["## Summary", ""]
     if facts.fit_score is not None:
         lines.append(f"- Fit: **{facts.fit_score.overall:.0%}**. {cell(facts.fit_score.explanation)}")
