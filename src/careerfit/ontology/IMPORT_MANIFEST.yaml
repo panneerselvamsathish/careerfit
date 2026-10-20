@@ -19,16 +19,16 @@ sources:
 counts:
   alias_dropped_curated_collision: 1
   alias_dropped_two_vendors: 10
-  dropped_by_override: 11
+  dropped_by_override: 12
   dropped_curated_collision: 37
-  dropped_curated_vendor_form: 6
+  dropped_curated_vendor_form: 4
   dropped_esco_abstract: 12
   dropped_everyday_word: 138
   dropped_shape: 100
   esco_alias_not_reviewed: 2045
   esco_not_knowledge: 745
-  imported_aliases: 232
-  imported_skills: 1786
+  imported_aliases: 231
+  imported_skills: 1787
   merged_plural_duplicate: 2
   merged_vendor_duplicate: 4
   onet_distinct_examples: 8753
@@ -36,7 +36,7 @@ counts:
   plural_merge_skipped_singular_dropped: 1
   renamed_by_override: 3
   vendor_merge_skipped_generic_plain: 1
-  vendor_merge_skipped_plain_dropped: 8
+  vendor_merge_skipped_plain_dropped: 7
 review:
   alias_dropped_curated_collision:
   - 'rdms: relational database management system'
@@ -53,6 +53,7 @@ review:
   - 'teradata database: database'
   contains_a_curated_term:
   - 'adeptia etl suite: etl'
+  - 'amazon data pipeline: data pipeline'
   - 'aurora helioscope: aurora'
   - 'azure devops services: azure, devops'
   - 'backbone.js: js'
@@ -107,6 +108,7 @@ review:
   - javascript framework
   - jenkins ci
   - microservices architecture
+  - oracle relational database
   - relational database management
   - restful api
   - single sign-on sso
@@ -151,11 +153,9 @@ review:
   - sql server
   - vector database
   dropped_curated_vendor_form:
-  - 'amazon data pipeline: data pipeline'
   - 'ibm terraform: terraform'
   - 'oracle java: java'
   - 'oracle pl/sql: pl/sql'
-  - 'oracle relational database: relational database'
   - 'oracle weblogic server: weblogic server'
   dropped_esco_abstract:
   - blockchain applications security principles

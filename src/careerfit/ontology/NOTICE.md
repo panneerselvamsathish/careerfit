@@ -32,11 +32,13 @@ This service uses the ESCO classification of the European Commission.
   Hot Technology or In Demand. ESCO: only "knowledge" concepts of the digital skills collection.
 - **Names.** Lowercased; a trailing "software" and ESCO's tags in parentheses removed; an acronym
   spelled out by the words before it replaces them ("learning management system LMS" becomes "lms",
-  with the phrase as an alias); a parenthetical acronym and a vendor-free form ("photoshop" for
-  "Adobe Photoshop") added as aliases.
+  with the phrase as an alias, unless the phrase opens with "a", "an" or "the"); a parenthetical
+  acronym and a vendor-free form ("photoshop" for "Adobe Photoshop", from O*NET and ESCO names
+  alike) added as aliases.
 - **Drops.** Everyday words ("spark", "database"), O*NET category labels, names over 5 words or
   40 characters, names about knowledge of a topic ("concepts of telecommunications"), and anything
-  already in careerfit's hand-written list.
+  already in careerfit's hand-written list, a vendor's form of it included ("Oracle PL/SQL"), but
+  not a vendor's product with a generic name ("Amazon Data Pipeline" is not data pipelines).
 - **Merges.** One tool under two names becomes one skill ("hadoop" and "Apache Hadoop"; an ESCO
   label that O*NET names too; a plural of several words and its singular, "learning management
   systems" and "LMS"). A vendor's product stays apart from the discipline its other words name

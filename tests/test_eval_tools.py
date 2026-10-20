@@ -131,3 +131,16 @@ def test_exactly_90_percent_passes_the_gate(tmp_path):
     sheet = tmp_path / "sample.md"
     sheet.write_text(text, encoding="utf-8")
     assert match_sample.main(["--score", str(sheet)]) == 0
+
+
+def test_the_sample_skips_a_name_inside_a_longer_skill_name():
+    # Copilot review on #31: "Adobe Photoshop Lightroom" asks for Lightroom only, but the sample took
+    # Photoshop too, so labelling it "no" failed a correct result.
+    ontology = Ontology({
+        "adobe photoshop": SkillEntry(aliases=("photoshop",), ambiguous=False, sources=("onet",)),
+        "adobe photoshop lightroom": SkillEntry(aliases=(), ambiguous=False, sources=("onet",)),
+    })
+    jd = "Requirements:\n- Adobe Photoshop Lightroom\n- Photoshop, but Lightroom is a plus"
+    found = match_sample.mentions("jd.txt", jd, ontology)
+    assert sorted((s.skill, s.line) for s in found) == [("adobe photoshop", 3), ("adobe photoshop lightroom", 2)]
+    assert "**Photoshop**" in next(s.sentence for s in found if s.line == 3)

@@ -223,7 +223,7 @@ def requirement_occurrences(jd_text: str, ontology: Mapping[str, SkillEntry]) ->
     found: dict[str, list[Occurrence]] = {}
     for level, line_no, clause in requirement_clauses(jd_text):
         mentioned = index.find(clause)
-        own = {skill for _start, _end, skill in _split_spans(mentioned)[0]}
+        own = {m.skill for m in outermost(mentioned)}
         for name, result in _present(mentioned, ontology, index).items():
             if name in own:
                 found.setdefault(name, []).append((level, line_no, result))
@@ -254,6 +254,14 @@ Span = tuple[int, int, str]
 def _mention_spans(clause: str, ontology: Mapping[str, SkillEntry]) -> tuple[list[Span], list[tuple[Span, int]]]:
     """Each skill mention in the clause as (start, end, skill), left to right, and the nested ones."""
     return _split_spans(index_of(ontology).find(clause))
+
+
+def outermost(found: Iterable[Mention]) -> list[Mention]:
+    """The mentions the JD asks for: of two overlapping ones the longer, as _split_spans keeps them
+    ("Adobe Photoshop Lightroom" asks for Lightroom, not Photoshop too)."""
+    found = list(found)
+    kept = set(_split_spans(found)[0])
+    return [m for m in found if (m.start, m.end, m.skill) in kept]
 
 
 def _split_spans(found: Iterable[Mention]) -> tuple[list[Span], list[tuple[Span, int]]]:

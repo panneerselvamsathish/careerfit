@@ -373,3 +373,31 @@ def test_workspace_is_an_everyday_word_and_no_alias():
     assert importer.everyday("workspace", set()) and importer.everyday("workspaces", set())
     assert importer.vendor_alias("google workspace", set()) is None
     assert "workspace" not in IMPORTED["google workspace"]["aliases"]
+
+
+def test_an_expansion_that_opens_with_an_article_is_no_alias():
+    # Copilot review on #31: "a programming language" was an alias of APL, so "a programming language
+    # such as Python" demanded APL.
+    assert importer.clean_onet("A Programming Language APL") == ("apl", set())
+    assert importer.clean_onet("Structured query report SQR") == ("sqr", {"structured query report"})
+    assert "a programming language" not in IMPORTED["apl"]["aliases"]
+    assert _facts("Python", "Experience with a programming language such as Python") == {"python": "matched"}
+
+
+def test_esco_names_get_the_vendor_free_alias_too():
+    # Copilot review on #31: ESCO-only "microsoft visual c++" had no alias, so "Visual C++" on a resume
+    # got a gap. Its unreviewed alternative labels still aren't aliases.
+    esco = [{"skillType": "knowledge", "preferredLabel": "Microsoft Visual C++", "altLabels": "MSVC | VC++"}]
+    skills, _ = _build([], esco)
+    assert skills["microsoft visual c++"].aliases == {"visual c++"}
+    assert _facts("Visual C++ desktop apps", "Microsoft Visual C++") == {"microsoft visual c++": "matched"}
+
+
+def test_a_vendor_product_with_a_generic_plain_name_is_kept():
+    # Copilot review on #31: "amazon data pipeline" was dropped as a vendor form of curated "data
+    # pipelines", so ordinary pipeline work met a JD asking for the AWS product.
+    curated = {**CURATED, "data pipelines": SkillEntry(aliases=("data pipeline",), ambiguous=False)}
+    words = WORDS | {"data", "pipeline"}
+    skills, _ = importer.build([_row("Amazon Data Pipeline"), _row("Oracle PL/SQL")], [], curated, words, {})
+    assert "amazon data pipeline" in skills and "oracle pl/sql" not in skills
+    assert _facts("Built data pipelines", "Amazon Data Pipeline") == {"amazon data pipeline": "gap"}

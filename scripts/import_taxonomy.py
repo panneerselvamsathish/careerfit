@@ -144,8 +144,10 @@ def clean_onet(example: str) -> tuple[str, set[str]]:
         # what job descriptions write. At the end, the spelled-out phrase is the skill too, so an alias.
         n = len(word)
         if i >= n and _ACRONYM.fullmatch(word) and "".join(w[0] for w in words[i - n:i]).upper() == word:
-            if i == len(words) - 1:  # the whole phrase, qualifiers included: "oracle java enterprise edition"
-                aliases.add(_norm(" ".join(words[:i])))
+            # Not a phrase that opens with an article: "A Programming Language APL" would make every
+            # "a programming language such as Python" a mention of APL.
+            if i == len(words) - 1 and words[0].lower() not in ("a", "an", "the"):
+                aliases.add(_norm(" ".join(words[:i])))  # the whole phrase, qualifiers included
             words = words[:i - n] + words[i:]
             break
     return _norm(" ".join(words)), aliases
@@ -226,6 +228,8 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
         target = candidates.setdefault(name, Candidate(name))  # the same name as an O*NET skill: one skill
         target.sources.add("esco")
         target.aliases |= accepted
+        if alias := vendor_alias(name, words):  # "microsoft visual c++": "visual c++", as for O*NET names
+            target.aliases.add(alias)
 
     def survives(name: str) -> bool:
         """Whether a name would pass the drop rules below (used before merging a vendor form into it)."""
@@ -255,9 +259,10 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
         if final in taken:
             report.drop("dropped_curated_collision", final)
             continue
-        if (rest := vendor_rest(final)) in taken:
+        if (rest := vendor_rest(final)) in taken and not all(everyday(t, words) for t in rest.split()):
             # "oracle pl/sql" is curated pl/sql under a vendor's name: as its own skill, a JD asking for
             # "Oracle PL/SQL" would also demand it, and a resume saying "PL/SQL" would get a false gap.
+            # Not when the rest is generic: "amazon data pipeline" is AWS's product, not data pipelines.
             report.drop("dropped_curated_vendor_form", f"{final}: {rest}")
             continue
         def accept(raw: set[str]) -> set[str]:

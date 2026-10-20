@@ -21,12 +21,12 @@ import random
 import re
 import sys
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from fractions import Fraction
 from datetime import date
 from pathlib import Path
 
-from careerfit.analyze.matcher import requirement_sentences
+from careerfit.analyze.matcher import outermost, requirement_sentences
 from careerfit.analyze.ontology import Ontology, load_default_ontology
 from careerfit.ingest.document import read_document
 
@@ -49,10 +49,17 @@ class Sample:
 
 
 def mentions(path: str, jd_text: str, ontology: Ontology) -> list[Sample]:
-    """Each imported skill mentioned in a requirement sentence, once per JD line."""
+    """Each imported skill mentioned in a requirement clause, once per JD line. Only the mentions the
+    product reads as requirements: one inside a longer skill name ("Photoshop" in "Adobe Photoshop
+    Lightroom") isn't one, so it is not sampled either."""
     found: dict[tuple[str, int], Sample] = {}
-    for line_no, sentence, _clauses in requirement_sentences(jd_text):
-        for m in ontology.index.find(sentence):
+    for line_no, sentence, levelled in requirement_sentences(jd_text):
+        offset, own = 0, []
+        for _level, clause in levelled:  # clause by clause, as requirement_occurrences reads them
+            at = sentence.find(clause, offset)
+            own += [replace(m, start=m.start + at, end=m.end + at) for m in outermost(ontology.index.find(clause))]
+            offset = at + len(clause)
+        for m in own:
             sources = ontology[m.skill].sources
             if "curated" in sources or (m.skill, line_no) in found:
                 continue

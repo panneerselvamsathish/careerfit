@@ -305,6 +305,7 @@ def test_the_packaged_lists_load_together():
     from careerfit.analyze.ontology import IMPORTED_SKILLS, load_default_ontology
     assert IMPORTED_SKILLS.exists()
     curated_only = load_default_ontology(with_imported=False)
+    from careerfit.analyze.ontology import load_default_ontology
     merged = load_default_ontology()
     assert list(merged)[:len(curated_only)] == list(curated_only)  # curated skills first, unchanged
     assert all(merged[name] == curated_only[name] for name in curated_only)
@@ -381,3 +382,26 @@ def test_a_negated_span_is_blanked_to_the_same_length():
     blanked = SKILLS.index.without_negated(text)
     assert len(blanked) == len(text) and blanked.splitlines()[1] == "non-      "
     assert [m.term for m in SKILLS.index.find(text)] == ["rds"]
+
+
+@pytest.mark.parametrize(("resume", "jd", "expected"), [
+    # Copilot review on #31: on the resume, a name inside an imported product's name showed that skill.
+    ("Edited photos in Adobe Photoshop Lightroom", "Photoshop", {"adobe photoshop": "gap"}),
+    ("Adobe Photoshop and Adobe Photoshop Lightroom", "Photoshop", {"adobe photoshop": "matched"}),  # on its own too
+    ("Built SQL Server Integration Services packages", "SQL Server", {"sql server": "gap"}),
+    ("Built SSIS packages", "SQL Server", {"sql server": "gap"}),                                   # the same either way
+    ("Built SQL Server Integration Services packages", "Relational databases", {"relational database": "gap"}),
+    ("Deployed AWS Lambda functions", "AWS", {"aws": "matched"}),           # a curated name keeps what it names
+    ("Aurora PostgreSQL clusters", "PostgreSQL", {"postgresql": "matched"}),
+])
+def test_a_name_inside_an_imported_product_shows_nothing_alone(resume, jd, expected):
+    from datetime import datetime
+    from careerfit.analyze.observations import build_observations
+    from careerfit.facts.schema import Coverage
+    coverage = Coverage(source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=1,
+                        known_blind_spots=())
+    from careerfit.analyze.ontology import load_default_ontology
+    merged = load_default_ontology()
+    result = {o.skill: o.status.value for o in build_observations(resume, coverage, f"Requirements:\n- {jd}", merged,
+                                                                  datetime(2026, 10, 20))}
+    assert {skill: result.get(skill) for skill in expected} == expected

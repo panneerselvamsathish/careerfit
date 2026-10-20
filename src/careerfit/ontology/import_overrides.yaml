@@ -18,6 +18,7 @@ drop:
   - javascript framework
   - jenkins ci
   - microservices architecture
+  - oracle relational database   # curated "oracle database"; proposed 2026-10-20 by claude, not yet confirmed by sathish
   - relational database management
   - restful api
   - simple storage service s3

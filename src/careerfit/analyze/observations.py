@@ -2,7 +2,7 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Literal
 
-from careerfit.analyze.matcher import (boundary_pattern, decide_status, detect, first_mention_line,
+from careerfit.analyze.matcher import (_split_spans, boundary_pattern, decide_status, detect, first_mention_line,
                                       requirement_alternatives, requirement_evidence)
 from careerfit.analyze.mentions import dashes_as_hyphens
 from careerfit.analyze.ontology import SkillEntry, implied_by_of, index_of
@@ -25,13 +25,14 @@ def build_observations(
     # The resume is then read one skill at a time, so negated terms go first: "non-Amazon RDS" shows
     # no RDS. Same length and lines, so every line number still points into the original text.
     resume_text = index_of(ontology).without_negated(resume_text)
+    hidden = nested_in_imported(resume_text, ontology)
     observations = []
     for name, (level, jd_line, jd_result) in requirement_evidence(jd_text, ontology).items():
         entry = ontology[name]
         # "SQL" inside "PL/SQL" is not a standalone SQL mention: the skill is shown through PL/SQL.
-        own_mentions = without_implying_mentions(name, ontology, resume_text)
+        own_mentions = without_implying_mentions(name, ontology, _blank(resume_text, hidden.get(name, ())))
         resume_result = detect(name, entry, own_mentions)
-        implied = implied_evidence(name, ontology, resume_text) if resume_result != "found" else None
+        implied = implied_evidence(name, ontology, resume_text, hidden) if resume_result != "found" else None
         if implied is not None:
             resume_result = "found"  # e.g. PL/SQL on the resume shows the back-end development the JD asks for
         status = decide_status(jd_result, resume_result, scanned)
@@ -86,6 +87,33 @@ def apply_alternatives(
     return tuple(result)
 
 
+def nested_in_imported(text: str, ontology: Mapping[str, SkillEntry]) -> dict[str, list[tuple[int, int]]]:
+    """Per skill, the mentions that sit inside an imported skill's longer name, which show nothing
+    alone: "Edited photos in Adobe Photoshop Lightroom" shows Lightroom, not Photoshop, and "SQL
+    Server Integration Services" shows SSIS, as "SSIS" does, not SQL Server (nor what it implies).
+
+    A curated name keeps what it names: "AWS Lambda" shows AWS too, "Aurora PostgreSQL" PostgreSQL.
+    Those were written by hand, and the JD side reads them the same way the resume is shown them."""
+    kept, nested = _split_spans(index_of(ontology).find(text))
+    hidden: dict[str, list[tuple[int, int]]] = {}
+    for (start, end, skill), i in nested:
+        outer_start, outer_end, outer = kept[i]
+        if (outer != skill and outer_start <= start and end <= outer_end  # its own alias in its own name counts
+                and "curated" not in ontology[outer].sources):
+            hidden.setdefault(skill, []).append((start, end))
+    return hidden
+
+
+def _blank(text: str, spans) -> str:
+    """The text with the spans blanked to spaces: same length and lines."""
+    if not spans:
+        return text
+    chars = list(text)
+    for start, end in spans:
+        chars[start:end] = " " * (end - start)
+    return "".join(chars)
+
+
 def without_implying_mentions(name: str, ontology: Mapping[str, SkillEntry], text: str) -> str:
     """The text with every mention of a skill that implies `name` blanked out, so a skill named only
     inside another's name ("SQL" in "PL/SQL") isn't taken as its own mention. Blanks keep each
@@ -100,7 +128,8 @@ def without_implying_mentions(name: str, ontology: Mapping[str, SkillEntry], tex
     return text
 
 
-def implied_evidence(name: str, ontology: Mapping[str, SkillEntry], resume_text: str) -> tuple[str, int] | None:
+def implied_evidence(name: str, ontology: Mapping[str, SkillEntry], resume_text: str,
+                     hidden: Mapping[str, list[tuple[int, int]]] | None = None) -> tuple[str, int] | None:
     """The resume's strongest evidence for `name` through a skill that implies it, as (that skill,
     the first line naming it).
 
@@ -108,10 +137,10 @@ def implied_evidence(name: str, ontology: Mapping[str, SkillEntry], resume_text:
     another skill. The implying skill the resume names on the most lines wins (15 years of PL/SQL
     over one FastAPI project), then the earliest line, then the name, so the result is deterministic.
     """
-    lines = resume_text.splitlines()
     best: tuple[int, int, str] | None = None  # (-lines naming it, first line, skill) sorts best first
     for other in implied_by_of(ontology).get(name, ()):
         entry = ontology[other]
+        lines = _blank(resume_text, (hidden or {}).get(other, ())).splitlines()  # "SQL Server" in SSIS implies nothing
         found = [i for i, line in enumerate(lines, start=1) if detect(other, entry, line) == "found"]
         if found and (best is None or (-len(found), found[0], other) < best):
             best = (-len(found), found[0], other)

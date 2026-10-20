@@ -319,6 +319,10 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+"amazon data pipeline":
+  aliases: []
+  ambiguous: false
+  sources: [onet]
 "amazon elastic compute cloud ec2":
   aliases: ["elastic compute cloud ec2"]
   ambiguous: false
@@ -332,7 +336,7 @@
   ambiguous: false
   sources: [onet]
 "ampl":
-  aliases: ["a mathematical programming language"]
+  aliases: []
   ambiguous: false
   sources: [onet]
 "ams realtime projects":
@@ -480,7 +484,7 @@
   ambiguous: false
   sources: [onet]
 "apl":
-  aliases: ["a programming language"]
+  aliases: []
   ambiguous: false
   sources: [onet, esco]
 "appium":
@@ -4140,7 +4144,7 @@
   ambiguous: false
   sources: [onet]
 "microsoft visual c++":
-  aliases: []
+  aliases: ["visual c++"]
   ambiguous: false
   sources: [esco]
 "microsoft visual foxpro":
