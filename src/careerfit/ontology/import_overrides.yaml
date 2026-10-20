@@ -27,7 +27,7 @@ drop:
   - single sign-on sso
   - sun microsystems java
   - waterfall development
-# Proposed 2026-10-19 by claude after the Copilot review on #31, not yet confirmed by sathish: one tool
+# Proposed 2026-10-19 by claude after the Copilot review on #31, confirmed by sathish on 2026-10-20: one tool
 # under two names. As two skills, a JD asking for "SQL Server Integration Services (SSIS)" demanded
 # both, and a resume saying "SSIS" got a false gap. Active Directory and Visual Basic are products
 # whose vendor-free names are everyday words, so the automatic vendor merge leaves them apart.
@@ -35,12 +35,12 @@ rename:
   microsoft active directory: active directory
   microsoft ssis: sql server integration services
   microsoft visual basic: visual basic
-  # Proposed 2026-10-20 by claude after the Copilot review on #31, not yet confirmed by sathish: the British
+  # Proposed 2026-10-20 by claude after the Copilot review on #31, confirmed by sathish on 2026-10-20: the British
   # spelling of uml's own alias "unified modeling language". As two skills, "Unified Modelling Language
   # (UML)" asked for both and a resume saying "UML" got a match and a gap. The only UK/US pair in the import.
   unified modelling language: uml
 alias_allow: {}
-# Proposed 2026-10-20 by claude after the Copilot review on #31, not yet confirmed by sathish: the 41
+# Proposed 2026-10-20 by claude after the Copilot review on #31, confirmed by sathish on 2026-10-20: the 41
 # imported names that contain a curated one (IMPORT_MANIFEST review: contains_a_curated_term). These 23
 # are a kind of that skill: a dialect, a library or runtime, a service of that platform, a product of
 # that category. Without it, "Wrote Transact-SQL procedures" left SQL a gap.

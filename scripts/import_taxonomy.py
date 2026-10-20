@@ -408,6 +408,7 @@ def merge_plural_duplicates(candidates: dict[str, Candidate], report: Report, su
     """"learning management systems" and "lms" (alias "learning management system") are one skill: a
     plural name whose singular is another candidate's name or alias merges into that candidate, as an
     alias. Otherwise a JD asking for the plural also demands it, and a resume saying "LMS" gets a gap.
+    The two merges it makes (lms, computer forensic) were confirmed by sathish on 2026-10-20.
     Only into a skill that survives the drop rules, so the plural is never lost with it. Only names of
     several words: one word ending in "s" is often another product ("canvas" is not "canva", "sass"
     is not "sas")."""
