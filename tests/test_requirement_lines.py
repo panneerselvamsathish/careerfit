@@ -99,3 +99,9 @@ def test_eeo_prose_in_a_jd_without_headings_is_skipped_not_a_stop():
           "AWS experience is a plus here")
     result = requirement_lines(jd, ONTOLOGY)
     assert (len(result.read), result.total) == (2, 2)
+
+
+def test_an_ampersand_is_not_a_word_in_a_title_case_heading():
+    # Hand check of Schneider on #35: "Digital Architecture & Data Strategy" counted as a requirement line.
+    result = requirement_lines("Requirements\nDigital Architecture & Data Strategy\n- Python services", ONTOLOGY)
+    assert (len(result.read), result.total) == (1, 1)

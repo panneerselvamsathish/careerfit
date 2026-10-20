@@ -65,7 +65,7 @@ def _stop_heading(line: str) -> bool:
 
 
 def _title_heading(line: str) -> bool:
-    words = line.split()
+    words = [w for w in line.split() if any(c.isalnum() for c in w)]  # "&" is not a word
     return (len(words) <= TITLE_MAX_WORDS and not re.search(r"[.,;!?]", line)
             and all(w[0].isupper() or not w[0].isalpha() for w in words))
 
