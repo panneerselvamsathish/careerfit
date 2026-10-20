@@ -55,7 +55,28 @@ terraform:
 postgresql:
   aliases: ["postgres"]
   ambiguous: false
-  implies: [sql]
+  implies: [sql, relational database]
+
+# Relational engines, so "MySQL or another relational database" is met by MySQL (Copilot review on #31).
+mysql:
+  aliases: []
+  ambiguous: false
+  implies: [sql, relational database]
+
+mariadb:
+  aliases: []
+  ambiguous: false
+  implies: [sql, relational database]
+
+sql server:
+  aliases: ["microsoft sql server", "mssql"]
+  ambiguous: false
+  implies: [sql, relational database]
+
+db2:
+  aliases: ["ibm db2"]
+  ambiguous: false
+  implies: [sql, relational database]
 
 sql:
   aliases: []
@@ -248,9 +269,18 @@ dynamodb:
 aurora:
   aliases: ["amazon aurora", "aurora rds", "aurora postgresql", "aurora mysql"]
   ambiguous: true
+  implies: [relational database]
 
 rds:
   aliases: ["amazon rds"]
+  ambiguous: false
+  implies: [relational database]
+
+# "PostgreSQL or another relational database": the JD asks for the kind of database, so each product
+# that is one by definition (postgresql, oracle database, aurora, rds) implies it.
+relational database:
+  aliases: ["relational databases", "rdbms", "relational database management system",
+            "relational database management systems"]
   ambiguous: false
 
 s3:
@@ -603,7 +633,7 @@ pl/sql:
 oracle database:
   aliases: ["oracle db", "oracle rdbms", "oracle 11g", "oracle 12c", "oracle 19c", "oracle 21c", "oracle 23ai"]
   ambiguous: false
-  implies: [sql]
+  implies: [sql, relational database]
 
 informix:
   aliases: ["ibm informix"]
@@ -746,6 +776,13 @@ software engineering:
   # names colleagues, not a skill.
   aliases: ["software engineer"]
   ambiguous: false
+
+rest assured:
+  # The Java API-testing library, but also an English idiom ("Rest assured, we support flexible
+  # hours"), so the two-word name is ambiguous; the spellings only the library uses are conclusive
+  # (Copilot review on #31).
+  aliases: ["rest-assured", "restassured"]
+  ambiguous: true
 
 conversational ai:
   # No "virtual assistants" or "virtual agents": both also name people, remote admin staff and

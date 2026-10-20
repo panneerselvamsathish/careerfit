@@ -15,6 +15,14 @@ def mention_pattern(term: str) -> re.Pattern[str]:
     """A whole-word, case-insensitive match for one term ("js" never inside "Node.js"). Skills are
     found through analyze/mentions.py, which matches exactly like this; the regex is kept for the
     section markers and for blanking out an implying skill's mentions."""
+    # (?<!(?<!\w)non-): "non-required" is no must marker, as "non-relational" is no relational database.
+    return re.compile(rf'(?<!\w)(?<!\w\.)(?<!(?<!\w)non-){re.escape(term)}(?!\w)(?!\.\w)', re.IGNORECASE)
+
+
+@lru_cache(maxsize=1024)
+def boundary_pattern(term: str) -> re.Pattern[str]:
+    """The term on word boundaries only, without the "non-" rule: for masking a compound's text
+    ("non-PL/SQL" still hides its "SQL"), never for deciding whether a skill is mentioned."""
     return re.compile(rf'(?<!\w)(?<!\w\.){re.escape(term)}(?!\w)(?!\.\w)', re.IGNORECASE)
 
 
@@ -206,22 +214,29 @@ def requirement_clauses(jd_text: str) -> Iterator[tuple[Level, int, str]]:
 
 
 def requirement_occurrences(jd_text: str, ontology: Mapping[str, SkillEntry]) -> dict[str, list[Occurrence]]:
-    """Every place the JD mentions each skill, as (level, line, detection result), in document order."""
+    """Every place the JD mentions each skill, as (level, line, detection result), in document order.
+
+    A skill named only inside another skill's name is part of that one, not a requirement of its
+    own: "SQL Server Integration Services" asks for SSIS, as "SSIS" does, not for SQL Server too.
+    Named on its own anywhere in the clause ("SQL Server and SSIS"), it is asked for."""
     index = index_of(ontology)
     found: dict[str, list[Occurrence]] = {}
     for level, line_no, clause in requirement_clauses(jd_text):
-        for name, result in scan_present(clause, ontology, index).items():
-            found.setdefault(name, []).append((level, line_no, result))
+        mentioned = index.find(clause)
+        own = {m.skill for m in outermost(mentioned)}
+        for name, result in _present(mentioned, ontology, index).items():
+            if name in own:
+                found.setdefault(name, []).append((level, line_no, result))
     return found
 
 
 # Skills a clause joins with "or" are alternatives: any one meets the requirement ("OpenAI or
 # Anthropic APIs", "Python, Java, or Go", "Python or Java or Go"). Between "or" and the next skill
 # only up to two modifiers may sit ("software engineering or applied machine learning", "or the
-# Anthropic API"); any other word ("Python or equivalent and Kubernetes", "... on Kubernetes")
+# Anthropic API", "MySQL or another relational database", "or any other"); any other word ("Python or equivalent and Kubernetes", "... on Kubernetes")
 # keeps the two separate requirements, and so does anything else between two skills.
 # The comma is grouped with its own spaces, so no run of spaces can be split two ways (backtracking).
-_OR_JOIN = re.compile(r"\s*(,\s*)?(and/)?or\s+((a|an|the|applied|modern|similar|comparable|related)\s+){0,2}",
+_OR_JOIN = re.compile(r"\s*(,\s*)?(and/)?or\s+((a|an|the|another|other|any|applied|modern|similar|comparable|related)\s+){0,2}",
                       re.IGNORECASE)
 _COMMA_JOIN = re.compile(r"\s*,\s*")
 MAX_JOIN = 60  # characters: a longer stretch between two skills is never a plain "or" or comma
@@ -241,19 +256,41 @@ def _mention_spans(clause: str, ontology: Mapping[str, SkillEntry]) -> tuple[lis
     return _split_spans(index_of(ontology).find(clause))
 
 
+def outermost(found: Iterable[Mention]) -> list[Mention]:
+    """The mentions the JD asks for: of two overlapping ones the longer, as _split_spans keeps them
+    ("Adobe Photoshop Lightroom" asks for Lightroom, not Photoshop too)."""
+    found = list(found)
+    kept = set(_split_spans(found)[0])
+    return [m for m in found if (m.start, m.end, m.skill) in kept]
+
+
 def _split_spans(found: Iterable[Mention]) -> tuple[list[Span], list[tuple[Span, int]]]:
-    """Of two overlapping mentions the longer is kept; the other is nested in it, paired with the
-    index of the kept mention it sits in: "SQL" inside "PL/SQL" is nested in PL/SQL's mention."""
-    spans = sorted(((m.start, m.end, m.skill) for m in found),
-                   key=lambda span: (span[0], span[0] - span[1], span[2]))
+    """Of two overlapping mentions the longer is kept, wherever each starts; the other is nested in
+    it, paired with the index of the kept mention it overlaps: "SQL" inside "PL/SQL" is nested in
+    PL/SQL's mention, and so is "Microsoft SQL Server" in "Microsoft SQL Server Integration
+    Services" (SSIS's name starts later but is longer). Kept mentions come left to right.
+
+    Longest first, each character owned by one kept mention: linear in the characters covered."""
+    spans = sorted({(m.start, m.end, m.skill) for m in found},
+                   key=lambda span: (span[0] - span[1], span[0], span[2]))  # longest first, then leftmost
+    if not spans:
+        return [], []
+    owner = [-1] * max(end for _start, end, _skill in spans)  # which kept mention covers each character
     kept: list[Span] = []
-    nested: list[tuple[Span, int]] = []
+    pending: list[Span] = []
     for span in spans:
-        if kept and span[0] < kept[-1][1]:
-            nested.append((span, len(kept) - 1))
+        start, end, _skill = span
+        if any(owner[i] >= 0 for i in range(start, end)):
+            pending.append(span)
         else:
+            for i in range(start, end):
+                owner[i] = len(kept)
             kept.append(span)
-    return kept, nested
+    order = sorted(range(len(kept)), key=lambda k: kept[k][0])
+    position = {k: p for p, k in enumerate(order)}
+    nested = [(span, position[next(owner[i] for i in range(span[0], span[1]) if owner[i] >= 0)])
+              for span in sorted(pending, key=lambda span: (span[0], span[0] - span[1], span[2]))]
+    return [kept[k] for k in order], nested
 
 
 def _choice_of(clause: str, kept: list[Span]) -> list[int]:
@@ -339,7 +376,8 @@ def requirement_alternatives(jd_text: str, ontology: Mapping[str, SkillEntry]) -
     for _line_no, sentence, _clauses in requirement_sentences(jd_text):
         mentioned = index.find(sentence)  # one pass serves both: what is mentioned, and the choices
         detected = set(_present(mentioned, ontology, index))
-        for name, others in _alternatives(sentence, mentioned):
+        own = len(_split_spans(mentioned)[0])  # nested mentions come last, and ask for nothing alone
+        for name, others in _alternatives(sentence, mentioned)[:own]:
             if name in detected:
                 found.setdefault(name, []).append(others)
     return found

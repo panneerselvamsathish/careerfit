@@ -197,18 +197,28 @@ def test_long_or_chains_and_repeated_mentions_stay_linear(joiner):
             best = min(best, time.perf_counter() - started)
         return best
 
-    small, large = seconds(2_000), seconds(8_000)
     # 4x the mentions: linear measures ~4.2x here, quadratic ~16x. 10x sits between with room for noise.
-    assert large < 2.0 and large < 10 * small
+    # Up to three tries: a shared CI runner once stretched one try to 11.7x (#31); quadratic fails all.
+    ratios = []
+    for _ in range(3):
+        small, large = seconds(2_000), seconds(8_000)
+        ratios.append(large / small)
+        if large < 2.0 and large < 10 * small:
+            break
+    else:
+        pytest.fail(f"not linear: 4x the mentions took {', '.join(f'{r:.1f}x' for r in ratios)} the time")
 
 
-def test_a_nested_skill_shares_the_choice_it_sits_in():
+def test_a_nested_skill_is_part_of_the_skill_it_sits_in():
+    # Copilot review on #31: the SQL in "PL/SQL" used to be a requirement of its own (sharing PL/SQL's
+    # choice); now it is part of PL/SQL, as "SQL Server" is part of "SQL Server Integration Services".
     resume, jd = "Python services", "Requirements:\n- PL/SQL or Python"
     facts = analyse(resume, jd)
     observed = by_skill(facts)
-    assert observed["pl/sql"].status == observed["sql"].status == SkillStatus.ALTERNATIVE_MET  # SQL in "PL/SQL"
-    assert observed["sql"].resume_evidence.via == "python"
+    assert observed["pl/sql"].status == SkillStatus.ALTERNATIVE_MET and "sql" not in observed
     assert honest(facts, resume, jd) == []
+    both = by_skill(analyse(resume, "Requirements:\n- PL/SQL or Python, and SQL"))
+    assert both["sql"].status == SkillStatus.GAP                         # asked for on its own too
 
 
 def test_the_same_skill_asked_for_alone_in_the_same_clause_is_still_a_gap():

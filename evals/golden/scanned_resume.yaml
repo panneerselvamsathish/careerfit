@@ -6,7 +6,9 @@ held_out: false
 resume: evals/golden/cases/scanned_resume/resume.pdf
 jd: fixtures/jd.txt
 labelled_by: sathish
-labelled_at: 2026-10-14
+labelled_at: 2026-10-19
+# relational database added 2026-10-19 when the skill list grew (relational database curated, the O*NET/ESCO
+# import in PR #31): proposed by claude from the documents, confirmed by sathish.
 # First labelled 2026-10-10. backend development was added 2026-10-14 when the skill joined
 # skills.yaml (PR #15), and sathish confirmed it the same day: matched, must-have.
 
@@ -17,6 +19,7 @@ expected:
   kubernetes: {status: not_assessed, requirement: must}
   terraform:  {status: not_assessed, requirement: must}
   postgresql: {status: not_assessed, requirement: must}
+  relational database: {status: not_assessed, requirement: must}   # not on the readable page; page 2 can't be read
   rest:       {status: not_assessed, requirement: must}
   go:         {status: unresolvable, requirement: nice}   # the JD's own mention is ambiguous
   kafka:      {status: not_assessed, requirement: nice}

@@ -6,9 +6,12 @@ held_out: true
 resume: evals/golden/cases/platform_pdf/resume.pdf
 jd: evals/golden/cases/platform_pdf/jd.txt
 labelled_by: claude, reviewed by sathish
-labelled_at: 2026-10-10
+labelled_at: 2026-10-19
+# platform engineering added 2026-10-19 when the skill list grew (relational database curated, the O*NET/ESCO
+# import in PR #31): proposed by claude from the documents, confirmed by sathish.
 
 expected:
+  platform engineering: {status: matched, requirement: must}   # "We are hiring a platform engineer"; resume line 1
   kubernetes: {status: matched,      requirement: must}
   terraform:  {status: matched,      requirement: must}
   aws:        {status: matched,      requirement: nice}   # "AWS experience is a plus"
