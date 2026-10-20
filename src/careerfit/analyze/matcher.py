@@ -118,6 +118,19 @@ def _heading_form(line: str) -> str:
     return " ".join(_LEADING_BULLET.sub("", dashes_as_hyphens(line)).strip().rstrip(":").split())
 
 
+# Equal-opportunity prose without a heading ("We hire without regard to race...") ends the requirements
+# the same way an "Equal Opportunity" heading does: what follows is legal text and benefits. Only a
+# long sentence that isn't a bullet counts, so "- Equal opportunity compliance reporting" (an HR
+# requirement) never stops the reading.
+_EEO_WORDS = re.compile(r"\b(equal (employment )?opportunit\w*|without regard to|affirmative action)\b", re.I)
+EEO_MIN_WORDS = 8
+
+
+def eeo_prose(line: str) -> bool:
+    return (_EEO_WORDS.search(line) is not None and len(line.split()) >= EEO_MIN_WORDS
+            and _LEADING_BULLET.match(dashes_as_hyphens(line)) is None)
+
+
 def requirement_section(line: str) -> Level | None:
     """The level a requirements-section heading opens, or None if the line isn't one.
 
@@ -179,12 +192,18 @@ def requirement_sentences(jd_text: str) -> Iterator[tuple[int, str, list[tuple[L
     jd_text = dashes_as_hyphens(jd_text)
     current: Literal["must", "nice"] = "must"
     counting = True  # off inside a benefits / equal-opportunity / pay section
+    # Without a requirements heading nothing could turn counting back on, so equal-opportunity prose
+    # at the top of such a JD is only skipped.
+    has_heading = any(requirement_section(raw.strip()) for raw in jd_text.splitlines())
     for line_no, raw_line in enumerate(jd_text.splitlines(), start=1):
         line = raw_line.strip()
         if not line:
             continue
         if stop_section(line):
             counting = False
+            continue
+        if eeo_prose(line):
+            counting = counting and not has_heading
             continue
         level_here = heading_level(line)
         if level_here is not None:
