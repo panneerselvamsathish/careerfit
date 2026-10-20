@@ -179,3 +179,23 @@ def test_split_spans_keeps_the_longer_of_partly_overlapping_mentions():
     kept, nested = _split_spans(found)
     assert kept == [(10, 41, "ssis"), (45, 51, "python")]
     assert nested == [((0, 20, "sql server"), 0), ((10, 13, "sql"), 0)]
+
+
+@pytest.mark.parametrize(("jd", "expected"), [
+    # Review of #35: the product kept reading after unheaded equal-opportunity prose, so a skill in
+    # the legal or benefits text below it became a requirement.
+    ("Requirements\n- Python\nWe hire without regard to race, religion, gender identity or age.\n- Kubernetes perks",
+     ["python"]),
+    # A bullet (an HR requirement) never stops the reading, and neither does a short line.
+    ("Requirements\n- Equal opportunity compliance reporting in Python for our hiring teams\n- Kubernetes",
+     ["kubernetes", "python"]),
+    # With no requirements heading nothing could reopen the reading, so the prose is only skipped.
+    ("We are an equal opportunity employer and we value every applicant.\nWe need Python engineers\n"
+     "Kubernetes experience is a plus", ["kubernetes", "python"]),
+    # A later requirements heading reopens it, as after a benefits heading.
+    ("We are an equal opportunity employer and we value every applicant here.\nRequirements\n- Python", ["python"]),
+])
+def test_unheaded_equal_opportunity_prose_ends_the_requirements(jd, expected):
+    from careerfit.analyze.matcher import requirement_evidence
+    skills = {n: SkillEntry(aliases=(), ambiguous=False) for n in ('python', 'kubernetes')}
+    assert sorted(requirement_evidence(jd, skills)) == expected

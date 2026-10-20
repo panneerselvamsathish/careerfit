@@ -26,7 +26,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from careerfit.analyze.matcher import requirement_section, scan_present, stop_section
+from careerfit.analyze.matcher import eeo_prose, requirement_section, scan_present, stop_section
 from careerfit.analyze.mentions import dashes_as_hyphens
 from careerfit.analyze.ontology import SkillEntry, index_of
 
@@ -36,7 +36,6 @@ ABOUT_COMPANY = re.compile(r"about (us|the company)", re.I)
 BULLET = re.compile(r"^\s*([-•*▪●]|\d+[.)])\s+")
 MIN_WORDS = 3  # a shorter line that isn't a bullet is a title or a fragment
 TITLE_MAX_WORDS = 4  # "What We Value": a short Title Case line without punctuation is a heading
-EEO_PROSE = re.compile(r"\b(equal (employment )?opportunit\w*|without regard to|affirmative action)\b", re.I)
 LOGISTICS = re.compile(
     r"\b(travel(l?ing)?|sponsor(ship)?|visas?|citizen(ship)?|authori[sz]ed to work|work authori[sz]ation"
     r"|relocat\w*|salary|pay range|apply (now|today|here))\b|\$\s?\d",
@@ -83,7 +82,7 @@ def requirement_lines(jd_text: str, ontology: Mapping[str, SkillEntry]) -> Requi
         if _stop_heading(text):
             inside = False
             continue
-        if EEO_PROSE.search(text):
+        if eeo_prose(text):
             inside = inside and not sections_found  # no heading could reopen counting
             continue
         if requirement_section(text):
