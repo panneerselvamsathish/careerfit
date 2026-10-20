@@ -19,7 +19,7 @@
   <main class="wrap">
     <article class="panel prose">
       <h1 id="title" class="page-title">Privacy</h1>
-      <p class="updated">Last updated 16 October 2026</p>
+      <p class="updated">Last updated 18 October 2026</p>
 
       <h2>The short version</h2>
       <ul>
@@ -54,7 +54,7 @@
           <tr role="row">
             <th scope="row" role="rowheader">Skill statistics</th>
             <td role="cell"><span class="cell-label">When</span>Each analysis, unless you turn usage counts off</td>
-            <td role="cell"><span class="cell-label">What it holds</span>The names of the skills from careerfit's own list that the job description asked for, whether each
+            <td role="cell"><span class="cell-label">What it holds</span>The names of the skills from careerfit's skill list (hand-written, plus technology names from the O*NET® database and ESCO) that the job description asked for, whether each
               was a must or nice to have, its result (for example matched, a gap, ambiguous, or met by another skill the
               job description accepts instead), and the day. Not linked to your
               ID or to you.</td>
@@ -105,6 +105,20 @@
       </form>
       <p id="remove-message" class="waitlist-message" role="status"></p>
 
+      <h2 id="skill-data">Where the skill list comes from</h2>
+      <p>careerfit's skill list is written by hand, plus technology names imported from two open datasets, both
+        modified by careerfit:</p>
+      <ul>
+        <li>This page includes information from the O*NET 31.0 Database by the U.S. Department of Labor, Employment and
+          Training Administration (USDOL/ETA). Used under the CC BY 4.0 license. careerfit has modified all or some of
+          this information. USDOL/ETA has not approved, endorsed, or tested these modifications. O*NET® is a trademark
+          of USDOL/ETA.</li>
+        <li>This service uses the ESCO classification of the European Commission (v1.2.1, a modified and adapted
+          version).</li>
+      </ul>
+      <p>What careerfit changed, and the licences:
+        <a href="https://github.com/panneerselvamsathish/careerfit/blob/main/src/careerfit/ontology/NOTICE.md">NOTICE.md</a>.</p>
+
       <h2>Who runs careerfit</h2>
       <p>careerfit is an independent, open-source project. The code, including exactly what is recorded
         (<code>usage.py</code>), is public at
@@ -115,5 +129,11 @@
       <p><a href="/">Back to careerfit</a></p>
     </article>
   </main>
+  <footer class="site-footer wrap">
+    <p>careerfit's skill list includes technology names from the O*NET® 31.0 Database by the U.S. Department of
+      Labor, Employment and Training Administration (USDOL/ETA), used under CC BY 4.0, and uses the ESCO classification of
+      the European Commission. Both are modified by careerfit; USDOL/ETA and the Commission have not approved or tested the
+      changes. <a href="/privacy#skill-data">Sources, licences and changes</a>.</p>
+  </footer>
 </body>
 </html>

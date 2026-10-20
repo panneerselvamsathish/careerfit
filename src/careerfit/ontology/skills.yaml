@@ -631,7 +631,10 @@ pl/sql:
   implies: [sql, backend development]
 
 oracle database:
-  aliases: ["oracle db", "oracle rdbms", "oracle 11g", "oracle 12c", "oracle 19c", "oracle 21c", "oracle 23ai"]
+  # "oracle relational database" (O*NET's spelling): proposed 2026-10-20 by claude after the Copilot review
+  # on #31, confirmed by sathish on 2026-10-20. As a drop alone it mapped to nothing: a resume saying it got a gap.
+  aliases: ["oracle db", "oracle rdbms", "oracle relational database", "oracle 11g", "oracle 12c", "oracle 19c",
+            "oracle 21c", "oracle 23ai"]
   ambiguous: false
   implies: [sql, relational database]
 

@@ -1,0 +1,509 @@
+"""scripts/import_taxonomy.py: the cleaning and drop rules, and the committed generated files."""
+
+import importlib.util
+from pathlib import Path
+
+import pytest
+import yaml
+
+from careerfit.analyze.ontology import CURATED_SKILLS, IMPORTED_SKILLS, SkillEntry, load_ontology
+
+ROOT = Path(__file__).parent.parent
+_spec = importlib.util.spec_from_file_location("import_taxonomy", ROOT / "scripts" / "import_taxonomy.py")
+importer = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(importer)
+
+WORDS = {"word", "team", "cloud", "platform", "spark", "chef", "shiny", "switch", "manager", "experience",
+         "server", "protection"}
+
+
+@pytest.mark.parametrize(("example", "name", "aliases"), [
+    ("Learning management system LMS", "lms", {"learning management system"}),       # spelled out at the end
+    ("Amazon Web Services AWS CloudFormation", "aws cloudformation", set()),          # spelled out in the middle
+    # Copilot review on #31: the alias keeps the qualifiers, never a bare "enterprise edition".
+    ("Oracle Java Enterprise Edition EE", "oracle java ee", {"oracle java enterprise edition"}),
+    ("Adobe Experience Manager (AEM)", "adobe experience manager", {"aem"}),           # parenthetical acronym
+    ("EpicCare Electronic Medical Records (EMR) software", "epiccare electronic medical records", {"emr"}),
+    ("Database design software", "database design", set()),
+    ("Neo4j", "neo4j", set()),
+])
+def test_onet_names_are_cleaned(example, name, aliases):
+    assert importer.clean_onet(example) == (name, aliases)
+
+
+def test_esco_tags_in_parentheses_are_dropped():
+    assert importer.clean_esco("Python (computer programming)") == "python"
+
+
+@pytest.mark.parametrize(("token", "expected"), [
+    ("team", True), ("teams", True), ("switches", True), ("switched", True), ("switching", True),
+    ("neo4j", False), ("photoshop", False),
+])
+def test_everyday_words_include_their_inflected_forms(token, expected):
+    words = WORDS | {"switch"}
+    assert importer.everyday(token, words) is expected
+
+
+@pytest.mark.parametrize(("name", "alias"), [
+    ("adobe photoshop", "photoshop"),
+    ("microsoft sql server", "sql server"),       # "sql" isn't an everyday word
+    ("microsoft word", None),                     # would match "word" in any JD
+    ("microsoft teams", None),                    # "teams" is "team", inflected
+    ("google cloud platform", None),              # every word is everyday
+    ("sap erp", None),                            # a generic acronym names a kind of system, not SAP's
+    ("apache http server", None),                 # "an HTTP server in Python" isn't Apache experience
+    ("microsoft dns server", None),               # generic technology words only
+    ("symantec endpoint protection", None),       # "endpoint" is generic, "protection" everyday
+    ("vmware esx server", "esx server"),          # one distinctive word is enough
+])
+def test_a_vendor_prefix_adds_the_rest_as_an_alias_only_if_it_is_distinctive(name, alias):
+    assert importer.vendor_alias(name, WORDS) == alias
+
+
+def _row(example, soc="15-1252.00", hot="N", demand="N", element="Development environment software"):
+    return {"O*NET-SOC Code": soc, "Title": "t", "Workplace Example": example, "Element ID": "x",
+            "Element Name": element, "Hot Technology": hot, "In Demand": demand}
+
+
+CURATED = {"kubernetes": SkillEntry(aliases=("k8s",), ambiguous=False),
+           "pl/sql": SkillEntry(aliases=("plsql",), ambiguous=False)}
+
+
+def _build(onet=(), esco=(), overrides=None):
+    return importer.build(list(onet), list(esco), CURATED, WORDS, overrides or {})
+
+
+def test_scope_categories_everyday_words_and_curated_collisions():
+    skills, report = _build([
+        _row("Neo4j"),
+        _row("Some accounting tool", soc="13-2011.00"),                  # not a computer occupation...
+        _row("Hot accounting tool", soc="13-2011.00", hot="Y"),          # ...unless Hot or In Demand
+        _row("Development environment software"),                        # O*NET's own category label
+        _row("Spark"),                                                   # everyday word
+        _row("Kubernetes"),                                              # curated name
+        _row("Oracle PL/SQL"),                                           # a vendor form of curated pl/sql
+        _row("Database software"),                                       # "database": a modern everyday word
+        _row("Ansible software"),                                        # a product named "X software"
+    ])
+    assert sorted(skills) == ["ansible", "hot accounting tool", "neo4j"]
+    assert "oracle pl/sql: pl/sql" in report.review["dropped_curated_vendor_form"]
+    assert report.counts["dropped_everyday_word"] == 2  # spark, database
+    assert report.counts["dropped_curated_collision"] == 1
+
+
+def test_overrides_keep_drop_and_allow():
+    overrides = {"keep": ["spark"], "drop": ["neo4j"], "alias_allow": {"spark": ["apache spark engine"]}}
+    skills, _ = _build([_row("Spark"), _row("Neo4j")], overrides=overrides)
+    assert sorted(skills) == ["spark"]
+    assert skills["spark"].aliases == {"apache spark engine"}
+
+
+def test_esco_aliases_need_a_person_to_allow_them_and_abstract_concepts_are_dropped():
+    # Copilot review on #31: ESCO lists related technologies as alternative labels ("computer
+    # programming": Lua, AWK, PowerShell). Accepting them because O*NET has the term made distinct
+    # tools interchangeable and swallowed their own entries.
+    esco = [
+        {"skillType": "knowledge", "preferredLabel": "computer programming", "altLabels": "Lua | AWK | coding"},
+        {"skillType": "knowledge", "preferredLabel": "Neo4j (graph database)", "altLabels": "Neo4j graph"},
+        {"skillType": "knowledge", "preferredLabel": "concepts of telecommunications", "altLabels": ""},
+        {"skillType": "skill/competence", "preferredLabel": "use Neo4j", "altLabels": ""},
+    ]
+    skills, report = _build([_row("Lua"), _row("AWK"), _row("Neo4j")], esco)
+    assert skills["computer programming"].aliases == set()
+    assert {"lua", "awk"} <= set(skills)                                   # still their own skills
+    assert skills["neo4j"].sources == {"onet", "esco"}                     # same name: one skill
+    assert "computer programming: lua" in report.review["esco_alias_not_reviewed"]
+    assert "concepts of telecommunications" not in skills
+    assert report.counts["esco_not_knowledge"] == 1
+    allowed, _ = _build([_row("Neo4j")], esco, {"alias_allow": {"neo4j": ["neo4j graph"]}})
+    assert allowed["neo4j"].aliases == {"neo4j graph"}
+
+
+def test_a_rename_onto_an_existing_alias_does_not_crash_and_the_names_win():
+    # Copilot review on #31: renaming to another skill's alias raised KeyError. Renames now apply
+    # first, so "photoshop" is a name when the vendor merge runs, and Adobe Photoshop joins it.
+    skills, _ = _build([_row("Adobe Photoshop"), _row("OldPhotoshop")], overrides={"rename": {"oldphotoshop": "photoshop"}})
+    assert set(skills) == {"photoshop"}
+    assert skills["photoshop"].aliases == {"adobe photoshop", "oldphotoshop"}
+
+
+def test_a_vendor_duplicate_merges_into_the_plain_name_unless_two_vendors_claim_it():
+    esco = [{"skillType": "knowledge", "preferredLabel": "Hadoop", "altLabels": ""},
+            {"skillType": "knowledge", "preferredLabel": "iOS", "altLabels": ""}]
+    skills, _ = _build([_row("Apache Hadoop"), _row("Apple iOS"), _row("Cisco IOS")], esco)
+    assert "apache hadoop" not in skills and skills["hadoop"].aliases == {"apache hadoop"}
+    assert skills["hadoop"].sources == {"onet", "esco"}
+    assert {"apple ios", "cisco ios", "ios"} <= set(skills)
+    assert all("ios" not in skills[n].aliases for n in ("apple ios", "cisco ios"))
+
+
+def test_rendered_skills_load_next_to_the_curated_list(tmp_path):
+    skills, _ = _build([_row("Neo4j"), _row("Adobe Photoshop")])
+    curated = tmp_path / "skills.yaml"
+    curated.write_text("kubernetes:\n  aliases: [k8s]\n  ambiguous: false\n", encoding="utf-8")
+    imported = tmp_path / "skills_imported.yaml"
+    imported.write_text(importer.render_skills(skills), encoding="utf-8")
+    merged = load_ontology(curated, imported=imported)
+    assert list(merged) == ["kubernetes", "adobe photoshop", "neo4j"]
+    assert merged["adobe photoshop"].aliases == ("photoshop",)
+    assert merged["neo4j"].sources == ("onet",)
+
+
+# ---- the committed generated files ----
+
+IMPORTED = yaml.safe_load(IMPORTED_SKILLS.read_text(encoding="utf-8"))
+MANIFEST = yaml.safe_load((IMPORTED_SKILLS.parent / "IMPORT_MANIFEST.yaml").read_text(encoding="utf-8"))
+
+
+def test_the_generated_file_is_current_with_the_curated_list():
+    # Nothing imported may collide with skills.yaml; if it does, the curated list grew after the last
+    # import: regenerate with scripts/import_taxonomy.py.
+    curated = load_ontology(CURATED_SKILLS)
+    merged = load_ontology(CURATED_SKILLS, imported=IMPORTED_SKILLS)
+    assert len(merged) == len(curated) + len(IMPORTED)
+
+
+def test_generated_entries_are_lowercase_ascii_with_only_reviewed_implications():
+    reviewed = yaml.safe_load((IMPORTED_SKILLS.parent / "import_overrides.yaml").read_text(encoding="utf-8"))["implies"]
+    for name, entry in IMPORTED.items():
+        assert name == name.lower() and name.isascii(), name
+        assert all(a == a.lower() and a.isascii() for a in entry["aliases"]), name
+        assert set(entry["sources"]) <= {"onet", "esco"}, name
+        # Implications are curated facts: only those reviewed in import_overrides.yaml, never the taxonomy's.
+        assert entry.get("implies", []) == sorted(reviewed.get(name, [])), name
+
+
+def test_the_manifest_counts_match_the_generated_file():
+    assert MANIFEST["counts"]["imported_skills"] == len(IMPORTED)
+    assert MANIFEST["counts"]["imported_aliases"] == sum(len(e["aliases"]) for e in IMPORTED.values())
+
+
+def test_a_rename_merge_checks_the_incoming_aliases_too():
+    # Copilot review on #31: renaming OldGraph (K8S) onto neo4j copied the curated alias k8s
+    # unchecked, and load_ontology() then dropped the whole imported neo4j entry.
+    skills, report = _build([_row("Neo4j"), _row("OldGraph (K8S)")], overrides={"rename": {"oldgraph": "neo4j"}})
+    assert "k8s" not in skills["neo4j"].aliases
+    assert "neo4j: k8s" in report.review["alias_dropped_curated_collision"]
+
+
+def test_a_qualified_jd_name_and_an_unqualified_resume_name_are_one_skill(tmp_path):
+    # Copilot review on #31: "oracle pl/sql" as its own skill made a JD asking for "Oracle PL/SQL"
+    # demand it too, and a resume saying "PL/SQL" then got a false gap.
+    from datetime import datetime, timezone
+    from careerfit.analyze.observations import build_facts
+    from careerfit.facts.schema import Coverage
+    skills, _ = _build([_row("Oracle PL/SQL")])
+    assert skills == {}  # pl/sql is curated (CURATED above), so its vendor form isn't imported
+    curated = tmp_path / "skills.yaml"
+    curated.write_text("pl/sql:\n  aliases: [plsql]\n  ambiguous: false\n", encoding="utf-8")
+    imported = tmp_path / "skills_imported.yaml"
+    imported.write_text(importer.render_skills(skills), encoding="utf-8")
+    txt = Coverage(source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=1, known_blind_spots=())
+    facts = build_facts(resume_text="Wrote PL/SQL packages", resume_coverage=txt, resume_source="r",
+                        jd_text="Requirements:\n- Oracle PL/SQL", jd_coverage=txt, jd_source="j",
+                        ontology=load_ontology(curated, imported=imported), at=datetime.now(timezone.utc),
+                        perspective="candidate")
+    assert [(o.skill, o.status.value) for o in facts.skill_observations] == [("pl/sql", "matched")]
+
+
+def test_a_vendor_form_is_kept_when_its_plain_name_would_be_dropped():
+    # Copilot review on #31: O*NET "Apache Spark" + ESCO "Spark" merged into "spark", which the
+    # everyday-word rule then dropped, losing the tool.
+    esco = [{"skillType": "knowledge", "preferredLabel": "Spark", "altLabels": ""}]
+    skills, report = _build([_row("Apache Spark")], esco)
+    assert "apache spark" in skills and "spark" not in skills
+    assert report.counts["vendor_merge_skipped_plain_dropped"] == 1
+    kept, _ = _build([_row("Apache Spark")], esco, {"keep": ["spark"]})   # unless overrides keep "spark"
+    assert "spark" in kept and "apache spark" in kept["spark"].aliases
+
+
+def test_an_allowed_alias_skips_only_the_everyday_word_check():
+    # Copilot review on #31: alias_allow couldn't restore a reviewed synonym that is a word ("tomcat").
+    words = WORDS | {"tomcat"}                                         # "tomcat" is an everyday word here
+    rows, overrides = [_row("Apache Tomcat")], {"alias_allow": {"apache tomcat": ["tomcat", "k8s"]}}
+    plain, _ = importer.build(rows, [], CURATED, words, {})
+    assert plain["apache tomcat"].aliases == set()                     # without the override: rejected
+    skills, _ = importer.build(rows, [], CURATED, words, overrides)
+    assert skills["apache tomcat"].aliases == {"tomcat"}   # k8s is curated: the collision check still applies
+
+
+def test_the_committed_import_has_no_reviewed_duplicate_of_a_curated_skill():
+    for name in ("jenkins ci", "restful api", "amazon simple storage service s3", "agile development"):
+        assert name not in IMPORTED, name
+
+
+def test_a_plural_name_merges_into_its_singular_name_or_alias():
+    # Copilot review on #31: "learning management systems" was its own skill next to "lms" (alias
+    # "learning management system"), so a JD asking for both demanded both, and a resume saying
+    # "LMS" got a gap on the plural.
+    esco = [{"skillType": "knowledge", "preferredLabel": "learning management systems", "altLabels": ""},
+            {"skillType": "knowledge", "preferredLabel": "computer forensics", "altLabels": ""}]
+    skills, report = _build([_row("Learning management system LMS"), _row("Computer forensic software")], esco)
+    assert "learning management systems" not in skills
+    assert skills["lms"].aliases == {"learning management system", "learning management systems"}
+    assert skills["lms"].sources == {"onet", "esco"}
+    assert "computer forensics" not in skills and skills["computer forensic"].aliases == {"computer forensics"}
+    assert "learning management systems -> lms" in report.review["merged_plural_duplicate"]
+    one_word, _ = _build([_row("Canva"), _row("Canvas LMS"), _row("Sas"), _row("Sass")], overrides={"keep": ["sass"]})
+    assert {"canva", "sass", "sas"} <= set(one_word)          # one word: another product, never merged
+
+
+def test_a_rename_onto_another_skill_keeps_the_old_name_as_an_alias():
+    skills, _ = _build([_row("Neo4j"), _row("Neo4j graph database")], overrides={"rename": {"neo4j graph database": "neo4j"}})
+    assert skills["neo4j"].aliases == {"neo4j graph database"}
+
+
+def test_the_committed_import_has_one_lms_skill():
+    assert "learning management systems" not in IMPORTED and "computer forensics" not in IMPORTED
+    assert {"learning management system", "learning management systems"} <= set(IMPORTED["lms"]["aliases"])
+
+
+def test_a_jd_asking_for_learning_management_systems_matches_a_resume_saying_lms():
+    from datetime import datetime, timezone
+    from careerfit.analyze.observations import build_facts
+    from careerfit.analyze.ontology import load_default_ontology
+    from careerfit.facts.schema import Coverage
+    txt = Coverage(source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=1, known_blind_spots=())
+    facts = build_facts(resume_text="Ran the company LMS rollout", resume_coverage=txt, resume_source="r",
+                        jd_text="Requirements:\n- Learning management systems (LMS) administration", jd_coverage=txt,
+                        jd_source="j", ontology=load_default_ontology(), at=datetime.now(timezone.utc),
+                        perspective="candidate")
+    assert [(o.skill, o.status.value) for o in facts.skill_observations] == [("lms", "matched")]
+
+
+def test_overrides_apply_to_source_names_before_the_automatic_merges():
+    # Copilot review on #31: the merges ran first, so a drop or rename of a merged source name never
+    # took effect ("apache hadoop" stayed an alias; "hadoop engine" was never produced).
+    esco = [{"skillType": "knowledge", "preferredLabel": "Hadoop", "altLabels": ""},
+            {"skillType": "knowledge", "preferredLabel": "learning management systems", "altLabels": ""}]
+    rows = [_row("Apache Hadoop"), _row("Learning management system LMS")]
+    dropped, _ = _build(rows, esco, {"drop": ["apache hadoop"]})
+    assert dropped["hadoop"].aliases == set() and "apache hadoop" not in dropped
+    renamed, _ = _build(rows, esco, {"rename": {"apache hadoop": "hadoop engine"}})
+    assert renamed["hadoop engine"].aliases == {"apache hadoop"} and renamed["hadoop"].aliases == set()
+    plural, _ = _build(rows, esco, {"rename": {"learning management systems": "lms suites"}})
+    assert plural["lms suites"].aliases == {"learning management systems"}
+    assert plural["lms"].aliases == {"learning management system"}
+
+
+def test_an_allowed_alias_survives_a_candidate_that_is_dropped_later():
+    # Copilot review on #31: "spark" was rejected as an alias of apache spark because a "spark"
+    # candidate existed, although the everyday-word rule then dropped it.
+    esco = [{"skillType": "knowledge", "preferredLabel": "Spark", "altLabels": ""}]
+    skills, _ = _build([_row("Apache Spark")], esco, {"alias_allow": {"apache spark": ["spark"]}})
+    assert "spark" not in skills and skills["apache spark"].aliases == {"spark"}
+    kept, report = _build([_row("Apache Spark"), _row("Neo4j")], esco,
+                          {"keep": ["spark"], "alias_allow": {"neo4j": ["spark"]}})
+    assert "spark" in kept and "spark" not in kept["neo4j"].aliases        # a real name still wins
+
+
+def test_a_vendor_product_does_not_merge_into_a_generic_discipline():
+    # Copilot review on #31: "sap business intelligence" became an alias of "business intelligence",
+    # so a resume naming the discipline met a JD asking for SAP's product.
+    words = WORDS | {"business", "intelligence"}
+    esco = [{"skillType": "knowledge", "preferredLabel": "business intelligence", "altLabels": ""},
+            {"skillType": "knowledge", "preferredLabel": "Hadoop", "altLabels": ""}]
+    skills, report = importer.build([_row("SAP Business Intelligence"), _row("Apache Hadoop")], esco, CURATED, words, {})
+    assert {"sap business intelligence", "business intelligence"} <= set(skills)
+    assert skills["business intelligence"].aliases == set() and skills["sap business intelligence"].aliases == set()
+    assert "apache hadoop" in skills["hadoop"].aliases                   # a distinctive name still merges
+    assert "sap business intelligence -> business intelligence" in report.review["vendor_merge_skipped_generic_plain"]
+
+
+def _facts(resume, jd):
+    from datetime import datetime, timezone
+    from careerfit.analyze.observations import build_facts
+    from careerfit.analyze.ontology import load_default_ontology
+    from careerfit.facts.schema import Coverage
+    txt = Coverage(source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=1, known_blind_spots=())
+    facts = build_facts(resume_text=resume, resume_coverage=txt, resume_source="r", jd_text=f"Requirements:\n- {jd}",
+                        jd_coverage=txt, jd_source="j", ontology=load_default_ontology(), at=datetime.now(timezone.utc),
+                        perspective="candidate")
+    return {o.skill: o.status.value for o in facts.skill_observations}
+
+
+def test_ssis_is_one_skill_under_both_names():
+    # Copilot review on #31: "microsoft ssis" (alias ssis) and "sql server integration services" were
+    # two skills, so a resume saying "SSIS" got a false gap on the expanded name.
+    assert "microsoft ssis" not in IMPORTED
+    assert {"microsoft ssis", "ssis"} <= set(IMPORTED["sql server integration services"]["aliases"])
+    # The SQL Server and SQL inside the expanded name are part of it, not requirements of their own
+    # (Copilot review on #31: they were false gaps), unless the JD names them on their own too.
+    assert _facts("Built SSIS packages", "SQL Server Integration Services (SSIS)") == {
+        "sql server integration services": "matched"}
+    assert _facts("Built SSIS packages", "SQL Server and SQL Server Integration Services") == {
+        "sql server": "gap", "sql server integration services": "matched"}
+
+
+def test_a_vendor_product_stays_apart_from_the_discipline_in_the_committed_import():
+    assert "sap business intelligence" in IMPORTED
+    assert "sap business intelligence" not in IMPORTED["business intelligence"]["aliases"]
+    assert _facts("Business intelligence dashboards", "SAP Business Intelligence")["sap business intelligence"] == "gap"
+    assert "microsoft active directory" in IMPORTED["active directory"]["aliases"]   # reviewed renames
+    assert "microsoft visual basic" in IMPORTED["visual basic"]["aliases"]
+
+
+@pytest.mark.parametrize(("resume", "jd", "skill", "status"), [
+    # Copilot review on #31: MySQL implied nothing, and "or another" didn't join an alternative.
+    ("MySQL", "MySQL or another relational database", "relational database", "matched"),
+    ("MySQL", "PostgreSQL or another relational database", "postgresql", "alternative_met"),
+    ("SQL Server and DB2", "Relational databases", "relational database", "matched"),
+    ("MariaDB", "PostgreSQL or any other relational database", "postgresql", "alternative_met"),
+])
+def test_relational_engines_meet_a_relational_database_requirement(resume, jd, skill, status):
+    assert _facts(resume, jd)[skill] == status
+
+
+@pytest.mark.parametrize("overrides", [
+    {},                                                         # the automatic vendor merge
+    {"rename": {"apache hadoop": "hadoop"}},                    # a reviewed rename onto the same name
+])
+def test_an_allowance_keyed_by_a_source_name_survives_merges_and_renames(overrides):
+    # Copilot review on #31: alias_allow was looked up under the final name only, so an allowance for
+    # "apache hadoop" was lost when it merged into "hadoop", with its everyday-word exemption.
+    words = WORDS | {"framework"}
+    esco = [{"skillType": "knowledge", "preferredLabel": "Hadoop", "altLabels": ""}]
+    allow = {"alias_allow": {"apache hadoop": ["hadoop framework", "framework"], "neo4j": ["k8s"]}}
+    skills, _ = importer.build([_row("Apache Hadoop"), _row("Neo4j")], esco, CURATED, words, {**overrides, **allow})
+    assert skills["hadoop"].aliases == {"apache hadoop", "hadoop framework", "framework"}
+    assert skills["neo4j"].aliases == set()                     # the collision checks still apply
+
+
+def test_an_allowance_survives_a_plural_merge():
+    esco = [{"skillType": "knowledge", "preferredLabel": "learning management systems", "altLabels": ""}]
+    skills, _ = _build([_row("Learning management system LMS")], esco,
+                       {"alias_allow": {"learning management systems": ["lms platforms"]}})
+    assert "lms platforms" in skills["lms"].aliases
+
+
+def test_a_generic_technology_mention_does_not_show_the_vendor_product():
+    # Copilot review on #31: "apache http server" had the alias "http server", so a resume that
+    # implemented an HTTP server in Python met an Apache HTTP Server requirement.
+    for name in ("apache http server", "microsoft dns server", "symantec endpoint protection"):
+        assert IMPORTED[name]["aliases"] == []
+    assert _facts("Implemented an HTTP server in Python", "Apache HTTP Server administration") == {
+        "apache http server": "gap"}
+    assert _facts("Ran the Apache HTTP Server fleet", "Apache HTTP Server administration") == {
+        "apache http server": "matched"}
+
+
+def test_either_or_reads_a_vendor_qualified_name_from_its_start():
+    # Copilot review on #31: the kept SSIS mention starts at "SQL", so " or Microsoft " sat between the
+    # two and they were read as two requirements: a Python-only resume got a false SSIS gap.
+    assert _facts("Built ETL in Python", "Python or Microsoft SQL Server Integration Services") == {
+        "python": "matched", "sql server integration services": "alternative_met"}
+    assert _facts("Built ETL in Python", "Python and Microsoft SQL Server Integration Services") == {
+        "python": "matched", "sql server integration services": "gap"}
+
+
+@pytest.mark.parametrize(("resume", "jd", "expected"), [
+    # Copilot review on #31: the nested-name rule hid the broader skill inside an imported name, and
+    # nothing brought it back. The reviewed implications in import_overrides.yaml do.
+    ("Wrote Transact-SQL procedures", "Strong SQL skills", {"sql": "matched"}),
+    ("Developed Java EE applications", "Java experience", {"java": "matched"}),
+    ("Deployed Microsoft Azure Data Factory pipelines", "Microsoft Azure experience", {"azure": "matched"}),
+    # Kept apart on purpose: SSIS shows no SQL Server, Lightroom no Photoshop, Aurora HelioScope (solar
+    # design software) no Amazon Aurora.
+    ("Built SSIS packages", "SQL Server experience", {"sql server": "gap"}),
+    ("Edited photos in Adobe Photoshop Lightroom", "Adobe Photoshop", {"adobe photoshop": "gap"}),
+    ("Designed arrays with Aurora HelioScope", "Amazon Aurora", {"aurora": "gap"}),
+])
+def test_a_reviewed_implication_restores_the_broader_skill(resume, jd, expected):
+    assert _facts(resume, jd) == expected
+
+
+def test_implies_overrides_apply_to_imported_skills_only_and_name_curated_targets():
+    skills, report = _build([_row("Transact-SQL")], overrides={"implies": {"transact-sql": ["pl/sql"],
+                                                                         "gone tool": ["kubernetes"]}})
+    assert skills["transact-sql"].implies == {"pl/sql"}
+    assert "gone tool: not an imported skill (dropped or renamed?)" in report.review["implies_not_applied"]
+    with pytest.raises(ValueError, match="not curated skill names"):
+        _build([_row("Transact-SQL")], overrides={"implies": {"transact-sql": ["sqll"]}})
+    assert 'implies: ["pl/sql"]' in importer.render_skills(skills)
+
+
+def test_a_job_title_is_no_alias():
+    # Copilot review on #31: "oracle sql developer" (the IDE) had the alias "sql developer", so a resume
+    # titled "SQL Developer" met an Oracle SQL Developer requirement, and a JD hiring one demanded the IDE.
+    assert importer.job_title("sql developer", {"sql"}) and importer.job_title("java engineer", {"java"})
+    assert not importer.job_title("arcgis spatial analyst", {"sql"})   # a product name, not a title
+    assert not importer.job_title("developer", {"sql"})
+    assert IMPORTED["oracle sql developer"]["aliases"] == []
+    assert "oracle sql developer: sql developer" in MANIFEST["review"]["alias_dropped_job_title"]
+    assert _facts("SQL Developer, Acme Corp 2019-2024", "Oracle SQL Developer") == {"oracle sql developer": "gap"}
+    assert "oracle sql developer" not in _facts("Wrote SQL", "We are hiring a SQL Developer")
+    assert _facts("Tuned queries in Oracle SQL Developer", "Oracle SQL Developer") == {"oracle sql developer": "matched"}
+
+
+@pytest.mark.parametrize(("resume", "jd", "expected"), [
+    # Copilot review on #31: the dropped "oracle relational database" mapped to nothing. It is now an
+    # alias of the curated "oracle database", in both directions.
+    ("Administered an Oracle relational database", "Oracle Database",
+     {"oracle database": "matched"}),
+    ("Administered Oracle Database 19c", "Oracle relational database",
+     {"oracle database": "matched"}),
+])
+def test_oracle_relational_database_is_oracle_database(resume, jd, expected):
+    assert "oracle relational database" not in IMPORTED
+    assert _facts(resume, jd) == expected
+
+
+def test_uml_is_one_skill_under_both_spellings():
+    # Copilot review on #31: "unified modelling language" was its own skill, so "Unified Modelling
+    # Language (UML)" asked for two, and a resume saying "UML" got a match and a gap.
+    assert "unified modelling language" not in IMPORTED
+    assert {"unified modeling language", "unified modelling language"} <= set(IMPORTED["uml"]["aliases"])
+    assert _facts("Designed services with UML diagrams", "Unified Modelling Language (UML)") == {"uml": "matched"}
+
+
+def test_workspace_is_an_everyday_word_and_no_alias():
+    # Copilot review on #31: "Configured a local development workspace" met a JD asking for Google Workspace.
+    assert importer.everyday("workspace", set()) and importer.everyday("workspaces", set())
+    assert importer.vendor_alias("google workspace", set()) is None
+    assert "workspace" not in IMPORTED["google workspace"]["aliases"]
+
+
+def test_an_expansion_that_opens_with_an_article_is_no_alias():
+    # Copilot review on #31: "a programming language" was an alias of APL, so "a programming language
+    # such as Python" demanded APL.
+    assert importer.clean_onet("A Programming Language APL") == ("apl", set())
+    assert importer.clean_onet("Structured query report SQR") == ("sqr", {"structured query report"})
+    assert "a programming language" not in IMPORTED["apl"]["aliases"]
+    assert _facts("Python", "Experience with a programming language such as Python") == {"python": "matched"}
+
+
+def test_esco_names_get_the_vendor_free_alias_too():
+    # Copilot review on #31: ESCO-only "microsoft visual c++" had no alias, so "Visual C++" on a resume
+    # got a gap. Its unreviewed alternative labels still aren't aliases.
+    esco = [{"skillType": "knowledge", "preferredLabel": "Microsoft Visual C++", "altLabels": "MSVC | VC++"}]
+    skills, _ = _build([], esco)
+    assert skills["microsoft visual c++"].aliases == {"visual c++"}
+    assert _facts("Visual C++ desktop apps", "Microsoft Visual C++") == {"microsoft visual c++": "matched"}
+
+
+def test_a_vendor_product_with_a_generic_plain_name_is_kept():
+    # Copilot review on #31: "amazon data pipeline" was dropped as a vendor form of curated "data
+    # pipelines", so ordinary pipeline work met a JD asking for the AWS product.
+    curated = {**CURATED, "data pipelines": SkillEntry(aliases=("data pipeline",), ambiguous=False)}
+    words = WORDS | {"data", "pipeline"}
+    skills, _ = importer.build([_row("Amazon Data Pipeline"), _row("Oracle PL/SQL")], [], curated, words, {})
+    assert "amazon data pipeline" in skills and "oracle pl/sql" not in skills
+    assert _facts("Built data pipelines", "Amazon Data Pipeline") == {"amazon data pipeline": "gap"}
+
+
+def test_the_longer_of_two_overlapping_names_wins_wherever_it_starts():
+    # Copilot review on #31: "Microsoft SQL Server Integration Services" kept the earlier
+    # "microsoft sql server" (0-20) and dropped SSIS's longer name (10-41).
+    assert _facts("Built SSIS packages", "Microsoft SQL Server Integration Services") == {
+        "sql server integration services": "matched"}
+    assert _facts("Microsoft SQL Server Integration Services", "SQL Server")["sql server"] == "gap"
+
+
+@pytest.mark.parametrize(("resume", "jd", "expected"), [
+    # Copilot review on #31: the idiom read as the testing library, on both sides.
+    ("Python", "Rest assured, we support your growth with Python", {"rest assured": "unresolvable", "python": "matched"}),
+    ("Rest assured, I deliver", "REST Assured", {"rest assured": "unresolvable"}),
+    ("API tests with RestAssured", "REST-assured API testing", {"rest assured": "matched"}),
+])
+def test_rest_assured_the_idiom_is_not_the_library(resume, jd, expected):
+    assert {k: v for k, v in _facts(resume, jd).items() if k in expected} == expected

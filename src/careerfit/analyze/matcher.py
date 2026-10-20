@@ -293,13 +293,22 @@ def _split_spans(found: Iterable[Mention]) -> tuple[list[Span], list[tuple[Span,
     return [kept[k] for k in order], nested
 
 
-def _choice_of(clause: str, kept: list[Span]) -> list[int]:
+def _choice_of(clause: str, kept: list[Span], nested: Iterable[tuple[Span, int]] = ()) -> list[int]:
     """For each kept mention, an id shared by every mention in the same either/or choice.
 
     A comma list ending in "or" is one choice ("A, B, or C"), and so is a chain of "or"s ("A or B or
     C"); a comma after a choice starts a new list ("A or B, C or D" is two choices). A sentence that
     asks for a count above one ("at least two of") gives every mention its own choice.
+
+    The text between two mentions is read from the full reach of each, nested mentions included:
+    in "Python or Microsoft SQL Server Integration Services" the kept SSIS name starts at "SQL", but
+    the "Microsoft SQL Server" it swallowed starts at "Microsoft", so only " or " sits between.
     """
+    starts = [span[0] for span in kept]
+    ends = [span[1] for span in kept]
+    for (start, end, _skill), i in nested:
+        starts[i] = min(starts[i], start)
+        ends[i] = max(ends[i], end)
     parent = list(range(len(kept)))
     if _COUNTED.search(clause):
         return parent
@@ -313,7 +322,7 @@ def _choice_of(clause: str, kept: list[Span]) -> list[int]:
     run = [0] if kept else []  # the comma-joined mentions ending at the current one
     after_or = False
     for i in range(1, len(kept)):
-        between = clause[kept[i - 1][1]:kept[i][0]]
+        between = clause[ends[i - 1]:starts[i]]
         if len(between) > MAX_JOIN:
             run, after_or = [i], False
         elif _OR_JOIN.fullmatch(between):
@@ -340,7 +349,7 @@ def mention_alternatives(clause: str, ontology: Mapping[str, SkillEntry]) -> lis
 
 def _alternatives(clause: str, found: Iterable[Mention]) -> list[tuple[str, frozenset[str]]]:
     kept, nested = _split_spans(found)
-    choice = _choice_of(clause, kept)
+    choice = _choice_of(clause, kept, nested)
     members: dict[int, set[str]] = {}  # built once: looking each choice up again per mention is quadratic
     for span, group in zip(kept, choice):
         members.setdefault(group, set()).add(span[2])
@@ -354,9 +363,9 @@ def _alternatives(clause: str, found: Iterable[Mention]) -> list[tuple[str, froz
 
 def alternative_groups(clause: str, ontology: Mapping[str, SkillEntry]) -> list[frozenset[str]]:
     """The groups of skills the clause offers as either/or choices, in order of first mention."""
-    kept, _ = _mention_spans(clause, ontology)
+    kept, nested = _mention_spans(clause, ontology)
     groups: dict[int, set[str]] = {}
-    for span, choice in zip(kept, _choice_of(clause, kept)):
+    for span, choice in zip(kept, _choice_of(clause, kept, nested)):
         groups.setdefault(choice, set()).add(span[2])
     return [frozenset(g) for g in groups.values() if len(g) > 1]
 
