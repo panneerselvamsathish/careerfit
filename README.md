@@ -23,12 +23,16 @@ analyze/   Pure keyword extraction and gap computation. No LLM, no network.
 facts/     Pydantic v2 schema. The shared contract between all packages.
 judge/     The only layer allowed to call the Anthropic API. Semantic matching,
            confidence scoring, learning path generation.
-ontology/  Skills taxonomy data file (skills.yaml). Data, not code.
+ontology/  Skill lists, data not code: skills.yaml (hand-written, always wins) and
+           skills_imported.yaml (generated from O*NET® and ESCO; see NOTICE.md).
 report/    Renderers only. Zero logic. Two perspectives: candidate, hiring_manager.
 ```
 
 Architectural boundaries are enforced by `tests/test_architecture.py` using `ast.parse()` —
 not conventions, not comments. A build constraint.
+
+Diagrams: [the pipeline](docs/architecture-flowchart.png) and [a `--deep` run step by step](docs/deep-run-sequence.png)
+(Mermaid sources in [docs/architecture.html](docs/architecture.html)).
 
 ## Milestones
 
@@ -41,6 +45,7 @@ not conventions, not comments. A build constraint.
 - [x] Milestone 7: Report + CLI — Markdown reports for two perspectives, every claim quoted, blind spots disclosed
 - [x] Milestone 8: Web API + UI — FastAPI file upload, vanilla JS client, strict CSP
 - [x] Milestone 9: Deploy — public-safe server limits, container image, CI deploy, live URL (free keyword tier) · *live since Oct 16, 2026, deployed by hand with `sam build && sam deploy`; the CI deploy job is written and connects once the AWS account allows GitHub's OIDC provider (M10)*
+- [x] Skill coverage (between M9 and M10), live since Oct 20, 2026 · *single-pass matcher (#29); Unicode dashes and the two-file loader (#30); matcher fixes and new hand-written skills (#32); 1,784 technology skills imported from O\*NET® 31.0 and ESCO v1.2.1 (#31, #33). Next: say how many of the JD's requirement lines the skill list could read (A1.3)*
 - [ ] Milestone 10: Paid tier — accounts, usage metering and rate limits, Stripe, `--deep` on the web
 
 ## Getting started
@@ -116,8 +121,17 @@ resume mentions the skill also cite that resume line.
 | `unresolvable` | A word like "Go" or "React" could be the skill or an ordinary word, so the keyword pass doesn't guess. `--deep` asks the LLM judge to settle these |
 | `not_assessed` | Part of the resume couldn't be read (for example scanned PDF pages), so a missing skill is not reported as a gap |
 
-The keyword pass only knows the skills listed in `src/careerfit/ontology/skills.yaml`.
-Skills outside that list are not checked at all.
+The keyword pass only knows the skills in its two lists: the hand-written
+`src/careerfit/ontology/skills.yaml` (177 skills) and the generated `skills_imported.yaml` (1,784
+technology skills from O\*NET® and ESCO). Skills outside them are not checked at all.
+
+A few matching rules worth knowing:
+
+- **"non-X" names nothing inside it:** "non-relational databases" asks for no relational database.
+- **A skill named only inside a longer skill's name is part of it:** "SQL Server Integration
+  Services" asks for SSIS, not SQL Server too. Of two overlapping names, the longer wins.
+- **"or" offers a choice:** "PostgreSQL or another relational database" is met by MySQL
+  (`alternative_met`).
 
 ### Growing the skill list
 
