@@ -3652,10 +3652,6 @@
   aliases: []
   ambiguous: false
   sources: [onet]
-"linkedin":
-  aliases: []
-  ambiguous: false
-  sources: [onet]
 "linq":
   aliases: []
   ambiguous: false
