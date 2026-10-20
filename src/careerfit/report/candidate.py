@@ -2,7 +2,7 @@
 
 from careerfit.facts.schema import GapAnalysisFacts
 from careerfit.report.shared import (STATUS_LABEL, blind_spots, by_requirement, cell, cite, header,
-                                     provenance_section, status_counts)
+                                     coverage_summary, provenance_section, status_counts)
 
 
 def render(facts: GapAnalysisFacts) -> str:
@@ -12,6 +12,8 @@ def render(facts: GapAnalysisFacts) -> str:
     if facts.fit_score is not None:
         lines.append(f"- Fit: **{facts.fit_score.overall:.0%}**. {cell(facts.fit_score.explanation)}")
     lines += [f"- Must-have skills: {status_counts(must)}", f"- Nice-to-have skills: {status_counts(nice)}", ""]
+    if summary := coverage_summary(facts):
+        lines.insert(len(lines) - 1, f"- {summary}")
     for title, rows in (("Must-have skills", must), ("Nice-to-have skills", nice)):
         if not rows:
             continue

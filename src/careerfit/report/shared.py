@@ -17,6 +17,7 @@ STATUS_ORDER = [SkillStatus.MATCHED, SkillStatus.PARTIAL, SkillStatus.ALTERNATIV
                 SkillStatus.UNRESOLVABLE, SkillStatus.NOT_ASSESSED]
 DECIDED = (SkillStatus.MATCHED, SkillStatus.PARTIAL, SkillStatus.GAP)
 LAYOUT_BLIND_SPOTS = ("layout_order", "graphics", "tables")
+LOW_COVERAGE = 0.5  # below this share of requirement lines read, the result gets a plain warning
 # What can start HTML or inline Markdown: tags and autolinks (< >), links and images ([ ]),
 # emphasis, strikethrough and code (* _ ~ `), the table delimiter (|), and the backslash itself.
 _MARKDOWN_ACTIVE = re.compile(r"([\\`*_~\[\]<>|])")
@@ -84,13 +85,36 @@ def blind_spots(facts: GapAnalysisFacts) -> list[str]:
     return ["## What this analysis could not see", "", *(f"- {n}" for n in blind_spot_notes(facts, cell)), ""]
 
 
+def requirement_lines_read(facts: GapAnalysisFacts) -> str | None:
+    """"8 of 23 requirement lines (35%)", or None when there is no count."""
+    count = facts.jd_requirement_lines
+    if count is None or count.total == 0:
+        return None
+    percent = (200 * count.read + count.total) // (2 * count.total)  # half up, as the web page rounds it
+    return f"{count.read} of {count.total} requirement lines ({percent}%)"
+
+
+def coverage_summary(facts: GapAnalysisFacts) -> str | None:
+    """The summary line, with a plain warning when the skill list read less than half of the JD."""
+    read = requirement_lines_read(facts)
+    if read is None:
+        return None
+    count = facts.jd_requirement_lines
+    low = count.read / count.total < LOW_COVERAGE
+    return (f"The skill list could read {read}."
+            + (" Less than half, so this result shows only part of what the job asks for." if low else ""))
+
+
 def blind_spot_notes(facts: GapAnalysisFacts, quote: Callable[[str], str] = str) -> list[str]:
     """The notes themselves. Every value taken from the facts goes through quote: cell() for Markdown,
     plain str for a caller that displays text literally (the web page sets textContent)."""
     def names(items: Iterable[str]) -> str:
         return ", ".join(quote(i) for i in items)
 
-    notes = ["Only skills in careerfit's skill list were checked. Anything else the job asks for is not shown here."]
+    read = requirement_lines_read(facts)
+    notes = [f"careerfit's skill list could read {read} in the job description. Only skills in its list were "
+             "checked; anything else the job asks for is not shown here." if read else
+             "Only skills in careerfit's skill list were checked. Anything else the job asks for is not shown here."]
     resume, jd = facts.resume_coverage, facts.jd_coverage
     if "scanned_pages" in resume.known_blind_spots:
         unread = (resume.pages_total or 0) - (resume.pages_with_text or 0)

@@ -2,7 +2,7 @@
 
 from careerfit.facts.schema import GapAnalysisFacts, SkillStatus
 from careerfit.report.shared import (STATUS_LABEL, blind_spots, by_requirement, cell, cite, header, names,
-                                     provenance_section, status_counts)
+                                     coverage_summary, provenance_section, status_counts)
 
 UNCERTAIN = (SkillStatus.UNRESOLVABLE, SkillStatus.NOT_ASSESSED)
 LEVEL_LABEL = {"must": "must-have", "nice": "nice-to-have"}
@@ -21,6 +21,8 @@ def render(facts: GapAnalysisFacts) -> str:
               f"- Missing must-haves: {names(missing) if missing else 'none'}",
               f"- Needs a human check: {names(uncertain) if uncertain else 'nothing'}",
               f"- Nice-to-have requirements: {status_counts(nice)}", ""]
+    if summary := coverage_summary(facts):
+        lines.insert(len(lines) - 1, f"- {summary}")
     lines += ["## Requirements", "", "| Requirement | Level | Status | Evidence in the resume | Asked for in the JD |",
               "|---|---|---|---|---|"]
     lines += [f"| {cell(o.skill)} | {LEVEL_LABEL[o.requirement]} | {STATUS_LABEL[o.status]} | {cite(o.resume_evidence)} | "

@@ -140,7 +140,9 @@ def test_facts_match_the_oracle_on_every_resume_and_jd_pair(name, resume, jd):
     new = observations.build_facts(ontology=SKILLS, **kwargs)
     old = old_observations.build_facts(ontology=PLAIN, **{**kwargs, "resume_text": _oracle_view(resume),
                                                             "jd_text": _oracle_view(jd)})
-    assert _oracle_view(new.model_dump_json()) == old.model_dump_json()
+    # jd_requirement_lines (0.7.0) is new, not a matcher change: the oracle never had it.
+    assert (_oracle_view(new.model_dump_json(exclude={"jd_requirement_lines"}))
+            == old.model_dump_json(exclude={"jd_requirement_lines"}))
 
 
 def _random_texts(n: int, seed: int) -> list[str]:

@@ -591,6 +591,19 @@ function setDownload(id, text, type) {
   $(id).href = url;
 }
 
+// Same wording as report/shared.py coverage_summary(): how much of the JD the skill list could read.
+const LOW_COVERAGE = 0.5;
+function renderCoverage(count) {
+  const line = $("coverage");
+  line.hidden = !count || count.total === 0;
+  if (line.hidden) return;
+  const low = count.read / count.total < LOW_COVERAGE;
+  const percent = Math.floor((200 * count.read + count.total) / (2 * count.total)); // half up, as in Python
+  line.classList.toggle("low", low);
+  line.textContent = `The skill list could read ${count.read} of ${count.total} requirement lines (${percent}%).` +
+    (low ? " Less than half, so this result shows only part of what the job asks for." : "");
+}
+
 function render(payload) {
   const { facts, blind_spots: blindSpots, report_markdown: markdown } = payload;
   current = { facts };
@@ -616,6 +629,7 @@ function render(payload) {
   summary.setAttribute("aria-label", "Summary");
   summary.replaceChildren(tally("Must have", must), tally("Nice to have", nice));
   summary.hidden = all.length === 0;
+  renderCoverage(facts.jd_requirement_lines);
 
   renderFilters(all);
   renderGroups();

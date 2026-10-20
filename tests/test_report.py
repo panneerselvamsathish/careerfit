@@ -48,7 +48,8 @@ def test_keyword_report_cites_both_documents_and_suggests_deep():
 
 def test_every_report_says_unlisted_skills_were_not_checked():
     for perspective in ("candidate", "hiring_manager"):
-        assert "Only skills in careerfit's skill list were checked." in render_markdown(sample_facts(perspective)[0])
+        assert "were checked; anything else the job asks for is not shown here." in render_markdown(
+            sample_facts(perspective)[0])
 
 
 def test_judged_candidate_report_shows_fit_plan_dismissals_and_provenance():

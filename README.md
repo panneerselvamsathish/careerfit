@@ -104,6 +104,12 @@ are always present.
 
 ### Reading the result
 
+The summary first says how much of the job description careerfit could read: "The skill list could
+read 8 of 23 requirement lines (35%)". A requirement line that names no skill careerfit knows is not
+checked at all, so below half the result also says it shows only part of what the job asks for.
+Headings, travel, work authorization, pay and benefits lines are not counted (`analyze/requirement_lines.py`;
+`evals.ontology_coverage` lists the lines).
+
 Every skill the job description mentions gets one status and whether the JD treats it as
 **must** or **nice** to have. Each result cites the JD line that decided it; results where the
 resume mentions the skill also cite that resume line.

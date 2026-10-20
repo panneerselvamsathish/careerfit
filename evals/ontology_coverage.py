@@ -11,72 +11,19 @@ Dev-time tool: it never runs in the product and makes no network or LLM calls.
 """
 
 import argparse
-import re
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 
-from careerfit.analyze.matcher import requirement_section, scan, stop_section
-from careerfit.analyze.mentions import dashes_as_hyphens
-from careerfit.analyze.ontology import SkillEntry, load_default_ontology, load_ontology
+from careerfit.analyze.ontology import load_default_ontology, load_ontology
+from careerfit.analyze.requirement_lines import RequirementLines, requirement_lines
 from careerfit.ingest.document import read_document
 
 DEFAULT_ONTOLOGY = Path(__file__).parent.parent / "src" / "careerfit" / "ontology" / "skills.yaml"
-# Benefits, equal-opportunity and pay sections use the matcher's own stop_section(), so the tool
-# measures what the product actually reads. The company blurb is skipped here too: it is never a
-# requirement line, but the matcher keeps reading after it because "About the Role" often is one.
-ABOUT_COMPANY = re.compile(r"about (us|the company)", re.I)
-BULLET = re.compile(r"^\s*([-•*▪●]|\d+[.)])\s+")
-MIN_WORDS = 3  # a shorter line that isn't a bullet is a title or a fragment
 
 
-@dataclass(frozen=True)
-class Coverage:
-    covered: tuple[tuple[int, str, tuple[str, ...]], ...]  # (line number, text, skills found)
-    uncovered: tuple[tuple[int, str], ...]
-    sections_found: bool  # False: no requirements heading, so every line was counted
-
-    @property
-    def share(self) -> float:
-        total = len(self.covered) + len(self.uncovered)
-        return len(self.covered) / total if total else 0.0
-
-
-def _stop_heading(line: str) -> bool:
-    # Normalised like the matcher's headings, so "* About Us" behind a bullet still counts.
-    return (stop_section(line)
-            or ABOUT_COMPANY.fullmatch(BULLET.sub("", dashes_as_hyphens(line)).strip().rstrip(":").strip()) is not None)
-
-
-def coverage(jd_text: str, ontology: dict[str, SkillEntry]) -> Coverage:
-    """Requirement lines are the lines inside requirement sections. The preamble before the first
-    such heading is skipped; a JD with no such heading at all is counted line by line."""
-    lines = [(n, raw.strip()) for n, raw in enumerate(jd_text.splitlines(), start=1) if raw.strip()]
-    sections_found = any(requirement_section(text) for _, text in lines)
-    inside = not sections_found
-    covered, uncovered = [], []
-    for number, text in lines:
-        # Headings count even behind a bullet: some postings bullet them ("* You Have:", "* Our Benefits").
-        if _stop_heading(text):
-            inside = False
-            continue
-        if requirement_section(text):
-            inside = True
-            continue
-        bullet = BULLET.match(dashes_as_hyphens(text))  # same length: bullet.end() still indexes text
-        if not bullet and text.endswith(":"):
-            continue  # any other heading ("About the Role:", "Cloud:") is skipped and changes nothing
-        if not inside:
-            continue
-        line = text[bullet.end():] if bullet else text
-        if not bullet and len(line.split()) < MIN_WORDS:
-            continue
-        found = tuple(sorted(name for name, result in scan(line, ontology).items() if result != "absent"))
-        if found:
-            covered.append((number, line, found))
-        else:
-            uncovered.append((number, line))
-    return Coverage(covered=tuple(covered), uncovered=tuple(uncovered), sections_found=sections_found)
+def coverage(jd_text, ontology) -> RequirementLines:
+    """The product's own count (analyze/requirement_lines.py), so the tool measures what users see."""
+    return requirement_lines(jd_text, ontology)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -90,15 +37,15 @@ def main(argv: list[str] | None = None) -> int:
     for path in args.jds:
         text, _ = read_document(path)
         result = coverage(text, ontology)
-        total = len(result.covered) + len(result.uncovered)
-        print(f"\n== {path.name}: {len(result.covered)} of {total} requirement lines mention a known skill "
+        total = result.total
+        print(f"\n== {path.name}: {len(result.read)} of {total} requirement lines mention a known skill "
               f"({result.share:.0%})")
         if not result.sections_found:
             print("  (no requirements heading found, so every line was counted)")
         if args.covered:
-            for number, line, skills in result.covered:
+            for number, line, skills in result.read:
                 print(f"  + line {number} [{', '.join(skills)}]: {line[:110]}")
-        for number, line in result.uncovered:
+        for number, line in result.unread:
             print(f"  - line {number}: {line[:120]}")
     return 0
 
