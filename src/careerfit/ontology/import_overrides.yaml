@@ -6,6 +6,9 @@
 # drop:        imported names that are too generic or wrong (after cleaning, lowercase).
 # rename:      a cleaned name that should read differently: {from: to}.
 # alias_allow: extra aliases for an imported skill that the rules would reject: {skill: [aliases]}.
+# implies:     curated skills an imported one shows by definition: {skill: [curated skills]}. Only strict
+#              "X is a kind of Y" facts, as in skills.yaml: a curated name inside an imported one
+#              ("SQL" in "Transact-SQL") is hidden as its own mention, so only this brings it back.
 
 keep: []
 # Proposed 2026-10-19 by claude after the Copilot review on #31, confirmed by sathish the same day: imported names that are a curated skill
@@ -34,3 +37,40 @@ rename:
   microsoft ssis: sql server integration services
   microsoft visual basic: visual basic
 alias_allow: {}
+# Proposed 2026-10-20 by claude after the Copilot review on #31, not yet confirmed by sathish: the 41
+# imported names that contain a curated one (IMPORT_MANIFEST review: contains_a_curated_term). These 23
+# are a kind of that skill: a dialect, a library or runtime, a service of that platform, a product of
+# that category. Without it, "Wrote Transact-SQL procedures" left SQL a gap.
+implies:
+  adeptia etl suite: [etl]
+  amazon data pipeline: [data pipelines]
+  backbone.js: [javascript]
+  citrix cloud computing: [cloud computing]
+  core banking software: [banking]
+  ext js: [javascript]
+  ibm qradar siem: [siem]
+  ibm racf: [access control]
+  information security strategy: [cybersecurity]
+  microsoft azure data factory: [azure]
+  microsoft azure devops services: [devops]          # a DevOps platform; not Azure cloud experience
+  microsoft azure sentinel: [azure, siem]
+  node.js: [javascript]
+  oracle java ee: [java]
+  oracle jms: [java]
+  react native: [react]
+  react redux: [react]
+  sun microsystems java persistence api: [java]
+  sun microsystems java servlet api: [java]
+  transact-sql: [sql]
+  vue.js: [javascript]
+  websense data loss prevention: [dlp]
+  xerces2 java parser: [java]
+# Left out on purpose (the nested name stays hidden), same proposal:
+#   aurora helioscope (solar design software, not Amazon Aurora); javascript object notation json (a data
+#   format, not JavaScript); micosoft ssas, microsoft ssrs, sql server integration services, redgate sql
+#   server (SQL Server tools, as SSIS shows no SQL Server); cast sql builder, oracle sql developer, oracle
+#   sql loader, oracle sql plus, quest sql optimizer for oracle, sentryone sql sentry, yourkit java
+#   profiler, endeavour agile alm (tools used with a skill, not the skill); nortonlifelock cybersecurity
+#   (a consumer product); openai chatgpt (using ChatGPT isn't the OpenAI API); qualys cloud platform (a
+#   security service, not cloud computing); event-driven state-machines programming (a programming style,
+#   not event-driven architecture).

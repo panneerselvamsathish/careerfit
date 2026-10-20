@@ -111,6 +111,7 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["etl"]
 "adexa egps suite":
   aliases: []
   ambiguous: false
@@ -323,6 +324,7 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["data pipelines"]
 "amazon elastic compute cloud ec2":
   aliases: ["elastic compute cloud ec2"]
   ambiguous: false
@@ -424,7 +426,7 @@
   ambiguous: false
   sources: [onet]
 "apache http server":
-  aliases: ["http server"]
+  aliases: []
   ambiguous: false
   sources: [onet]
 "apache jmeter":
@@ -795,6 +797,7 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["javascript"]
 "backbox":
   aliases: []
   ambiguous: false
@@ -1235,6 +1238,7 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["cloud computing"]
 "citrix xenapp":
   aliases: []
   ambiguous: false
@@ -1543,6 +1547,7 @@
   aliases: []
   ambiguous: false
   sources: [esco]
+  implies: ["banking"]
 "corel coreldraw graphics suite":
   aliases: []
   ambiguous: false
@@ -2307,6 +2312,7 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["javascript"]
 "extensible markup language xml":
   aliases: []
   ambiguous: false
@@ -2935,10 +2941,12 @@
   aliases: ["qradar siem"]
   ambiguous: false
   sources: [onet]
+  implies: ["siem"]
 "ibm racf":
   aliases: ["ibm resource access control facility", "racf"]
   ambiguous: false
   sources: [onet]
+  implies: ["access control"]
 "ibm rational apex":
   aliases: []
   ambiguous: false
@@ -3263,6 +3271,7 @@
   aliases: []
   ambiguous: false
   sources: [esco]
+  implies: ["cybersecurity"]
 "information structure":
   aliases: []
   ambiguous: false
@@ -3959,14 +3968,17 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["azure"]
 "microsoft azure devops services":
   aliases: ["azure devops services"]
   ambiguous: false
   sources: [onet]
+  implies: ["devops"]
 "microsoft azure sentinel":
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["azure", "siem"]
 "microsoft commerce server":
   aliases: []
   ambiguous: false
@@ -3980,7 +3992,7 @@
   ambiguous: false
   sources: [onet]
 "microsoft dns server":
-  aliases: ["dns server"]
+  aliases: []
   ambiguous: false
   sources: [onet]
 "microsoft dynamics":
@@ -4531,6 +4543,7 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["javascript"]
 "norton antivirus":
   aliases: []
   ambiguous: false
@@ -4871,6 +4884,7 @@
   aliases: ["java ee", "oracle java enterprise edition"]
   ambiguous: false
   sources: [onet]
+  implies: ["java"]
 "oracle javaserver pages jsp":
   aliases: ["javaserver pages jsp"]
   ambiguous: false
@@ -4891,6 +4905,7 @@
   aliases: ["jms", "oracle java message service"]
   ambiguous: false
   sources: [onet]
+  implies: ["java"]
 "oracle learning management":
   aliases: []
   ambiguous: false
@@ -5479,10 +5494,12 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["react"]
 "react redux":
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["react"]
 "real-time computing":
   aliases: []
   ambiguous: false
@@ -6295,10 +6312,12 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["java"]
 "sun microsystems java servlet api":
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["java"]
 "sun microsystems sun one":
   aliases: []
   ambiguous: false
@@ -6312,7 +6331,7 @@
   ambiguous: false
   sources: [esco]
 "symantec endpoint protection":
-  aliases: ["endpoint protection"]
+  aliases: []
   ambiguous: false
   sources: [onet]
 "symantec ghost solution suite":
@@ -6667,6 +6686,7 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["sql"]
 "transmission technology":
   aliases: []
   ambiguous: false
@@ -6903,6 +6923,7 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["javascript"]
 "vulkan graphics api":
   aliases: []
   ambiguous: false
@@ -6999,6 +7020,7 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["dlp"]
 "webtrends analytics":
   aliases: []
   ambiguous: false
@@ -7087,6 +7109,7 @@
   aliases: []
   ambiguous: false
   sources: [onet]
+  implies: ["java"]
 "xerox docushare":
   aliases: []
   ambiguous: false

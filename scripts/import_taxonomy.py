@@ -21,7 +21,8 @@ The rules, in the order they run:
    parenthetical acronym becomes an alias ("Adobe Experience Manager (AEM)"); an ESCO tag in
    parentheses is dropped ("Python (computer programming)"). Lowercase.
 2. A vendor prefix ("Adobe Photoshop") adds the rest as an alias ("photoshop"), but only when the
-   rest has a word that isn't an everyday word: "Microsoft Word" never yields the alias "word".
+   rest has a word that is neither an everyday word nor a generic technology word: "Microsoft Word"
+   never yields the alias "word", nor "Apache HTTP Server" the alias "http server".
 3. Drop names longer than 5 words or 40 characters, names with ",;" (lists), O*NET's own category
    labels ("Accounting software"), and names of 1 or 2 characters.
 4. A one-word name that is an everyday word in the dictionary word list ("spark", "chef", "shiny")
@@ -72,6 +73,13 @@ MODERN_EVERYDAY = frozenset("""
 """.split()) | frozenset("""
     api crm cms dms edw erp gis hcm hris iam ide jdbc mdm odbc plm scm sdk sso tim
 """.split())  # generic acronyms (and a first name): "sap erp" must not match every "ERP experience"
+# Generic technology words: a vendor-free rest made only of these and everyday words names the
+# technology, not the vendor's product. "Apache HTTP Server" must not give the alias "http server", or
+# "Implemented an HTTP server in Python" would show Apache experience; likewise "dns server" (Microsoft)
+# and "endpoint protection" (Symantec). Proposed 2026-10-20 by claude after the Copilot review on #31.
+GENERIC_TECH = frozenset("""
+    http https dns dhcp ftp smtp tcp ip endpoint web client server cloud network
+""".split())
 # ESCO names that describe knowledge about a topic, not a tool or technology a JD would name.
 _ABSTRACT = re.compile(r"(concepts|principles|levels|types|methods|techniques|fundamentals|characteristics|"
                        r"features|functionalities|aspects|theory|theories) (of|for|in)\b|"
@@ -84,6 +92,7 @@ class Candidate:
     aliases: set[str] = field(default_factory=set)
     sources: set[str] = field(default_factory=set)
     allowed: set[str] = field(default_factory=set)  # aliases a person allowed: exempt from the everyday check
+    implies: set[str] = field(default_factory=set)  # curated skills it shows by definition (import_overrides.yaml)
 
     def absorb(self, other: "Candidate", *extra: str) -> None:
         """Merge another candidate (and the extra terms) into this one, as aliases."""
@@ -171,7 +180,8 @@ def vendor_rest(name: str) -> str | None:
 
 def vendor_alias(name: str, words: set[str]) -> str | None:
     rest = vendor_rest(name)
-    if rest and any(not everyday(token, words) for token in rest.split()) and len(rest) >= MIN_CHARS:
+    distinctive = [t for t in rest.split() if not everyday(t, words) and t not in GENERIC_TECH] if rest else []
+    if distinctive and len(rest) >= MIN_CHARS:
         return rest
     return None
 
@@ -189,6 +199,10 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
     drop = {_norm(w) for w in overrides.get("drop", [])}
     rename = {_norm(k): _norm(v) for k, v in (overrides.get("rename") or {}).items()}
     alias_allow = {_norm(k): {_norm(a) for a in v} for k, v in (overrides.get("alias_allow") or {}).items()}
+    implies = {_norm(k): {_norm(t) for t in v} for k, v in (overrides.get("implies") or {}).items()}
+    unknown = sorted(f"{k}: {t}" for k, v in implies.items() for t in v if t not in curated)
+    if unknown:  # a typo here would silently imply nothing
+        raise ValueError(f"import_overrides.yaml implies: not curated skill names: {unknown}")
     taken = {_norm(t) for name, entry in curated.items() for t in (*entry.aliases, name)}
     categories = {_norm(r["Element Name"]) for r in onet_rows}
 
@@ -293,6 +307,14 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
         for alias in sorted(clashes):
             report.drop("alias_dropped_imported_collision", f"{c.name}: {alias}")
         c.aliases -= clashes
+    # Reviewed implications: "transact-sql" shows SQL. The nested-name rule hides "SQL" inside an imported
+    # name (SSIS shows no SQL Server), so a broader skill an imported one really is comes back only here.
+    for name, targets in sorted(implies.items()):
+        if name in result:
+            result[name].implies = set(targets)
+        else:
+            report.drop("implies_not_applied", f"{name}: not an imported skill (dropped or renamed?)")
+    report.counts["imported_implications"] = sum(len(c.implies) for c in result.values())
     for c in result.values():
         for term in (c.name, *c.aliases):
             inside = sorted(t for t in taken if re.search(rf"(?<!\w){re.escape(t)}(?!\w)", term) and t != term)
@@ -394,6 +416,8 @@ def render_skills(skills: dict[str, Candidate]) -> str:
         c = skills[name]
         lines += [f"{_q(name)}:", f"  aliases: [{', '.join(_q(a) for a in sorted(c.aliases))}]",
                   "  ambiguous: false", f"  sources: [{', '.join(s for s in ('onet', 'esco') if s in c.sources)}]"]
+        if c.implies:  # reviewed, from import_overrides.yaml: curated skills only
+            lines.append(f"  implies: [{', '.join(_q(t) for t in sorted(c.implies))}]")
     return "\n".join(lines) + "\n"
 
 

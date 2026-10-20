@@ -13,7 +13,8 @@ _spec = importlib.util.spec_from_file_location("import_taxonomy", ROOT / "script
 importer = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(importer)
 
-WORDS = {"word", "team", "cloud", "platform", "spark", "chef", "shiny", "switch", "manager", "experience"}
+WORDS = {"word", "team", "cloud", "platform", "spark", "chef", "shiny", "switch", "manager", "experience",
+         "server", "protection"}
 
 
 @pytest.mark.parametrize(("example", "name", "aliases"), [
@@ -50,6 +51,10 @@ def test_everyday_words_include_their_inflected_forms(token, expected):
     ("microsoft teams", None),                    # "teams" is "team", inflected
     ("google cloud platform", None),              # every word is everyday
     ("sap erp", None),                            # a generic acronym names a kind of system, not SAP's
+    ("apache http server", None),                 # "an HTTP server in Python" isn't Apache experience
+    ("microsoft dns server", None),               # generic technology words only
+    ("symantec endpoint protection", None),       # "endpoint" is generic, "protection" everyday
+    ("vmware esx server", "esx server"),          # one distinctive word is enough
 ])
 def test_a_vendor_prefix_adds_the_rest_as_an_alias_only_if_it_is_distinctive(name, alias):
     assert importer.vendor_alias(name, WORDS) == alias
@@ -158,11 +163,14 @@ def test_the_generated_file_is_current_with_the_curated_list():
     assert len(merged) == len(curated) + len(IMPORTED)
 
 
-def test_generated_entries_are_lowercase_ascii_without_implications():
+def test_generated_entries_are_lowercase_ascii_with_only_reviewed_implications():
+    reviewed = yaml.safe_load((IMPORTED_SKILLS.parent / "import_overrides.yaml").read_text(encoding="utf-8"))["implies"]
     for name, entry in IMPORTED.items():
         assert name == name.lower() and name.isascii(), name
         assert all(a == a.lower() and a.isascii() for a in entry["aliases"]), name
-        assert "implies" not in entry and set(entry["sources"]) <= {"onet", "esco"}, name
+        assert set(entry["sources"]) <= {"onet", "esco"}, name
+        # Implications are curated facts: only those reviewed in import_overrides.yaml, never the taxonomy's.
+        assert entry.get("implies", []) == sorted(reviewed.get(name, [])), name
 
 
 def test_the_manifest_counts_match_the_generated_file():
@@ -366,6 +374,52 @@ def test_an_allowance_survives_a_plural_merge():
     skills, _ = _build([_row("Learning management system LMS")], esco,
                        {"alias_allow": {"learning management systems": ["lms platforms"]}})
     assert "lms platforms" in skills["lms"].aliases
+
+
+def test_a_generic_technology_mention_does_not_show_the_vendor_product():
+    # Copilot review on #31: "apache http server" had the alias "http server", so a resume that
+    # implemented an HTTP server in Python met an Apache HTTP Server requirement.
+    for name in ("apache http server", "microsoft dns server", "symantec endpoint protection"):
+        assert IMPORTED[name]["aliases"] == []
+    assert _facts("Implemented an HTTP server in Python", "Apache HTTP Server administration") == {
+        "apache http server": "gap"}
+    assert _facts("Ran the Apache HTTP Server fleet", "Apache HTTP Server administration") == {
+        "apache http server": "matched"}
+
+
+def test_either_or_reads_a_vendor_qualified_name_from_its_start():
+    # Copilot review on #31: the kept SSIS mention starts at "SQL", so " or Microsoft " sat between the
+    # two and they were read as two requirements: a Python-only resume got a false SSIS gap.
+    assert _facts("Built ETL in Python", "Python or Microsoft SQL Server Integration Services") == {
+        "python": "matched", "sql server integration services": "alternative_met"}
+    assert _facts("Built ETL in Python", "Python and Microsoft SQL Server Integration Services") == {
+        "python": "matched", "sql server integration services": "gap"}
+
+
+@pytest.mark.parametrize(("resume", "jd", "expected"), [
+    # Copilot review on #31: the nested-name rule hid the broader skill inside an imported name, and
+    # nothing brought it back. The reviewed implications in import_overrides.yaml do.
+    ("Wrote Transact-SQL procedures", "Strong SQL skills", {"sql": "matched"}),
+    ("Developed Java EE applications", "Java experience", {"java": "matched"}),
+    ("Deployed Microsoft Azure Data Factory pipelines", "Microsoft Azure experience", {"azure": "matched"}),
+    # Kept apart on purpose: SSIS shows no SQL Server, Lightroom no Photoshop, Aurora HelioScope (solar
+    # design software) no Amazon Aurora.
+    ("Built SSIS packages", "SQL Server experience", {"sql server": "gap"}),
+    ("Edited photos in Adobe Photoshop Lightroom", "Adobe Photoshop", {"adobe photoshop": "gap"}),
+    ("Designed arrays with Aurora HelioScope", "Amazon Aurora", {"aurora": "gap"}),
+])
+def test_a_reviewed_implication_restores_the_broader_skill(resume, jd, expected):
+    assert _facts(resume, jd) == expected
+
+
+def test_implies_overrides_apply_to_imported_skills_only_and_name_curated_targets():
+    skills, report = _build([_row("Transact-SQL")], overrides={"implies": {"transact-sql": ["pl/sql"],
+                                                                         "gone tool": ["kubernetes"]}})
+    assert skills["transact-sql"].implies == {"pl/sql"}
+    assert "gone tool: not an imported skill (dropped or renamed?)" in report.review["implies_not_applied"]
+    with pytest.raises(ValueError, match="not curated skill names"):
+        _build([_row("Transact-SQL")], overrides={"implies": {"transact-sql": ["sqll"]}})
+    assert 'implies: ["pl/sql"]' in importer.render_skills(skills)
 
 
 def test_workspace_is_an_everyday_word_and_no_alias():

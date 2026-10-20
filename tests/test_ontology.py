@@ -280,8 +280,21 @@ helm charts:
     assert merged["rancher"].sources == ("onet",)
 
 
+def test_an_imported_entry_may_imply_a_curated_skill(tmp_path):
+    from careerfit.analyze.ontology import load_ontology
+    curated = _write(tmp_path / "skills.yaml", CURATED)
+    imported = _write(tmp_path / "skills_imported.yaml",
+                      "x tool:\n  aliases: []\n  ambiguous: false\n  implies: [kubernetes]\n  sources: [onet]\n")
+    assert load_ontology(curated, imported=imported)["x tool"].implies == ("kubernetes",)
+
+
 @pytest.mark.parametrize(("imported", "message"), [
-    ("x tool:\n  aliases: []\n  ambiguous: false\n  implies: [kubernetes]\n  sources: [onet]\n", "may not imply"),
+    # An imported entry may imply curated skills only (reviewed in import_overrides.yaml), never another
+    # imported one or an unknown name.
+    ("x tool:\n  aliases: []\n  ambiguous: false\n  implies: [y tool]\n  sources: [onet]\n"
+     "y tool:\n  aliases: []\n  ambiguous: false\n  sources: [esco]\n", "may imply only curated skills"),
+    ("x tool:\n  aliases: []\n  ambiguous: false\n  implies: [nonexistent]\n  sources: [onet]\n",
+     "may imply only curated skills"),
     ("x tool:\n  aliases: []\n  ambiguous: false\n  sources: [curated]\n", "cannot have source 'curated'"),
     ("x tool:\n  aliases: [same]\n  ambiguous: false\n  sources: [onet]\n"
      "y tool:\n  aliases: [Same]\n  ambiguous: false\n  sources: [esco]\n", "shares a name or alias"),

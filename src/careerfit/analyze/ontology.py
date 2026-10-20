@@ -90,16 +90,20 @@ def load_ontology(path: Path, *, imported: Path | None = None) -> Ontology:
     """The skill list in `path`, plus the entries in `imported` that don't collide with it.
 
     An imported entry is dropped whole if its name or any alias is already a curated name or alias
-    (compared case-insensitively): the hand-written list always wins. Imported entries may not imply
-    other skills, and every name and alias must be ASCII (the matcher folds ASCII case only).
+    (compared case-insensitively): the hand-written list always wins. An imported entry may imply only
+    curated skills: those implications are reviewed by hand in import_overrides.yaml ("transact-sql"
+    is SQL), never taken from a taxonomy. Every name and alias must be ASCII (the matcher folds ASCII
+    case only).
     """
     ontology = _read_entries(path)
+    curated = frozenset(ontology)
     if imported is not None:
         taken = {term.lower() for name, entry in ontology.items() for term in (*entry.aliases, name)}
         seen: set[str] = set()
         for name, entry in _read_entries(imported, imported=True).items():
-            if entry.implies:
-                raise ValueError(f"{imported.name}: imported '{name}' may not imply other skills")
+            not_curated = [t for t in entry.implies if t not in curated]
+            if not_curated:
+                raise ValueError(f"{imported.name}: imported '{name}' may imply only curated skills, not {not_curated}")
             if "curated" in entry.sources:
                 raise ValueError(f"{imported.name}: imported '{name}' cannot have source 'curated'")
             terms = {term.lower() for term in (*entry.aliases, name)}
@@ -127,7 +131,7 @@ def _read_entries(path: Path, *, imported: bool = False) -> dict[str, SkillEntry
         bad = [term for term in (*ontology[skill_name].aliases, skill_name) if not term.isascii()]
         if bad:
             raise ValueError(f"{path.name}: '{skill_name}' has non-ASCII name or alias {bad}")
-    if imported:  # implications are curated facts; load_ontology refuses them in an imported file
+    if imported:  # implications are curated facts: load_ontology checks an imported file's against skills.yaml
         return ontology
     for skill_name, entry in ontology.items():
         if skill_name in entry.implies:
