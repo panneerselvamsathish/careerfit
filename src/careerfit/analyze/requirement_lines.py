@@ -9,11 +9,15 @@ What counts as a requirement line:
 - Lines inside requirement sections ("Requirements", "What you'll bring"...). The preamble before
   the first such heading is skipped. A JD with no such heading at all is counted line by line.
 - Counting stops at a benefits, equal-opportunity or pay heading, at "About us", and at unheaded
-  equal-opportunity prose ("... without regard to race"), until the next requirements heading.
-- Not headings: a non-bullet line ending in ":", a non-bullet line of fewer than 3 words, or a
-  short Title Case line with no sentence punctuation ("What We Value").
+  equal-opportunity prose ("... without regard to race"), until the next requirements heading. In a
+  JD with no requirements heading there is nothing to reopen counting, so that prose line is only
+  skipped.
+- Not headings: a non-bullet line ending in ":" or of fewer than 3 words. A short Title Case line
+  with no sentence punctuation ("What We Value") is a heading too, unless it names a known skill.
 - Not logistics: travel, work authorization and sponsorship, relocation, pay, "apply today". They
-  are requirements of a kind, but never skills, so they would only shrink the share.
+  are requirements of a kind, but never skills, so they would only shrink the share. A line that
+  names a known skill always counts ("Python and AWS, up to 10% travel"; "Visa payment APIs in
+  Java"): the product reads it as a requirement, so the count must too.
 
 Pure: no network, no clock, no LLM.
 """
@@ -76,21 +80,26 @@ def requirement_lines(jd_text: str, ontology: Mapping[str, SkillEntry]) -> Requi
     read, unread = [], []
     for number, text in lines:
         # Headings count even behind a bullet: some postings bullet them ("* You Have:", "* Our Benefits").
-        if _stop_heading(text) or EEO_PROSE.search(text):
+        if _stop_heading(text):
             inside = False
+            continue
+        if EEO_PROSE.search(text):
+            inside = inside and not sections_found  # no heading could reopen counting
             continue
         if requirement_section(text):
             inside = True
             continue
         bullet = BULLET.match(dashes_as_hyphens(text))  # same length: bullet.end() still indexes text
-        if not bullet and (text.endswith(":") or _title_heading(text)):
-            continue  # any other heading ("About the Role:", "Cloud:", "What We Value") changes nothing
+        if not bullet and text.endswith(":"):
+            continue  # any other heading ("About the Role:", "Cloud:") is skipped and changes nothing
         if not inside:
             continue
         line = text[bullet.end():] if bullet else text
-        if (not bullet and len(line.split()) < MIN_WORDS) or LOGISTICS.search(line):
+        if not bullet and len(line.split()) < MIN_WORDS:
             continue
         found = tuple(sorted(scan_present(line, ontology, index)))
+        if not found and ((not bullet and _title_heading(text)) or LOGISTICS.search(line)):
+            continue  # "What We Value", "Willingness to travel 30%": no skill, and not a skill line
         if found:
             read.append((number, line, found))
         else:

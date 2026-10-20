@@ -79,3 +79,23 @@ def test_facts_without_a_count_keep_the_old_note_and_no_summary_line():
 def test_a_half_percent_rounds_up_as_on_the_web_page():
     facts = facts_for(JD).model_copy(update={"jd_requirement_lines": RequirementLineCount(read=1, total=8)})
     assert coverage_summary(facts).startswith("The skill list could read 1 of 8 requirement lines (13%).")
+
+
+@pytest.mark.parametrize("line", [
+    # Review of #35: the new filters dropped lines the product reads as requirements.
+    "- Python and AWS services, with up to 10% travel",
+    "- Experience integrating Visa payment APIs in Python",
+    "- Owned a $5M AWS budget across teams",
+    "Strong Python Skills",
+])
+def test_a_line_naming_a_known_skill_always_counts(line):
+    result = requirement_lines(f"Requirements\n{line}\n- Clear writing for a wide audience", ONTOLOGY)
+    assert (len(result.read), result.total) == (1, 2)
+
+
+def test_eeo_prose_in_a_jd_without_headings_is_skipped_not_a_stop():
+    # Review of #35: with no requirements heading nothing reopened counting, so this gave 0 of 0.
+    jd = ("We are an equal opportunity employer and value diversity.\nWe need Python engineers for our data team\n"
+          "AWS experience is a plus here")
+    result = requirement_lines(jd, ONTOLOGY)
+    assert (len(result.read), result.total) == (2, 2)
