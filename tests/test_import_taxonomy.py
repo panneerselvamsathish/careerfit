@@ -422,6 +422,40 @@ def test_implies_overrides_apply_to_imported_skills_only_and_name_curated_target
     assert 'implies: ["pl/sql"]' in importer.render_skills(skills)
 
 
+def test_a_job_title_is_no_alias():
+    # Copilot review on #31: "oracle sql developer" (the IDE) had the alias "sql developer", so a resume
+    # titled "SQL Developer" met an Oracle SQL Developer requirement, and a JD hiring one demanded the IDE.
+    assert importer.job_title("sql developer", {"sql"}) and importer.job_title("java engineer", {"java"})
+    assert not importer.job_title("arcgis spatial analyst", {"sql"})   # a product name, not a title
+    assert not importer.job_title("developer", {"sql"})
+    assert IMPORTED["oracle sql developer"]["aliases"] == []
+    assert "oracle sql developer: sql developer" in MANIFEST["review"]["alias_dropped_job_title"]
+    assert _facts("SQL Developer, Acme Corp 2019-2024", "Oracle SQL Developer") == {"oracle sql developer": "gap"}
+    assert "oracle sql developer" not in _facts("Wrote SQL", "We are hiring a SQL Developer")
+    assert _facts("Tuned queries in Oracle SQL Developer", "Oracle SQL Developer") == {"oracle sql developer": "matched"}
+
+
+@pytest.mark.parametrize(("resume", "jd", "expected"), [
+    # Copilot review on #31: the dropped "oracle relational database" mapped to nothing. It is now an
+    # alias of the curated "oracle database", in both directions.
+    ("Administered an Oracle relational database", "Oracle Database",
+     {"oracle database": "matched"}),
+    ("Administered Oracle Database 19c", "Oracle relational database",
+     {"oracle database": "matched"}),
+])
+def test_oracle_relational_database_is_oracle_database(resume, jd, expected):
+    assert "oracle relational database" not in IMPORTED
+    assert _facts(resume, jd) == expected
+
+
+def test_uml_is_one_skill_under_both_spellings():
+    # Copilot review on #31: "unified modelling language" was its own skill, so "Unified Modelling
+    # Language (UML)" asked for two, and a resume saying "UML" got a match and a gap.
+    assert "unified modelling language" not in IMPORTED
+    assert {"unified modeling language", "unified modelling language"} <= set(IMPORTED["uml"]["aliases"])
+    assert _facts("Designed services with UML diagrams", "Unified Modelling Language (UML)") == {"uml": "matched"}
+
+
 def test_workspace_is_an_everyday_word_and_no_alias():
     # Copilot review on #31: "Configured a local development workspace" met a JD asking for Google Workspace.
     assert importer.everyday("workspace", set()) and importer.everyday("workspaces", set())

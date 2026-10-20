@@ -21,7 +21,6 @@ drop:
   - javascript framework
   - jenkins ci
   - microservices architecture
-  - oracle relational database   # curated "oracle database"; proposed 2026-10-20 by claude, not yet confirmed by sathish
   - relational database management
   - restful api
   - simple storage service s3
@@ -36,6 +35,10 @@ rename:
   microsoft active directory: active directory
   microsoft ssis: sql server integration services
   microsoft visual basic: visual basic
+  # Proposed 2026-10-20 by claude after the Copilot review on #31, not yet confirmed by sathish: the British
+  # spelling of uml's own alias "unified modeling language". As two skills, "Unified Modelling Language
+  # (UML)" asked for both and a resume saying "UML" got a match and a gap. The only UK/US pair in the import.
+  unified modelling language: uml
 alias_allow: {}
 # Proposed 2026-10-20 by claude after the Copilot review on #31, not yet confirmed by sathish: the 41
 # imported names that contain a curated one (IMPORT_MANIFEST review: contains_a_curated_term). These 23

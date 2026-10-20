@@ -4951,7 +4951,7 @@
   ambiguous: false
   sources: [onet]
 "oracle sql developer":
-  aliases: ["sql developer"]
+  aliases: []
   ambiguous: false
   sources: [onet]
 "oracle sql loader":
@@ -6724,17 +6724,13 @@
   ambiguous: false
   sources: [onet]
 "uml":
-  aliases: ["unified modeling language"]
+  aliases: ["unified modeling language", "unified modelling language"]
   ambiguous: false
-  sources: [onet]
+  sources: [onet, esco]
 "unawave":
   aliases: []
   ambiguous: false
   sources: [onet]
-"unified modelling language":
-  aliases: []
-  ambiguous: false
-  sources: [esco]
 "unistat statistical package":
   aliases: []
   ambiguous: false

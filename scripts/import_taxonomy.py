@@ -22,7 +22,9 @@ The rules, in the order they run:
    parentheses is dropped ("Python (computer programming)"). Lowercase.
 2. A vendor prefix ("Adobe Photoshop") adds the rest as an alias ("photoshop"), but only when the
    rest has a word that is neither an everyday word nor a generic technology word: "Microsoft Word"
-   never yields the alias "word", nor "Apache HTTP Server" the alias "http server".
+   never yields the alias "word", nor "Apache HTTP Server" the alias "http server". No name or alias
+   may be a job title (a curated skill and a word like "developer"): "Oracle SQL Developer" gives no
+   alias "sql developer".
 3. Drop names longer than 5 words or 40 characters, names with ",;" (lists), O*NET's own category
    labels ("Accounting software"), and names of 1 or 2 characters.
 4. A one-word name that is an everyday word in the dictionary word list ("spark", "chef", "shiny")
@@ -80,6 +82,23 @@ MODERN_EVERYDAY = frozenset("""
 GENERIC_TECH = frozenset("""
     http https dns dhcp ftp smtp tcp ip endpoint web client server cloud network
 """.split())
+# Job-title words: a curated skill followed by one of these is a job title, not a tool. "Oracle SQL
+# Developer" (the IDE) must not give the alias "sql developer", or a resume whose title is "SQL
+# Developer" would show the IDE, and a JD hiring one would demand it. Proposed 2026-10-20 by claude
+# after the Copilot review on #31.
+JOB_TITLE_WORDS = frozenset("""
+    developer developers engineer engineers administrator administrators admin analyst analysts
+    architect architects programmer programmers consultant consultants specialist specialists dba
+    tester testers designer designers manager managers lead
+""".split())
+
+
+def job_title(term: str, taken: set[str]) -> bool:
+    """A curated skill and a job-title word: "sql developer", "java engineer", "oracle dba"."""
+    *skill, last = term.split() or [""]
+    return bool(skill) and last in JOB_TITLE_WORDS and " ".join(skill) in taken
+
+
 # ESCO names that describe knowledge about a topic, not a tool or technology a JD would name.
 _ABSTRACT = re.compile(r"(concepts|principles|levels|types|methods|techniques|fundamentals|characteristics|"
                        r"features|functionalities|aspects|theory|theories) (of|for|in)\b|"
@@ -273,6 +292,9 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
         if final in taken:
             report.drop("dropped_curated_collision", final)
             continue
+        if job_title(final, taken):
+            report.drop("dropped_job_title", final)
+            continue
         if (rest := vendor_rest(final)) in taken and not all(everyday(t, words) for t in rest.split()):
             # "oracle pl/sql" is curated pl/sql under a vendor's name: as its own skill, a JD asking for
             # "Oracle PL/SQL" would also demand it, and a resume saying "PL/SQL" would get a false gap.
@@ -292,6 +314,8 @@ def build(onet_rows: list[dict], esco_rows: list[dict], curated: dict, words: se
                     report.drop("alias_dropped_curated_collision", f"{final}: {alias}")
                 elif alias in used:  # one taken by another skill already; names are settled after the loop
                     report.drop("alias_dropped_imported_collision", f"{final}: {alias}")
+                elif job_title(alias, taken):
+                    report.drop("alias_dropped_job_title", f"{final}: {alias}")
                 elif len(alias.split()) == 1 and everyday(alias, words) and alias not in allowed:
                     report.drop("alias_dropped_everyday_word", f"{final}: {alias}")
                 else:
