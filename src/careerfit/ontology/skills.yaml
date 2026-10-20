@@ -777,6 +777,13 @@ software engineering:
   aliases: ["software engineer"]
   ambiguous: false
 
+rest assured:
+  # The Java API-testing library, but also an English idiom ("Rest assured, we support flexible
+  # hours"), so the two-word name is ambiguous; the spellings only the library uses are conclusive
+  # (Copilot review on #31).
+  aliases: ["rest-assured", "restassured"]
+  ambiguous: true
+
 conversational ai:
   # No "virtual assistants" or "virtual agents": both also name people, remote admin staff and
   # work-from-home contact-center agents (Copilot review on #24).

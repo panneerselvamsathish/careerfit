@@ -265,18 +265,32 @@ def outermost(found: Iterable[Mention]) -> list[Mention]:
 
 
 def _split_spans(found: Iterable[Mention]) -> tuple[list[Span], list[tuple[Span, int]]]:
-    """Of two overlapping mentions the longer is kept; the other is nested in it, paired with the
-    index of the kept mention it sits in: "SQL" inside "PL/SQL" is nested in PL/SQL's mention."""
-    spans = sorted(((m.start, m.end, m.skill) for m in found),
-                   key=lambda span: (span[0], span[0] - span[1], span[2]))
+    """Of two overlapping mentions the longer is kept, wherever each starts; the other is nested in
+    it, paired with the index of the kept mention it overlaps: "SQL" inside "PL/SQL" is nested in
+    PL/SQL's mention, and so is "Microsoft SQL Server" in "Microsoft SQL Server Integration
+    Services" (SSIS's name starts later but is longer). Kept mentions come left to right.
+
+    Longest first, each character owned by one kept mention: linear in the characters covered."""
+    spans = sorted({(m.start, m.end, m.skill) for m in found},
+                   key=lambda span: (span[0] - span[1], span[0], span[2]))  # longest first, then leftmost
+    if not spans:
+        return [], []
+    owner = [-1] * max(end for _start, end, _skill in spans)  # which kept mention covers each character
     kept: list[Span] = []
-    nested: list[tuple[Span, int]] = []
+    pending: list[Span] = []
     for span in spans:
-        if kept and span[0] < kept[-1][1]:
-            nested.append((span, len(kept) - 1))
+        start, end, _skill = span
+        if any(owner[i] >= 0 for i in range(start, end)):
+            pending.append(span)
         else:
+            for i in range(start, end):
+                owner[i] = len(kept)
             kept.append(span)
-    return kept, nested
+    order = sorted(range(len(kept)), key=lambda k: kept[k][0])
+    position = {k: p for p, k in enumerate(order)}
+    nested = [(span, position[next(owner[i] for i in range(span[0], span[1]) if owner[i] >= 0)])
+              for span in sorted(pending, key=lambda span: (span[0], span[0] - span[1], span[2]))]
+    return [kept[k] for k in order], nested
 
 
 def _choice_of(clause: str, kept: list[Span]) -> list[int]:

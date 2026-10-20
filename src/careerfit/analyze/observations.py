@@ -88,8 +88,8 @@ def apply_alternatives(
 
 
 def nested_in_imported(text: str, ontology: Mapping[str, SkillEntry]) -> dict[str, list[tuple[int, int]]]:
-    """Per skill, the mentions that sit inside an imported skill's longer name, which show nothing
-    alone: "Edited photos in Adobe Photoshop Lightroom" shows Lightroom, not Photoshop, and "SQL
+    """Per skill, the mentions that sit inside (or overlap) an imported skill's longer name, which
+    show nothing alone: "Edited photos in Adobe Photoshop Lightroom" shows Lightroom, not Photoshop, and "SQL
     Server Integration Services" shows SSIS, as "SSIS" does, not SQL Server (nor what it implies).
 
     A curated name keeps what it names: "AWS Lambda" shows AWS too, "Aurora PostgreSQL" PostgreSQL.
@@ -97,9 +97,9 @@ def nested_in_imported(text: str, ontology: Mapping[str, SkillEntry]) -> dict[st
     kept, nested = _split_spans(index_of(ontology).find(text))
     hidden: dict[str, list[tuple[int, int]]] = {}
     for (start, end, skill), i in nested:
-        outer_start, outer_end, outer = kept[i]
-        if (outer != skill and outer_start <= start and end <= outer_end  # its own alias in its own name counts
-                and "curated" not in ontology[outer].sources):
+        outer = kept[i][2]
+        # Overlapping is enough: "Microsoft SQL Server" in "Microsoft SQL Server Integration Services".
+        if outer != skill and "curated" not in ontology[outer].sources:  # its own alias in its own name counts
             hidden.setdefault(skill, []).append((start, end))
     return hidden
 

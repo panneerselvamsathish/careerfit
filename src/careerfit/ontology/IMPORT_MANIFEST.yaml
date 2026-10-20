@@ -20,7 +20,7 @@ counts:
   alias_dropped_curated_collision: 1
   alias_dropped_two_vendors: 10
   dropped_by_override: 12
-  dropped_curated_collision: 37
+  dropped_curated_collision: 38
   dropped_curated_vendor_form: 4
   dropped_esco_abstract: 12
   dropped_everyday_word: 138
@@ -28,7 +28,7 @@ counts:
   esco_alias_not_reviewed: 2045
   esco_not_knowledge: 745
   imported_aliases: 231
-  imported_skills: 1787
+  imported_skills: 1786
   merged_plural_duplicate: 2
   merged_vendor_duplicate: 4
   onet_distinct_examples: 8753
@@ -88,7 +88,6 @@ review:
   - 'react native: react'
   - 'react redux: react'
   - 'redgate sql server: sql, sql server'
-  - 'rest assured: rest'
   - 'sentryone sql sentry: sql'
   - 'sql developer: sql'
   - 'sql loader: sql'
@@ -148,6 +147,7 @@ review:
   - redis
   - relational database
   - relational database management system
+  - rest assured
   - saml
   - sql
   - sql server

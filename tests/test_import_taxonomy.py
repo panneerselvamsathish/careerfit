@@ -401,3 +401,21 @@ def test_a_vendor_product_with_a_generic_plain_name_is_kept():
     skills, _ = importer.build([_row("Amazon Data Pipeline"), _row("Oracle PL/SQL")], [], curated, words, {})
     assert "amazon data pipeline" in skills and "oracle pl/sql" not in skills
     assert _facts("Built data pipelines", "Amazon Data Pipeline") == {"amazon data pipeline": "gap"}
+
+
+def test_the_longer_of_two_overlapping_names_wins_wherever_it_starts():
+    # Copilot review on #31: "Microsoft SQL Server Integration Services" kept the earlier
+    # "microsoft sql server" (0-20) and dropped SSIS's longer name (10-41).
+    assert _facts("Built SSIS packages", "Microsoft SQL Server Integration Services") == {
+        "sql server integration services": "matched"}
+    assert _facts("Microsoft SQL Server Integration Services", "SQL Server")["sql server"] == "gap"
+
+
+@pytest.mark.parametrize(("resume", "jd", "expected"), [
+    # Copilot review on #31: the idiom read as the testing library, on both sides.
+    ("Python", "Rest assured, we support your growth with Python", {"rest assured": "unresolvable", "python": "matched"}),
+    ("Rest assured, I deliver", "REST Assured", {"rest assured": "unresolvable"}),
+    ("API tests with RestAssured", "REST-assured API testing", {"rest assured": "matched"}),
+])
+def test_rest_assured_the_idiom_is_not_the_library(resume, jd, expected):
+    assert {k: v for k, v in _facts(resume, jd).items() if k in expected} == expected

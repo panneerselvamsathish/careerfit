@@ -5575,10 +5575,6 @@
   aliases: []
   ambiguous: false
   sources: [onet]
-"rest assured":
-  aliases: []
-  ambiguous: false
-  sources: [onet]
 "restructured extended executor rexx":
   aliases: []
   ambiguous: false
