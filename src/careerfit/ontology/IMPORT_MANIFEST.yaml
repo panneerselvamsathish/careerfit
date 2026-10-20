@@ -20,7 +20,7 @@ counts:
   alias_dropped_curated_collision: 1
   alias_dropped_job_title: 1
   alias_dropped_two_vendors: 10
-  dropped_by_override: 11
+  dropped_by_override: 12
   dropped_curated_collision: 39
   dropped_curated_vendor_form: 4
   dropped_esco_abstract: 12
@@ -30,7 +30,7 @@ counts:
   esco_not_knowledge: 745
   imported_aliases: 228
   imported_implications: 24
-  imported_skills: 1785
+  imported_skills: 1784
   merged_plural_duplicate: 2
   merged_vendor_duplicate: 4
   onet_distinct_examples: 8753
@@ -109,6 +109,7 @@ review:
   - amazon simple storage service s3
   - javascript framework
   - jenkins ci
+  - linkedin
   - microservices architecture
   - relational database management
   - restful api

@@ -507,3 +507,10 @@ def test_the_longer_of_two_overlapping_names_wins_wherever_it_starts():
 ])
 def test_rest_assured_the_idiom_is_not_the_library(resume, jd, expected):
     assert {k: v for k, v in _facts(resume, jd).items() if k in expected} == expected
+
+
+def test_linkedin_job_board_text_is_no_requirement():
+    # Precision sample 2026-10-20: all 5 "linkedin" mentions in the saved JDs were LinkedIn's own
+    # job-board text, so a JD pasted from LinkedIn demanded LinkedIn.
+    assert "linkedin" not in IMPORTED
+    assert _facts("Python", "Python\nPromoted by hirer · Responses managed off LinkedIn") == {"python": "matched"}

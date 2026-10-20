@@ -603,7 +603,7 @@ function render(payload) {
   const ambiguous = all.filter((o) => o.status === "unresolvable").length;
 
   const candidate = facts.perspective === "candidate";
-  $("title").textContent = candidate ? "Your fit for this job" : "Candidate against the job description";
+  $("title").textContent = candidate ? "Your resume against this job" : "Candidate against the job description";
   $("meta").textContent =
     `${candidate ? "Candidate" : "Hiring manager"} report · ${source(facts.resume_source)} compared with ${source(facts.jd_source)}` +
     (payload.jd_donated ? " · Job description donated, thank you" : "");
