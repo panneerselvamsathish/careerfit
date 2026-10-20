@@ -169,3 +169,13 @@ def test_a_requirement_about_pay_does_not_stop_counting():
     entry = SkillEntry(aliases=(), ambiguous=False)
     jd = "Requirements:\n- Compensation analysis experience\n- Salary benchmarking\n- Python"
     assert requirement_levels(jd, {"python": entry}) == {"python": "must"}
+
+
+def test_split_spans_keeps_the_longer_of_partly_overlapping_mentions():
+    from careerfit.analyze.matcher import _split_spans
+    from careerfit.analyze.mentions import Mention
+    found = [Mention(0, 20, "sql server", "microsoft sql server", True), Mention(10, 13, "sql", "sql", False),
+             Mention(10, 41, "ssis", "sql server integration services", True), Mention(45, 51, "python", "python", False)]
+    kept, nested = _split_spans(found)
+    assert kept == [(10, 41, "ssis"), (45, 51, "python")]
+    assert nested == [((0, 20, "sql server"), 0), ((10, 13, "sql"), 0)]

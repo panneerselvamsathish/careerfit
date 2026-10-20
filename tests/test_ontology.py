@@ -175,6 +175,8 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     ("financial services", "Experience with insurance, financial services, or other regulated industries", "found"),
     ("regulatory compliance", "Familiarity with AI safety practices, evaluation frameworks, monitoring, and regulatory compliance", "found"),
     ("sox compliance", "AI governance, SOX controls, audit logging", "found"),
+    ("relational database", "PostgreSQL or another relational database", "found"),
+    ("relational database", "Experience with an RDBMS such as Oracle", "found"),
     ("sox compliance", "Originated and led a SOX compliance initiative", "found"),
     # bare "sox" also names an audio tool and a baseball team (Copilot review on #24)
     ("sox compliance", "Built speech preprocessing pipelines using SoX", "absent"),
@@ -211,6 +213,9 @@ def test_load_ontology_rejects_bad_implications(tmp_path):
 
 def test_implications_run_from_the_specific_skill_to_the_broad_one():
     assert set(SKILLS["pl/sql"].implies) == {"sql", "backend development"}
+    # each is a relational database by definition, so "or another relational database" is met by it
+    for product in ("postgresql", "oracle database", "aurora", "rds"):
+        assert "relational database" in SKILLS[product].implies, product
     assert set(SKILLS["fastapi"].implies) == {"python", "backend development"}
     assert SKILLS["sql"].implies == ()  # SQL alone does not show back-end development
     assert SKILLS["aws"].implies == ("cloud computing",)  # AWS and Azure are cloud platforms by definition
@@ -300,6 +305,80 @@ def test_the_packaged_lists_load_together():
     from careerfit.analyze.ontology import IMPORTED_SKILLS, load_default_ontology
     assert IMPORTED_SKILLS.exists()
     curated_only = load_default_ontology(with_imported=False)
+    from careerfit.analyze.ontology import load_default_ontology
     merged = load_default_ontology()
     assert list(merged)[:len(curated_only)] == list(curated_only)  # curated skills first, unchanged
     assert all(merged[name] == curated_only[name] for name in curated_only)
+
+
+@pytest.mark.parametrize(("text", "expected"), [
+    # Copilot review on #31: "non-relational" asks for the opposite; the hyphen is a word boundary,
+    # so without the negation rule it was a mention of relational database.
+    ("Experience with non-relational databases (MongoDB, Cassandra)", "absent"),
+    ("Designed a non-relational database for events", "absent"),
+    ("Non‑relational database tuning", "absent"),                 # a non-breaking hyphen too
+    ("Relational databases and non-relational stores", "found"),       # the plain mention counts
+])
+def test_a_skill_right_after_non_is_not_a_mention(text, expected):
+    from careerfit.analyze.matcher import detect
+    assert detect("relational database", SKILLS["relational database"], text) == expected
+
+
+def test_non_negates_markers_too():
+    from careerfit.analyze.matcher import has_must_marker
+    assert has_must_marker("Kubernetes is required") and not has_must_marker("a non-required extra")
+
+
+def test_non_relational_in_either_document_is_no_relational_database():
+    # Copilot review on #31: both documents, singular and plural.
+    from datetime import datetime
+    from careerfit.analyze.observations import build_observations
+    from careerfit.facts.schema import Coverage, SkillStatus
+    coverage = Coverage(source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=1,
+                        known_blind_spots=())
+    def observed(resume, jd):
+        return {o.skill: o.status for o in build_observations(resume, coverage, jd, SKILLS, datetime(2026, 10, 19))}
+    assert "relational database" not in observed("MongoDB", "Requirements:\n- Experience with non-relational databases")
+    assert "relational database" not in observed("MongoDB", "Requirements:\n- A non-relational database background")
+    assert observed("Designed non-relational database schemas", "Requirements:\n- Relational database design")[
+        "relational database"] == SkillStatus.GAP
+    assert observed("Tuned non-relational databases", "Requirements:\n- Relational databases")[
+        "relational database"] == SkillStatus.GAP
+
+
+def test_a_negated_compound_still_masks_the_skill_inside_it():
+    # Copilot review on #31: "non-PL/SQL" names no PL/SQL, and its "SQL" must not count as SQL either.
+    from datetime import datetime
+    from careerfit.analyze.observations import build_observations
+    from careerfit.facts.schema import Coverage, SkillStatus
+    coverage = Coverage(source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=1,
+                        known_blind_spots=())
+    result = {o.skill: o.status for o in build_observations("Built non-PL/SQL tooling", coverage,
+                                                            "Requirements:\n- SQL", SKILLS, datetime(2026, 10, 19))}
+    assert result["sql"] == SkillStatus.GAP
+
+
+@pytest.mark.parametrize(("resume", "jd", "expected"), [
+    # Copilot review on #31: a negated term hid only its own name, so a skill inside it still
+    # matched: "non-Amazon RDS" required RDS, and "non-PL/SQL" required SQL.
+    ("PostgreSQL", "Requirements:\n- Experience with non-Amazon RDS databases", {"rds": None, "relational database": None}),
+    ("PostgreSQL", "Requirements:\n- Tuning non-PL/SQL databases", {"sql": None, "pl/sql": None}),
+    ("Migrated non-Amazon RDS stores", "Requirements:\n- RDS", {"rds": "gap"}),       # the resume side too
+    ("Ran non-Amazon RDS and RDS clusters", "Requirements:\n- RDS", {"rds": "matched"}),  # a separate mention counts
+    ("PostgreSQL", "Requirements:\n- Non-Amazon RDS or Amazon RDS", {"rds": "gap"}),
+])
+def test_nothing_inside_a_negated_term_is_a_mention(resume, jd, expected):
+    from datetime import datetime
+    from careerfit.analyze.observations import build_observations
+    from careerfit.facts.schema import Coverage
+    coverage = Coverage(source_format="txt", pages_total=None, pages_with_text=None, chars_extracted=1,
+                        known_blind_spots=())
+    result = {o.skill: o.status.value for o in build_observations(resume, coverage, jd, SKILLS, datetime(2026, 10, 19))}
+    assert {skill: result.get(skill) for skill in expected} == expected
+
+
+def test_a_negated_span_is_blanked_to_the_same_length():
+    text = "non-Amazon RDS, and RDS\nnon-PL/SQL"
+    blanked = SKILLS.index.without_negated(text)
+    assert len(blanked) == len(text) and blanked.splitlines()[1] == "non-      "
+    assert [m.term for m in SKILLS.index.find(text)] == ["rds"]

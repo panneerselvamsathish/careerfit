@@ -174,8 +174,11 @@ def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> di
     """Every place the JD mentions each skill, as (level, line, detection result), in document order."""
     found: dict[str, list[Occurrence]] = {}
     for level, line_no, clause in requirement_clauses(jd_text):
+        # Updated with the product (Copilot review on #31): a skill named only inside another
+        # skill's name ("SQL Server" in "SQL Server Integration Services") asks for nothing alone.
+        own = {skill for _start, _end, skill in _mention_spans(clause, ontology)[0]}
         for name, result in scan(clause, ontology).items():
-            if result != "absent":
+            if result != "absent" and name in own:
                 found.setdefault(name, []).append((level, line_no, result))
     return found
 
@@ -186,7 +189,9 @@ def requirement_occurrences(jd_text: str, ontology: dict[str, SkillEntry]) -> di
 # Anthropic API"); any other word ("Python or equivalent and Kubernetes", "... on Kubernetes")
 # keeps the two separate requirements, and so does anything else between two skills.
 # The comma is grouped with its own spaces, so no run of spaces can be split two ways (backtracking).
-_OR_JOIN = re.compile(r"\s*(,\s*)?(and/)?or\s+((a|an|the|applied|modern|similar|comparable|related)\s+){0,2}",
+# Updated with the product (Copilot review on #31, "MySQL or another relational database"): which
+# words may join alternatives is not the index's business, so the oracle follows it.
+_OR_JOIN = re.compile(r"\s*(,\s*)?(and/)?or\s+((a|an|the|another|other|any|applied|modern|similar|comparable|related)\s+){0,2}",
                       re.IGNORECASE)
 _COMMA_JOIN = re.compile(r"\s*,\s*")
 MAX_JOIN = 60  # characters: a longer stretch between two skills is never a plain "or" or comma
@@ -207,17 +212,19 @@ def _mention_spans(clause: str, ontology: dict[str, SkillEntry]) -> tuple[list[S
     Of two overlapping mentions the longer is kept; the other is nested in it, paired with the index
     of the kept mention it sits in: "SQL" inside "PL/SQL" is nested in PL/SQL's mention.
     """
-    spans = sorted(((m.start(), m.end(), name)
+    # Updated with the product (Copilot review on #31): the longer of two overlapping mentions is
+    # kept even when it starts later ("Microsoft SQL Server Integration Services" is SSIS).
+    spans = sorted({(m.start(), m.end(), name)
                     for name, entry in ontology.items() for term in (*entry.aliases, name)
-                    for m in mention_pattern(term).finditer(clause)),
-                   key=lambda span: (span[0], span[0] - span[1], span[2]))
+                    for m in mention_pattern(term).finditer(clause)},
+                   key=lambda span: (span[0] - span[1], span[0], span[2]))
     kept: list[Span] = []
-    nested: list[tuple[Span, int]] = []
     for span in spans:
-        if kept and span[0] < kept[-1][1]:
-            nested.append((span, len(kept) - 1))
-        else:
+        if not any(span[0] < k[1] and k[0] < span[1] for k in kept):
             kept.append(span)
+    kept.sort()
+    nested = [(span, next(i for i, k in enumerate(kept) if span[0] < k[1] and k[0] < span[1]))
+              for span in sorted(set(spans) - set(kept), key=lambda span: (span[0], span[0] - span[1], span[2]))]
     return kept, nested
 
 
@@ -298,7 +305,8 @@ def requirement_alternatives(jd_text: str, ontology: dict[str, SkillEntry]) -> d
     found: dict[str, list[frozenset[str]]] = {}
     for line_no, sentence, _clauses in requirement_sentences(jd_text):
         detected = {name for name, result in scan(sentence, ontology).items() if result != "absent"}
-        for name, others in mention_alternatives(sentence, ontology):
+        own = len(_mention_spans(sentence, ontology)[0])  # updated with the product, as above
+        for name, others in mention_alternatives(sentence, ontology)[:own]:
             if name in detected:
                 found.setdefault(name, []).append(others)
     return found

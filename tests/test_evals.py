@@ -48,7 +48,7 @@ def test_held_out_miss_is_reported_but_does_not_fail_the_run(tmp_path, capsys):
     assert harness.main(["--golden-dir", str(tmp_path)]) == 0
     out = " ".join(capsys.readouterr().out.split())
     assert "MISS python: expected gap/must, got gap/nice" in out
-    assert "held-out status 6/6 (100%) requirement 5/6 (83%)" in out
+    assert "held-out status 7/7 (100%) requirement 6/7 (85%)" in out  # frontend.yaml's 7 labels, one made wrong
 
 
 def test_harness_exits_nonzero_when_a_golden_expectation_is_wrong(tmp_path, capsys):
