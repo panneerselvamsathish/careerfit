@@ -118,17 +118,23 @@ def _heading_form(line: str) -> str:
     return " ".join(_LEADING_BULLET.sub("", dashes_as_hyphens(line)).strip().rstrip(":").split())
 
 
-# Equal-opportunity prose without a heading ("We hire without regard to race...") ends the requirements
-# the same way an "Equal Opportunity" heading does: what follows is legal text and benefits. Only a
-# long sentence that isn't a bullet counts, so "- Equal opportunity compliance reporting" (an HR
-# requirement) never stops the reading.
-_EEO_WORDS = re.compile(r"\b(equal (employment )?opportunit\w*|without regard to|affirmative action)\b", re.I)
-EEO_MIN_WORDS = 8
+# Two kinds of line that end the requirements the way a benefits or "Equal Opportunity" heading does:
+# what follows is legal text and benefits. Only the employer's own wording counts, never a topic a
+# requirement can be about: "You will run our affirmative action plan" (HR) or "evaluate candidates
+# fairly without regard to personal connections" must never stop the reading.
+_EEO_STATEMENT = re.compile(
+    r"\b(equal (employment )?opportunity employer|affirmative action employer"
+    r"|without regard to (race|colou?r|religion|sex|gender|age|national origin|disability|veteran))", re.I)
+# A call to apply ("Let us learn about you! Apply today.") comes after the requirements, never among them.
+_CALL_TO_APPLY = re.compile(r"\bapply (today|now)\b", re.I)
 
 
 def eeo_prose(line: str) -> bool:
-    return (_EEO_WORDS.search(line) is not None and len(line.split()) >= EEO_MIN_WORDS
-            and _LEADING_BULLET.match(dashes_as_hyphens(line)) is None)
+    return _EEO_STATEMENT.search(line) is not None
+
+
+def call_to_apply(line: str) -> bool:
+    return _CALL_TO_APPLY.search(line) is not None
 
 
 def requirement_section(line: str) -> Level | None:
@@ -192,8 +198,8 @@ def requirement_sentences(jd_text: str) -> Iterator[tuple[int, str, list[tuple[L
     jd_text = dashes_as_hyphens(jd_text)
     current: Literal["must", "nice"] = "must"
     counting = True  # off inside a benefits / equal-opportunity / pay section
-    # Without a requirements heading nothing could turn counting back on, so equal-opportunity prose
-    # at the top of such a JD is only skipped.
+    # Without a requirements heading nothing could turn counting back on, so an equal-opportunity
+    # statement or a call to apply at the top of such a JD is only skipped.
     has_heading = any(requirement_section(raw.strip()) for raw in jd_text.splitlines())
     for line_no, raw_line in enumerate(jd_text.splitlines(), start=1):
         line = raw_line.strip()
@@ -202,7 +208,7 @@ def requirement_sentences(jd_text: str) -> Iterator[tuple[int, str, list[tuple[L
         if stop_section(line):
             counting = False
             continue
-        if eeo_prose(line):
+        if eeo_prose(line) or call_to_apply(line):
             counting = counting and not has_heading
             continue
         level_here = heading_level(line)

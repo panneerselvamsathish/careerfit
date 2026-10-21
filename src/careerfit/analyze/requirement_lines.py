@@ -8,10 +8,10 @@ is less than half. The same function backs the dev tool `evals/ontology_coverage
 What counts as a requirement line:
 - Lines inside requirement sections ("Requirements", "What you'll bring"...). The preamble before
   the first such heading is skipped. A JD with no such heading at all is counted line by line.
-- Counting stops at a benefits, equal-opportunity or pay heading, at "About us", and at unheaded
-  equal-opportunity prose ("... without regard to race"), until the next requirements heading. In a
-  JD with no requirements heading there is nothing to reopen counting, so that prose line is only
-  skipped.
+- Counting stops at a benefits, equal-opportunity or pay heading, at "About us", at the employer's
+  equal-opportunity statement ("... without regard to race") and at a call to apply ("Apply
+  today"), until the next requirements heading, as in the product (matcher.requirement_sentences).
+  In a JD with no requirements heading nothing could reopen counting, so such a line is only skipped.
 - Not headings: a non-bullet line ending in ":" or of fewer than 3 words. A short Title Case line
   with no sentence punctuation ("What We Value") is a heading too, unless it names a known skill.
 - Not logistics: travel, work authorization and sponsorship, relocation, pay, "apply today". They
@@ -26,7 +26,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from careerfit.analyze.matcher import eeo_prose, requirement_section, scan_present, stop_section
+from careerfit.analyze.matcher import call_to_apply, eeo_prose, requirement_section, scan_present, stop_section
 from careerfit.analyze.mentions import dashes_as_hyphens
 from careerfit.analyze.ontology import SkillEntry, index_of
 
@@ -38,7 +38,7 @@ MIN_WORDS = 3  # a shorter line that isn't a bullet is a title or a fragment
 TITLE_MAX_WORDS = 4  # "What We Value": a short Title Case line without punctuation is a heading
 LOGISTICS = re.compile(
     r"\b(travel(l?ing)?|sponsor(ship)?|visas?|citizen(ship)?|authori[sz]ed to work|work authori[sz]ation"
-    r"|relocat\w*|salary|pay range|apply (now|today|here))\b|\$\s?\d",
+    r"|relocat\w*|salary|pay range|apply here)\b|\$\s?\d",
     re.I,
 )
 
@@ -82,7 +82,7 @@ def requirement_lines(jd_text: str, ontology: Mapping[str, SkillEntry]) -> Requi
         if _stop_heading(text):
             inside = False
             continue
-        if eeo_prose(text):
+        if eeo_prose(text) or call_to_apply(text):
             inside = inside and not sections_found  # no heading could reopen counting
             continue
         if requirement_section(text):

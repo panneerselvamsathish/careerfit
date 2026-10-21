@@ -113,7 +113,8 @@ The summary first says how much of the job description careerfit could read: "Th
 read 8 of 22 requirement lines (36%)". A requirement line that names no skill careerfit knows is not
 checked at all, so below half the result also says it shows only part of what the job asks for.
 Headings, travel, work authorization, pay and benefits lines are not counted (`analyze/requirement_lines.py`;
-`evals.ontology_coverage` lists the lines).
+`evals.ontology_coverage` lists the lines). The count starts at the first requirements heading, so a
+skill named only before it (in the role overview, say) is in the report but not in the count.
 
 Every skill the job description mentions gets one status and whether the JD treats it as
 **must** or **nice** to have. Each result cites the JD line that decided it; results where the

@@ -192,6 +192,13 @@ def test_split_spans_keeps_the_longer_of_partly_overlapping_mentions():
     # With no requirements heading nothing could reopen the reading, so the prose is only skipped.
     ("We are an equal opportunity employer and we value every applicant.\nWe need Python engineers\n"
      "Kubernetes experience is a plus", ["kubernetes", "python"]),
+    # Review of #35: HR and compliance requirements written as sentences, not bullets, must not stop it.
+    ("Requirements\nFive years of HR compliance experience using Python in a large enterprise\n"
+     "You will run our affirmative action plan and EEO-1 reporting across all sites\n"
+     "Ability to evaluate candidates fairly without regard to personal connections\n"
+     "Advanced Kubernetes skills for workforce analytics and reporting", ["kubernetes", "python"]),
+    # A call to apply ends the requirements too ("Let us learn about you! Apply today.").
+    ("Requirements\n- Python\nLet us learn about you! Apply today.\nKubernetes benefits for everyone", ["python"]),
     # A later requirements heading reopens it, as after a benefits heading.
     ("We are an equal opportunity employer and we value every applicant here.\nRequirements\n- Python", ["python"]),
 ])

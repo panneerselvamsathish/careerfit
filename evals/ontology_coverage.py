@@ -12,16 +12,17 @@ Dev-time tool: it never runs in the product and makes no network or LLM calls.
 
 import argparse
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
-from careerfit.analyze.ontology import load_default_ontology, load_ontology
+from careerfit.analyze.ontology import SkillEntry, load_default_ontology, load_ontology
 from careerfit.analyze.requirement_lines import RequirementLines, requirement_lines
 from careerfit.ingest.document import read_document
 
 DEFAULT_ONTOLOGY = Path(__file__).parent.parent / "src" / "careerfit" / "ontology" / "skills.yaml"
 
 
-def coverage(jd_text, ontology) -> RequirementLines:
+def coverage(jd_text: str, ontology: Mapping[str, SkillEntry]) -> RequirementLines:
     """The product's own count (analyze/requirement_lines.py), so the tool measures what users see."""
     return requirement_lines(jd_text, ontology)
 
