@@ -1,0 +1,35 @@
+# Real requirement lines that must never stop the matcher reading the JD.
+# evals/stop_probe.py puts each one inside a requirements section, as a bullet and as a sentence,
+# and checks that the requirement after it is still read. One line per requirement; "#" starts a
+# comment. Don't name python here: the probe uses it as the requirement that must survive.
+
+# HR, recruiting and compliance roles (review of #35: a stop rule on these words dropped the rest)
+You will run our affirmative action plan and EEO-1 reporting across all sites
+Experience designing equal opportunity programs for a global workforce of 20,000
+Ability to evaluate candidates fairly without regard to personal connections or referrals
+Knowledge of equal employment opportunity law and OFCCP audits
+Partner with legal on affirmative action compliance and pay equity reviews
+Commitment to diversity, equity and inclusion in every hiring decision
+Train hiring managers to interview without bias and document their decisions
+
+# "apply" inside a requirement (review of #35: "apply today" ended the requirements)
+Ability to apply today's security best practices to our cloud estate
+Skills you can apply now and keep growing over time
+Apply machine learning to fraud detection at scale
+Eagerness to apply new tools to everyday problems
+
+# Benefits, perks and pay words inside a requirement
+Benefits administration experience with self-funded medical plans
+Compensation analysis experience across sales and engineering
+Experience running payroll for 2,000 employees in three states
+Experience building perks and rewards platforms for retail customers
+Built a salary benchmarking tool used by 500 recruiters
+Own the pay-per-click budget for our paid search campaigns
+Experience with disclaimer and consent flows in mobile apps
+
+# Logistics and company words inside a requirement
+Manage relocation packages and visa sponsorship cases for new hires
+Willingness to travel to customer sites up to 25% of the time
+Your journey with each customer matters: you own outcomes end to end
+Life at sea experience for offshore platform engineers and crews
+What we offer clients: clear, honest reporting every single week
