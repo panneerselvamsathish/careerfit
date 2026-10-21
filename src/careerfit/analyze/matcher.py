@@ -126,15 +126,22 @@ _EEO_STATEMENT = re.compile(
     r"\b(equal (employment )?opportunity employer|affirmative action employer"
     r"|without regard to (race|colou?r|religion|sex|gender|age|national origin|disability|veteran))", re.I)
 # A call to apply ("Let us learn about you! Apply today.") comes after the requirements, never among them.
-_CALL_TO_APPLY = re.compile(r"\bapply (today|now)\b", re.I)
+# Only a sentence that opens with it: "apply today's security best practices" is a requirement.
+_CALL_TO_APPLY = re.compile(r"(?:^|[.!?]\s+)apply (today|now)\b(?!['\u2019])", re.I)
+
+
+def _not_a_bullet(line: str) -> bool:
+    # The employer's own text is never a bullet; "- Ensure hiring decisions are made without regard to
+    # race" is a recruiter's requirement.
+    return _LEADING_BULLET.match(dashes_as_hyphens(line)) is None
 
 
 def eeo_prose(line: str) -> bool:
-    return _EEO_STATEMENT.search(line) is not None
+    return _not_a_bullet(line) and _EEO_STATEMENT.search(line) is not None
 
 
 def call_to_apply(line: str) -> bool:
-    return _CALL_TO_APPLY.search(line) is not None
+    return _not_a_bullet(line) and _CALL_TO_APPLY.search(line) is not None
 
 
 def requirement_section(line: str) -> Level | None:

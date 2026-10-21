@@ -197,12 +197,20 @@ def test_split_spans_keeps_the_longer_of_partly_overlapping_mentions():
      "You will run our affirmative action plan and EEO-1 reporting across all sites\n"
      "Ability to evaluate candidates fairly without regard to personal connections\n"
      "Advanced Kubernetes skills for workforce analytics and reporting", ["kubernetes", "python"]),
+    # Review of #35: "apply today's" and "apply now" inside a requirement, or the EEO wording in a
+    # recruiter's bullet, must not stop it.
+    ("Requirements\n- Python services in production\n- Ability to apply today's security best practices to our AWS "
+     "estate\n- Kubernetes in production\n- Skills you can apply now and grow over time\n"
+     "- Ensure hiring decisions are made without regard to race, gender or age\n- Terraform modules",
+     ["aws", "kubernetes", "python", "terraform"]),
+    ("Requirements\nPython services you can apply now in production work\nKubernetes clusters at scale", ["kubernetes", "python"]),
     # A call to apply ends the requirements too ("Let us learn about you! Apply today.").
     ("Requirements\n- Python\nLet us learn about you! Apply today.\nKubernetes benefits for everyone", ["python"]),
+    ("Requirements\n- Python\nApply today and join us!\nKubernetes benefits for everyone", ["python"]),
     # A later requirements heading reopens it, as after a benefits heading.
     ("We are an equal opportunity employer and we value every applicant here.\nRequirements\n- Python", ["python"]),
 ])
 def test_unheaded_equal_opportunity_prose_ends_the_requirements(jd, expected):
     from careerfit.analyze.matcher import requirement_evidence
-    skills = {n: SkillEntry(aliases=(), ambiguous=False) for n in ('python', 'kubernetes')}
+    skills = {n: SkillEntry(aliases=(), ambiguous=False) for n in ('python', 'kubernetes', 'aws', 'terraform')}
     assert sorted(requirement_evidence(jd, skills)) == expected

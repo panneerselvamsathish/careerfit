@@ -133,7 +133,8 @@ Occurrence = tuple[Literal["must", "nice"], int, Literal["found", "unclear"]]
 _EEO_STATEMENT = re.compile(
     r"\b(equal (employment )?opportunity employer|affirmative action employer"
     r"|without regard to (race|colou?r|religion|sex|gender|age|national origin|disability|veteran))", re.I)
-_CALL_TO_APPLY = re.compile(r"\bapply (today|now)\b", re.I)
+_CALL_TO_APPLY = re.compile(r"(?:^|[.!?]\s+)apply (today|now)\b(?!['\u2019])", re.I)
+_BULLET = re.compile(r"^\s*([-\u2022*\u25aa\u25cf]|\d+[.)])\s+")
 
 
 def requirement_sentences(jd_text: str) -> Iterator[tuple[int, str, list[tuple[Level, str]]]]:
@@ -151,7 +152,7 @@ def requirement_sentences(jd_text: str) -> Iterator[tuple[int, str, list[tuple[L
         if stop_section(line):
             counting = False
             continue
-        if _EEO_STATEMENT.search(line) or _CALL_TO_APPLY.search(line):
+        if not _BULLET.match(line) and (_EEO_STATEMENT.search(line) or _CALL_TO_APPLY.search(line)):
             counting = counting and not has_heading
             continue
         level_here = heading_level(line)
