@@ -179,3 +179,38 @@ def test_split_spans_keeps_the_longer_of_partly_overlapping_mentions():
     kept, nested = _split_spans(found)
     assert kept == [(10, 41, "ssis"), (45, 51, "python")]
     assert nested == [((0, 20, "sql server"), 0), ((10, 13, "sql"), 0)]
+
+
+@pytest.mark.parametrize(("jd", "expected"), [
+    # Review of #35: the product kept reading after unheaded equal-opportunity prose, so a skill in
+    # the legal or benefits text below it became a requirement.
+    ("Requirements\n- Python\nWe hire without regard to race, religion, gender identity or age.\n- Kubernetes perks",
+     ["python"]),
+    # A bullet (an HR requirement) never stops the reading, and neither does a short line.
+    ("Requirements\n- Equal opportunity compliance reporting in Python for our hiring teams\n- Kubernetes",
+     ["kubernetes", "python"]),
+    # With no requirements heading nothing could reopen the reading, so the prose is only skipped.
+    ("We are an equal opportunity employer and we value every applicant.\nWe need Python engineers\n"
+     "Kubernetes experience is a plus", ["kubernetes", "python"]),
+    # Review of #35: HR and compliance requirements written as sentences, not bullets, must not stop it.
+    ("Requirements\nFive years of HR compliance experience using Python in a large enterprise\n"
+     "You will run our affirmative action plan and EEO-1 reporting across all sites\n"
+     "Ability to evaluate candidates fairly without regard to personal connections\n"
+     "Advanced Kubernetes skills for workforce analytics and reporting", ["kubernetes", "python"]),
+    # Review of #35: "apply today's" and "apply now" inside a requirement, or the EEO wording in a
+    # recruiter's bullet, must not stop it.
+    ("Requirements\n- Python services in production\n- Ability to apply today's security best practices to our AWS "
+     "estate\n- Kubernetes in production\n- Skills you can apply now and grow over time\n"
+     "- Ensure hiring decisions are made without regard to race, gender or age\n- Terraform modules",
+     ["aws", "kubernetes", "python", "terraform"]),
+    ("Requirements\nPython services you can apply now in production work\nKubernetes clusters at scale", ["kubernetes", "python"]),
+    # A call to apply ends the requirements too ("Let us learn about you! Apply today.").
+    ("Requirements\n- Python\nLet us learn about you! Apply today.\nKubernetes benefits for everyone", ["python"]),
+    ("Requirements\n- Python\nApply today and join us!\nKubernetes benefits for everyone", ["python"]),
+    # A later requirements heading reopens it, as after a benefits heading.
+    ("We are an equal opportunity employer and we value every applicant here.\nRequirements\n- Python", ["python"]),
+])
+def test_unheaded_equal_opportunity_prose_ends_the_requirements(jd, expected):
+    from careerfit.analyze.matcher import requirement_evidence
+    skills = {n: SkillEntry(aliases=(), ambiguous=False) for n in ('python', 'kubernetes', 'aws', 'terraform')}
+    assert sorted(requirement_evidence(jd, skills)) == expected

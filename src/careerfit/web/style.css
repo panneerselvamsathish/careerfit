@@ -274,6 +274,8 @@ a:hover { color: var(--teal-hover); }
 #title { font-size: 1.625rem; font-weight: 700; line-height: 1.25; }
 #title:focus:not(:focus-visible) { outline: none; }
 .results-meta { margin-top: 4px; color: var(--muted); overflow-wrap: anywhere; }
+.coverage { margin: 12px 0 0; color: var(--muted); }
+.coverage.low { padding: 10px 14px; border-radius: 8px; color: var(--warn); background: var(--warn-bg); font-weight: 600; }
 .downloads { display: flex; flex-wrap: wrap; gap: 8px; }
 .button-secondary {
   display: inline-flex;

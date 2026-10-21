@@ -130,18 +130,30 @@ def clauses(sentence: str) -> list[str]:
 
 Occurrence = tuple[Literal["must", "nice"], int, Literal["found", "unclear"]]
 
+_EEO_STATEMENT = re.compile(
+    r"\b(equal (employment )?opportunity employer|affirmative action employer"
+    r"|without regard to (race|colou?r|religion|sex|gender|age|national origin|disability|veteran))", re.I)
+_CALL_TO_APPLY = re.compile(r"(?:^|[.!?]\s+)apply (today|now)\b(?!['\u2019])", re.I)
+_BULLET = re.compile(r"^\s*([-\u2022*\u25aa\u25cf]|\d+[.)])\s+")
+
 
 def requirement_sentences(jd_text: str) -> Iterator[tuple[int, str, list[tuple[Level, str]]]]:
     """Every sentence of the JD that can hold a requirement, as (line, sentence, its clauses with their
     levels), in document order. A sentence mixing a must and a nice marker is split into clauses."""
     current: Literal["must", "nice"] = "must"
     counting = True  # off inside a benefits / equal-opportunity / pay section
+    # Updated with the product (review of #35): the employer's equal-opportunity statement and a call
+    # to apply end the requirements. A copy of the rule, so the differential test checks it.
+    has_heading = any(requirement_section(raw.strip()) for raw in jd_text.splitlines())
     for line_no, raw_line in enumerate(jd_text.splitlines(), start=1):
         line = raw_line.strip()
         if not line:
             continue
         if stop_section(line):
             counting = False
+            continue
+        if not _BULLET.match(line) and (_EEO_STATEMENT.search(line) or _CALL_TO_APPLY.search(line)):
+            counting = counting and not has_heading
             continue
         level_here = heading_level(line)
         if level_here is not None:

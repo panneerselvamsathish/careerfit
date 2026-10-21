@@ -6,7 +6,9 @@ from careerfit.analyze.matcher import (_split_spans, boundary_pattern, decide_st
                                       requirement_alternatives, requirement_evidence)
 from careerfit.analyze.mentions import dashes_as_hyphens
 from careerfit.analyze.ontology import SkillEntry, implied_by_of, index_of
-from careerfit.facts.schema import Coverage, GapAnalysisFacts, Provenance, SkillObservation, SkillStatus
+from careerfit.analyze.requirement_lines import requirement_lines
+from careerfit.facts.schema import (Coverage, GapAnalysisFacts, Provenance, RequirementLineCount, SkillObservation,
+                                    SkillStatus)
 
 # What a matched alternative can stand in for: a skill the resume doesn't show, can't be read for,
 # or shows only partly (half credit would mark down a requirement the alternative fully meets).
@@ -159,6 +161,7 @@ def build_facts(
     at: datetime,
     perspective: Literal["candidate", "hiring_manager"],
 ) -> GapAnalysisFacts:
+    lines = requirement_lines(jd_text, ontology)
     return GapAnalysisFacts(
         resume_source=resume_source,
         jd_source=jd_source,
@@ -166,6 +169,7 @@ def build_facts(
         jd_coverage=jd_coverage,
         analyzed_at=at,
         llm_used=False,
+        jd_requirement_lines=RequirementLineCount(read=len(lines.read), total=lines.total),
         skill_observations=build_observations(resume_text, resume_coverage, jd_text, ontology, at),
         perspective=perspective,
     )

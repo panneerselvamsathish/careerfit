@@ -123,6 +123,14 @@ a conclusion from UNRESOLVABLE — it must say "ambiguous" and defer to judge/.
 after LLM semantic analysis. When `llm_used=False`, confidence is always None.
 An honesty invariant in `evals/invariants.py` enforces this.
 
+### Requirement-line coverage (schema 0.7.0)
+
+`GapAnalysisFacts.jd_requirement_lines` (`RequirementLineCount {read, total}`, `read ≤ total`) says how
+many of the JD's requirement lines name a skill careerfit knows. `analyze/requirement_lines.py`
+counts it (pure; `evals/ontology_coverage.py` calls the same function); `build_facts` sets it. The
+report summary and first blind-spot note show it, with a warning below 50% (`report/shared.py`
+`LOW_COVERAGE`, mirrored in `web/app.js`). `None` only on facts written before 0.7.0.
+
 ### Prompt versioning
 
 Prompts live as YAML files in `judge/prompts/`, not string literals in code.

@@ -54,8 +54,10 @@ def test_analyze_returns_the_same_facts_as_the_cli(client):
 def test_analyze_returns_the_report_and_plain_text_blind_spots(client):
     body = analyze(client).json()
     assert body["report_markdown"].startswith("# ")
-    assert body["blind_spots"][0] == ("Only skills in careerfit's skill list were checked. "
-                                      "Anything else the job asks for is not shown here.")
+    assert body["blind_spots"][0] == ("careerfit's skill list could read 9 of 9 requirement lines (100%) in the job "
+                                      "description. Only skills in its list were checked; anything else the job asks "
+                                      "for is not shown here.")
+    assert body["facts"]["jd_requirement_lines"] == {"read": 9, "total": 9}
     # Plain text for textContent, so no Markdown escaping
     assert "2 skill(s) could not be decided from keywords alone (go, react). Run with --deep to have Claude settle them." \
         in body["blind_spots"]

@@ -100,6 +100,22 @@ class Coverage(BaseModel):
             if self.pages_with_text > self.pages_total:
                 raise ValueError("pages_with_text cannot be greater than pages_total")
         return self
+class RequirementLineCount(BaseModel):
+    """How many of the JD's requirement lines name at least one skill careerfit knows. The rest it
+    could not read at all, so the result covers only part of what the job asks for."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    read: int = Field(ge=0)
+    total: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def check_read(self) -> "RequirementLineCount":
+        if self.read > self.total:
+            raise ValueError("read cannot be greater than total")
+        return self
+
+
 class JudgeRun(BaseModel):
     """Audit record of an LLM judge pass: what ran, and what it could not do."""
 
@@ -123,7 +139,9 @@ class GapAnalysisFacts(BaseModel):
     llm_used: bool
     # 0.5.0: Provenance.via for skills shown through another skill
     # 0.6.0: alternative_met status and alternative evidence for either/or requirements
-    schema_version: str = "0.6.0"
+    # 0.7.0: jd_requirement_lines, how much of the JD the skill list could read
+    schema_version: str = "0.7.0"
+    jd_requirement_lines: RequirementLineCount | None = None
     fit_score: FitScore | None = None
     judge: JudgeRun | None = None
     skill_observations: tuple[SkillObservation, ...]
