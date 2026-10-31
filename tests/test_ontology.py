@@ -195,6 +195,19 @@ def test_skill_names_are_lowercase_and_aliases_are_not_repeated():
     ("software engineering", "**Lead Software Engineer**", "found"),
     # the plural names colleagues, not a skill the JD asks for
     ("software engineering", "Partner with product managers and software engineers", "absent"),
+    # from the Thomson Reuters Staff Software Engineer - AI II JD (2026-10-31)
+    ("graphrag", "combining graphs with LLMs through approaches such as GraphRAG and entity extraction", "found"),
+    ("graphrag", "Built a graph RAG pipeline over case law", "found"),
+    ("graph database", "graph databases (e.g., Neo4j, Amazon Neptune)", "found"),
+    ("neo4j", "graph databases (e.g., Neo4j, Amazon Neptune)", "found"),
+    ("amazon neptune", "graph databases (e.g., Neo4j, Amazon Neptune)", "found"),
+    ("amazon neptune", "Mission telemetry from the Neptune flyby", "absent"),
+    ("ontology", "graph data modeling, ontologies and taxonomies", "found"),
+    ("ontology", "Designed careerfit's skills ontology", "found"),
+    ("taxonomy", "graph data modeling, ontologies and taxonomies", "found"),
+    ("entity extraction", "combining graphs with LLMs through approaches such as GraphRAG and entity extraction", "found"),
+    ("entity extraction", "Trained named entity recognition models for contracts", "found"),
+    ("llmops", "champion MLOps and LLMOps practices and governance", "found"),
 ])
 def test_new_skills_detect_as_intended(skill, text, expected):
     from careerfit.analyze.matcher import detect
@@ -225,6 +238,9 @@ def test_implications_run_from_the_specific_skill_to_the_broad_one():
     assert SKILLS["sox compliance"].implies == ("regulatory compliance",)
     assert SKILLS["spring ai"].implies == SKILLS["langchain4j"].implies == ("java",)
     assert SKILLS["embabel"].implies == ()  # JVM, but Kotlin or Java
+    assert set(SKILLS["graphrag"].implies) == {"retrieval", "knowledge graph"}
+    assert SKILLS["neo4j"].implies == SKILLS["amazon neptune"].implies == ("graph database",)
+    assert SKILLS["graph database"].implies == SKILLS["knowledge graph"].implies == ()
 
 
 def test_sox_the_tool_or_the_team_shows_no_compliance_even_through_implication():

@@ -4399,10 +4399,6 @@
   aliases: []
   ambiguous: false
   sources: [onet]
-"neo4j":
-  aliases: []
-  ambiguous: false
-  sources: [onet]
 "nessus":
   aliases: []
   ambiguous: false

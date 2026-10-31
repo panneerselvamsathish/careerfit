@@ -792,3 +792,45 @@ conversational ai:
   # work-from-home contact-center agents (Copilot review on #24).
   aliases: ["intelligent assistants", "intelligent assistant", "conversational assistants", "chatbot", "chatbots"]
   ambiguous: false
+
+# ---- Added 2026-10-31 from the Thomson Reuters "Staff Software Engineer - AI II" (Westlaw) JD,
+# now development data. ----
+
+# Knowledge graphs: GraphRAG is retrieval-augmented generation over a knowledge graph, by definition.
+graphrag:
+  aliases: ["graph rag", "graph-rag"]
+  ambiguous: false
+  implies: [retrieval, knowledge graph]
+
+graph database:
+  aliases: ["graph databases", "graph db", "graph dbs"]
+  ambiguous: false
+
+# Curated here so it implies graph database; the imported entry is ignored.
+neo4j:
+  aliases: []
+  ambiguous: false
+  implies: [graph database]
+
+# No bare "neptune": the planet.
+amazon neptune:
+  aliases: ["aws neptune"]
+  ambiguous: false
+  implies: [graph database]
+
+ontology:
+  aliases: ["ontologies"]
+  ambiguous: false
+
+taxonomy:
+  aliases: ["taxonomies"]
+  ambiguous: false
+
+# No bare "ner": also a surname, and too short to be conclusive.
+entity extraction:
+  aliases: ["named entity recognition", "named-entity recognition", "entity recognition"]
+  ambiguous: false
+
+llmops:
+  aliases: ["llm ops"]
+  ambiguous: false
